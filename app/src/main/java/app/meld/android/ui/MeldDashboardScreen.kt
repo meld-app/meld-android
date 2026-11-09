@@ -589,7 +589,10 @@ private fun MeldOutputPreviewCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
                         contentDescription = null,
@@ -597,11 +600,13 @@ private fun MeldOutputPreviewCard(
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = result.outputFile.name,
                             style = MaterialTheme.typography.titleMedium,
-                            color = MeldColors.TextPrimary
+                            color = MeldColors.TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             text = "${SelectedFileInfo.formatByteCount(result.outputSizeBytes)} • Completed in ${result.durationMs} ms",
@@ -610,6 +615,7 @@ private fun MeldOutputPreviewCard(
                         )
                     }
                 }
+                Spacer(modifier = Modifier.width(10.dp))
 
                 Button(
                     onClick = onShareResult,
