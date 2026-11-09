@@ -140,8 +140,9 @@ class MeldViewModel : ViewModel() {
                 it.copy(
                     isProcessing = false,
                     selectedFile = info,
+                    selectedCategory = matchingTool.category,
                     selectedTool = matchingTool,
-                    statusMessage = "Staged ${info.displayName} (${info.formattedSize})"
+                    statusMessage = "Staged ${info.displayName} (${info.formattedSize}) • Ready for ${matchingTool.title}"
                 )
             }
         }
