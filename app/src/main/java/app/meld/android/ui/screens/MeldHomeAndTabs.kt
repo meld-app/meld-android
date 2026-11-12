@@ -2,6 +2,7 @@ package app.meld.android.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -77,10 +78,12 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -103,6 +106,8 @@ import app.meld.android.ui.components.TactileChipPill
 import app.meld.android.ui.components.TactileCircleIconButton
 import app.meld.android.ui.components.WorkingDocumentIllustration
 import app.meld.android.ui.theme.MeldColors
+import app.meld.android.ui.theme.MeldMotion
+import app.meld.android.ui.theme.rememberReduceMotion
 import java.io.File
 import java.util.Calendar
 import kotlin.math.hypot
@@ -311,7 +316,7 @@ fun MeldStudioHomeScreen(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = file?.formattedMetaLine ?: "Tap Change file to pick one",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
                                 color = MeldColors.InkBlack.copy(alpha = 0.85f)
                             )
                             Spacer(modifier = Modifier.height(14.dp))
@@ -576,7 +581,7 @@ fun MeldStudioHomeScreen(
                             )
                             Text(
                                 text = "${SelectedFileInfo.formatByteCount(latest.outputSizeBytes)} · just now",
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
                                 color = MeldColors.TextSecondary
                             )
                         }
@@ -720,8 +725,46 @@ fun MeldAllToolsScreen(
 
         // 2-Column Tactile Action Grid
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                filtered.chunked(2).forEachIndexed { rowIdx, pair ->
+            Column(
+                modifier = Modifier.animateContentSize(animationSpec = MeldMotion.snapSpring()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (filtered.isEmpty()) {
+                    TactileCard(
+                        backgroundColor = MeldColors.PureWhite,
+                        cornerRadius = MeldColors.CardCorner,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                text = "No matching tools",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MeldColors.InkBlack
+                            )
+                            Text(
+                                text = "Try another keyword or clear your filters.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MeldColors.TextSecondary
+                            )
+                            TactileChipPill(
+                                label = "Reset filters",
+                                selected = true,
+                                onClick = {
+                                    onSelectMode(MeldMode.ALL)
+                                    onSelectCategory(MeldCategory.ALL)
+                                    onSearchChange("")
+                                }
+                            )
+                        }
+                    }
+                } else {
+                    filtered.chunked(2).forEachIndexed { rowIdx, pair ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -793,6 +836,7 @@ fun MeldAllToolsScreen(
                             Spacer(modifier = Modifier.weight(1f))
                         }
                     }
+                }
                 }
             }
         }
@@ -1008,6 +1052,8 @@ fun MeldFloatingBottomDock(
     modifier: Modifier = Modifier
 ) {
     val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+    val reduceMotion = rememberReduceMotion()
     val slide90Px = with(density) { 90.dp.toPx() }
     val dockT = if (!openingDriver.showOverlay) 1f else openingDriver.navDockAnim.value
 
@@ -1040,22 +1086,24 @@ fun MeldFloatingBottomDock(
                 val selected = tab == activeTab
                 val pillBg by animateColorAsState(
                     targetValue = if (selected) MeldColors.CoralOrange else Color.Transparent,
-                    animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                    animationSpec = MeldMotion.snapSpring(),
                     label = "dockPillBg"
                 )
                 val iconScale by animateFloatAsState(
-                    targetValue = if (selected) 1.08f else 1f,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    ),
+                    targetValue = if (reduceMotion) 1f else if (selected) 1.06f else 1f,
+                    animationSpec = MeldMotion.popSpring(),
                     label = "dockIconScale"
                 )
 
                 Surface(
                     modifier = Modifier
                         .clip(CircleShape)
-                        .clickable { onSelectTab(tab) },
+                        .clickable {
+                            if (tab != activeTab) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onSelectTab(tab)
+                            }
+                        },
                     shape = CircleShape,
                     color = pillBg
                 ) {
