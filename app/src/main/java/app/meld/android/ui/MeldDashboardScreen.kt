@@ -1,6 +1,10 @@
 package app.meld.android.ui
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -27,23 +31,38 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Compress
+import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.HideImage
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material.icons.filled.Transform
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -63,7 +82,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -73,6 +91,7 @@ import androidx.compose.ui.unit.sp
 import app.meld.android.R
 import app.meld.android.model.ConversionResult
 import app.meld.android.model.MeldCategory
+import app.meld.android.model.MeldMode
 import app.meld.android.model.MeldToolId
 import app.meld.android.model.SelectedFileInfo
 import app.meld.android.ui.theme.MeldColors
@@ -81,6 +100,7 @@ import java.io.File
 @Composable
 fun MeldDashboardScreen(
     uiState: MeldUiState,
+    onSelectMode: (MeldMode) -> Unit,
     onSelectCategory: (MeldCategory) -> Unit,
     onSelectTool: (MeldToolId) -> Unit,
     onPickFile: () -> Unit,
@@ -88,13 +108,17 @@ fun MeldDashboardScreen(
     onRunTool: () -> Unit,
     onShareResult: (File) -> Unit,
     onUpdateTargetKb: (Int) -> Unit,
+    onUpdateResizePercent: (Int) -> Unit,
+    onToggleStudioFrame: (Boolean) -> Unit,
     onUpdateStampText: (String) -> Unit,
     onUpdateHandoutMode: (Int) -> Unit,
-    onUpdateQrPayload: (String) -> Unit
+    onUpdateQrPayload: (String) -> Unit,
+    onUpdatePageRange: (Int, Int) -> Unit
 ) {
-    val visibleTools = remember(uiState.selectedCategory) {
-        MeldToolId.entries.filter {
-            uiState.selectedCategory == MeldCategory.ALL || it.category == uiState.selectedCategory
+    val visibleTools = remember(uiState.selectedMode, uiState.selectedCategory) {
+        MeldToolId.entries.filter { tool ->
+            (uiState.selectedMode == MeldMode.ALL || tool.mode == uiState.selectedMode) &&
+                (uiState.selectedCategory == MeldCategory.ALL || tool.category == uiState.selectedCategory)
         }
     }
 
@@ -108,7 +132,7 @@ fun MeldDashboardScreen(
                 .statusBarsPadding()
                 .navigationBarsPadding(),
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // 1. MELD Brand Header
             item {
@@ -126,7 +150,15 @@ fun MeldDashboardScreen(
                 )
             }
 
-            // 3. Category Filter Strip
+            // 3. MELD Mode Toggle (ALL / ⇧ CONVERT / ⌘ TOOLS)
+            item {
+                MeldModeSelectorBar(
+                    selectedMode = uiState.selectedMode,
+                    onSelectMode = onSelectMode
+                )
+            }
+
+            // 4. Category Filter Strip
             item {
                 MeldCategoryFilterStrip(
                     selectedCategory = uiState.selectedCategory,
@@ -134,7 +166,7 @@ fun MeldDashboardScreen(
                 )
             }
 
-            // 4. Active Tool Inspector & Parameter Controls
+            // 5. Active Tool Inspector & Parameter Controls
             item {
                 MeldActiveToolWorkbench(
                     tool = uiState.selectedTool,
@@ -142,13 +174,16 @@ fun MeldDashboardScreen(
                     isProcessing = uiState.isProcessing,
                     onRunTool = onRunTool,
                     onUpdateTargetKb = onUpdateTargetKb,
+                    onUpdateResizePercent = onUpdateResizePercent,
+                    onToggleStudioFrame = onToggleStudioFrame,
                     onUpdateStampText = onUpdateStampText,
                     onUpdateHandoutMode = onUpdateHandoutMode,
-                    onUpdateQrPayload = onUpdateQrPayload
+                    onUpdateQrPayload = onUpdateQrPayload,
+                    onUpdatePageRange = onUpdatePageRange
                 )
             }
 
-            // 5. Live Output Preview Card (when available)
+            // 6. Live Output Preview Card (Images, PDF Page 1 Thumbnail, JSON/MD/HTML/TXT)
             item {
                 AnimatedVisibility(visible = uiState.lastResult != null) {
                     uiState.lastResult?.let { result ->
@@ -160,10 +195,10 @@ fun MeldDashboardScreen(
                 }
             }
 
-            // 6. All Tools Grid (2-column radial studio explorer feel)
+            // 7. All Tools & Conversions Grid
             item {
                 Text(
-                    text = "STUDIO UTILITY ENGINE (${visibleTools.size} TOOLS)",
+                    text = "MELD STUDIO ENGINE (${visibleTools.size} ACTIONS)",
                     style = MaterialTheme.typography.labelSmall,
                     color = MeldColors.TextSecondary,
                     modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
@@ -212,7 +247,7 @@ private fun MeldTopBrandHeader() {
             painter = painterResource(id = R.drawable.meld_logo),
             contentDescription = "MELD Ribbon Logo",
             modifier = Modifier
-                .size(52.dp)
+                .size(50.dp)
                 .clip(RoundedCornerShape(12.dp)),
             contentScale = ContentScale.Fit
         )
@@ -292,7 +327,7 @@ private fun MeldFileStagingCard(
                         text = if (selectedFile != null) {
                             "${selectedFile.extension.uppercase()} • ${selectedFile.formattedSize}"
                         } else {
-                            "Pick any PDF, Image, Audio, or CSV — or load a built-in test file"
+                            "Pick any PDF, Image, Audio, or CSV — or tap a sample"
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MeldColors.TextSecondary
@@ -381,6 +416,42 @@ private fun MeldFileStagingCard(
 }
 
 @Composable
+private fun MeldModeSelectorBar(
+    selectedMode: MeldMode,
+    onSelectMode: (MeldMode) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(MeldColors.Surface)
+            .border(1.dp, MeldColors.CardBorder, RoundedCornerShape(14.dp))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        MeldMode.entries.forEach { mode ->
+            val selected = mode == selectedMode
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (selected) MeldColors.RibbonOrange else Color.Transparent)
+                    .clickable { onSelectMode(mode) }
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = mode.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (selected) Color.White else MeldColors.TextSecondary,
+                    fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun MeldCategoryFilterStrip(
     selectedCategory: MeldCategory,
     onSelectCategory: (MeldCategory) -> Unit
@@ -396,7 +467,7 @@ private fun MeldCategoryFilterStrip(
             Surface(
                 modifier = Modifier.clickable { onSelectCategory(category) },
                 shape = RoundedCornerShape(20.dp),
-                color = if (selected) MeldColors.RibbonOrange else MeldColors.Surface,
+                color = if (selected) MeldColors.SurfaceElevated else MeldColors.Surface,
                 border = BorderStroke(
                     1.dp,
                     if (selected) MeldColors.RibbonOrange else MeldColors.CardBorder
@@ -405,7 +476,7 @@ private fun MeldCategoryFilterStrip(
                 Text(
                     text = category.label,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (selected) Color.White else MeldColors.TextSecondary,
+                    color = if (selected) MeldColors.RibbonOrange else MeldColors.TextSecondary,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                 )
             }
@@ -420,9 +491,12 @@ private fun MeldActiveToolWorkbench(
     isProcessing: Boolean,
     onRunTool: () -> Unit,
     onUpdateTargetKb: (Int) -> Unit,
+    onUpdateResizePercent: (Int) -> Unit,
+    onToggleStudioFrame: (Boolean) -> Unit,
     onUpdateStampText: (String) -> Unit,
     onUpdateHandoutMode: (Int) -> Unit,
-    onUpdateQrPayload: (String) -> Unit
+    onUpdateQrPayload: (String) -> Unit,
+    onUpdatePageRange: (Int, Int) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -433,35 +507,48 @@ private fun MeldActiveToolWorkbench(
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = iconForTool(tool),
-                        contentDescription = null,
-                        tint = MeldColors.RibbonOrange,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                Icon(
+                    imageVector = iconForTool(tool),
+                    contentDescription = null,
+                    tint = MeldColors.RibbonOrange,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = tool.title,
                             style = MaterialTheme.typography.titleMedium,
                             color = MeldColors.TextPrimary
                         )
-                        Text(
-                            text = tool.subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MeldColors.TextSecondary
-                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(MeldColors.RibbonOrange.copy(alpha = 0.2f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = tool.mode.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MeldColors.RibbonAmber,
+                                fontSize = 9.sp
+                            )
+                        }
                     }
+                    Text(
+                        text = tool.subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MeldColors.TextSecondary
+                    )
                 }
             }
 
             // Contextual Tool Controls
             when (tool) {
-                MeldToolId.COMPRESS -> {
+                MeldToolId.COMPRESS, MeldToolId.COMPRESS_PDF -> {
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "TARGET PORTAL LIMIT: ${options.targetKb} KB",
@@ -479,6 +566,39 @@ private fun MeldActiveToolWorkbench(
                     )
                 }
 
+                MeldToolId.RESIZE_IMAGE -> {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "SCALE RESOLUTION: ${options.resizePercent}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MeldColors.RibbonAmber
+                    )
+                    Slider(
+                        value = options.resizePercent.toFloat(),
+                        onValueChange = { onUpdateResizePercent(it.toInt()) },
+                        valueRange = 25f..200f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MeldColors.RibbonOrange,
+                            activeTrackColor = MeldColors.RibbonOrange
+                        )
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { onToggleStudioFrame(!options.addStudioFrame) }
+                    ) {
+                        Checkbox(
+                            checked = options.addStudioFrame,
+                            onCheckedChange = onToggleStudioFrame,
+                            colors = CheckboxDefaults.colors(checkedColor = MeldColors.RibbonOrange)
+                        )
+                        Text(
+                            text = "Wrap with Dark MELD Studio Frame",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MeldColors.TextPrimary
+                        )
+                    }
+                }
+
                 MeldToolId.LOCK_STAMP -> {
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
@@ -492,8 +612,15 @@ private fun MeldActiveToolWorkbench(
 
                 MeldToolId.HANDOUT -> {
                     Spacer(modifier = Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(2 to "2-UP + NOTE LINES", 4 to "4-UP STUDY GRID").forEach { (mode, label) ->
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            2 to "2-UP + NOTES",
+                            3 to "3-UP (MAC STYLE)",
+                            4 to "4-UP GRID"
+                        ).forEach { (mode, label) ->
                             val active = options.handoutPagesPerSheet == mode
                             OutlinedButton(
                                 onClick = { onUpdateHandoutMode(mode) },
@@ -509,6 +636,38 @@ private fun MeldActiveToolWorkbench(
                                 Text(label, style = MaterialTheme.typography.labelSmall)
                             }
                         }
+                    }
+                }
+
+                MeldToolId.PDF_EXTRACT -> {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = options.pageRangeStart.toString(),
+                            onValueChange = { str ->
+                                str.toIntOrNull()?.let { start ->
+                                    onUpdatePageRange(start.coerceAtLeast(1), options.pageRangeEnd)
+                                }
+                            },
+                            label = { Text("Start Page") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = options.pageRangeEnd.toString(),
+                            onValueChange = { str ->
+                                str.toIntOrNull()?.let { end ->
+                                    onUpdatePageRange(options.pageRangeStart, end.coerceAtLeast(1))
+                                }
+                            },
+                            label = { Text("End Page") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
 
@@ -561,17 +720,20 @@ private fun MeldOutputPreviewCard(
 ) {
     val previewBitmap = remember(result.outputFile.absolutePath, result.outputSizeBytes) {
         val ext = result.outputFile.extension.lowercase()
-        if (ext in setOf("png", "jpg", "jpeg", "webp") && result.outputFile.exists()) {
-            BitmapFactory.decodeFile(result.outputFile.absolutePath)
-        } else {
-            null
+        when {
+            !result.outputFile.exists() -> null
+            ext in setOf("png", "jpg", "jpeg", "webp") ->
+                BitmapFactory.decodeFile(result.outputFile.absolutePath)
+            ext == "pdf" ->
+                renderPdfFirstPageThumbnail(result.outputFile)
+            else -> null
         }
     }
 
     val textPreview = remember(result.outputFile.absolutePath, result.outputSizeBytes) {
         val ext = result.outputFile.extension.lowercase()
-        if (ext == "json" && result.outputFile.exists()) {
-            result.outputFile.readText().take(420)
+        if (ext in setOf("json", "md", "txt", "html") && result.outputFile.exists()) {
+            result.outputFile.readText().take(480)
         } else {
             null
         }
@@ -642,7 +804,7 @@ private fun MeldOutputPreviewCard(
                     contentDescription = "Output Preview",
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(190.dp)
+                        .height(210.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(Color(0xFF0A0B0E)),
                     contentScale = ContentScale.Fit
@@ -666,6 +828,25 @@ private fun MeldOutputPreviewCard(
             }
         }
     }
+}
+
+private fun renderPdfFirstPageThumbnail(pdfFile: File): Bitmap? {
+    return runCatching {
+        val pfd = ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY)
+        val renderer = PdfRenderer(pfd)
+        val bmp = if (renderer.pageCount > 0) {
+            val page = renderer.openPage(0)
+            val b = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(b)
+            canvas.drawColor(android.graphics.Color.WHITE)
+            page.render(b, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            page.close()
+            b
+        } else null
+        renderer.close()
+        pfd.close()
+        bmp
+    }.getOrNull()
 }
 
 @Composable
@@ -716,7 +897,9 @@ private fun MeldToolTile(
             Text(
                 text = tool.title,
                 style = MaterialTheme.typography.titleMedium,
-                color = MeldColors.TextPrimary
+                color = MeldColors.TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Spacer(modifier = Modifier.height(3.dp))
             Text(
@@ -732,14 +915,31 @@ private fun MeldToolTile(
 }
 
 private fun iconForTool(tool: MeldToolId): ImageVector = when (tool) {
+    MeldToolId.IMG_TO_JPG,
+    MeldToolId.IMG_TO_PNG,
+    MeldToolId.IMG_TO_WEBP,
+    MeldToolId.IMG_TO_BMP,
+    MeldToolId.IMG_TO_TIFF -> Icons.Default.Transform
+    MeldToolId.IMG_TO_PDF -> Icons.Default.PictureAsPdf
     MeldToolId.REMOVE_BG -> Icons.Default.AutoAwesome
-    MeldToolId.COMPRESS -> Icons.Default.Compress
-    MeldToolId.LOCK_STAMP -> Icons.Default.Lock
-    MeldToolId.HANDOUT -> Icons.Default.GridView
-    MeldToolId.REDACT -> Icons.Default.VisibilityOff
+    MeldToolId.COMPRESS, MeldToolId.COMPRESS_PDF -> Icons.Default.Compress
+    MeldToolId.RESIZE_IMAGE -> Icons.Default.AspectRatio
+    MeldToolId.COLLAGE -> Icons.Default.Collections
+    MeldToolId.STRIP_EXIF -> Icons.Default.HideImage
     MeldToolId.SCAN_QR -> Icons.Default.QrCode2
+    MeldToolId.PDF_TO_PNG, MeldToolId.PDF_TO_JPG -> Icons.Default.Image
+    MeldToolId.PDF_TO_MD -> Icons.Default.Code
+    MeldToolId.PDF_TO_HTML -> Icons.Default.Language
+    MeldToolId.PDF_TO_DOCX -> Icons.Default.Description
+    MeldToolId.PDF_TO_TXT -> Icons.Default.EditNote
+    MeldToolId.HANDOUT -> Icons.Default.GridView
+    MeldToolId.LOCK_STAMP -> Icons.Default.Lock
+    MeldToolId.REDACT, MeldToolId.STRIP_PDF_META -> Icons.Default.VisibilityOff
+    MeldToolId.PDF_EXTRACT -> Icons.Default.ContentCut
+    MeldToolId.PDF_MERGE -> Icons.Default.Layers
     MeldToolId.VISUALIZE -> Icons.Default.GraphicEq
-    MeldToolId.PDF_EXTRACT -> Icons.Default.Description
-    MeldToolId.TABLE_CONVERT -> Icons.Default.TableChart
+    MeldToolId.SPEED_2X -> Icons.Default.FastForward
+    MeldToolId.SHEET_TO_PDF -> Icons.Default.PictureAsPdf
+    MeldToolId.SHEET_TO_MD, MeldToolId.TABLE_CONVERT -> Icons.Default.TableChart
+    MeldToolId.PACK_ZIP -> Icons.Default.Archive
 }
-

@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
 
                 MeldDashboardScreen(
                     uiState = uiState,
+                    onSelectMode = viewModel::selectMode,
                     onSelectCategory = viewModel::selectCategory,
                     onSelectTool = viewModel::selectTool,
                     onPickFile = { filePickerLauncher.launch(arrayOf("*/*")) },
@@ -67,6 +68,12 @@ class MainActivity : ComponentActivity() {
                     onUpdateTargetKb = { kb ->
                         viewModel.updateOptions { it.copy(targetKb = kb) }
                     },
+                    onUpdateResizePercent = { pct ->
+                        viewModel.updateOptions { it.copy(resizePercent = pct) }
+                    },
+                    onToggleStudioFrame = { enabled ->
+                        viewModel.updateOptions { it.copy(addStudioFrame = enabled) }
+                    },
                     onUpdateStampText = { text ->
                         viewModel.updateOptions { it.copy(stampText = text) }
                     },
@@ -75,6 +82,9 @@ class MainActivity : ComponentActivity() {
                     },
                     onUpdateQrPayload = { payload ->
                         viewModel.updateOptions { it.copy(qrPayloadText = payload) }
+                    },
+                    onUpdatePageRange = { start, end ->
+                        viewModel.updateOptions { it.copy(pageRangeStart = start, pageRangeEnd = end) }
                     }
                 )
             }
@@ -92,7 +102,15 @@ class MainActivity : ComponentActivity() {
             "pdf" -> "application/pdf"
             "png" -> "image/png"
             "jpg", "jpeg" -> "image/jpeg"
+            "webp" -> "image/webp"
+            "bmp" -> "image/bmp"
+            "tiff", "tif" -> "image/tiff"
             "json" -> "application/json"
+            "md", "txt" -> "text/plain"
+            "html" -> "text/html"
+            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            "wav" -> "audio/wav"
+            "zip" -> "application/zip"
             else -> "*/*"
         }
         val shareIntent = Intent(Intent.ACTION_SEND).apply {

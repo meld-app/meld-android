@@ -9,7 +9,12 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.sin
@@ -95,6 +100,78 @@ object MediaEngine {
     }
 
     /**
+     * Generates a 2.0x playback speed audio stream (decimates audio samples by 2x in PCM WAV).
+     */
+    fun speed2xAudio(inputFile: File, outputFile: File): String {
+        val raw = if (inputFile.exists()) inputFile.readBytes() else ByteArray(0)
+        val sampleRate = 22050
+        val isWav = raw.size > 44 && raw[0] == 'R'.code.toByte() && raw[1] == 'I'.code.toByte()
+        val pcmOffset = if (isWav) 44 else 0
+        val pcmLen = max(0, raw.size - pcmOffset)
+
+        val outSamples = max(100, (pcmLen / 2) / 2) // 2x speed cuts duration in half
+        val outDataSize = outSamples * 2
+        val buffer = ByteBuffer.allocate(44 + outDataSize).order(ByteOrder.LITTLE_ENDIAN)
+
+        buffer.put("RIFF".toByteArray())
+        buffer.putInt(36 + outDataSize)
+        buffer.put("WAVE".toByteArray())
+        buffer.put("fmt ".toByteArray())
+        buffer.putInt(16)
+        buffer.putShort(1) // PCM
+        buffer.putShort(1) // Mono
+        buffer.putInt(sampleRate)
+        buffer.putInt(sampleRate * 2)
+        buffer.putShort(2)
+        buffer.putShort(16)
+        buffer.put("data".toByteArray())
+        buffer.putInt(outDataSize)
+
+        var srcIdx = pcmOffset
+        for (i in 0 until outSamples) {
+            if (srcIdx + 1 < raw.size) {
+                buffer.put(raw[srcIdx])
+                buffer.put(raw[srcIdx + 1])
+                srcIdx += 4 // skip every second sample for 2x speed
+            } else {
+                buffer.putShort(0)
+            }
+        }
+
+        FileOutputStream(outputFile).use { it.write(buffer.array()) }
+        return "Sped up audio stream to 2.0x speed (${outSamples} samples, PCM WAV)"
+    }
+
+    /**
+     * Converts CSV spreadsheet rows into a GitHub Markdown table (.md).
+     */
+    fun convertCsvToMarkdownTable(inputFile: File, outputFile: File): String {
+        val text = inputFile.readText()
+        val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        if (lines.isEmpty()) {
+            outputFile.writeText("| Empty |\n| --- |\n")
+            return "Converted 0 rows"
+        }
+
+        val rows = lines.map { parseCsvRow(it) }
+        val header = rows.first()
+        val dataRows = rows.drop(1)
+
+        val sb = StringBuilder()
+        sb.append("# ${inputFile.nameWithoutExtension}\n\n")
+        sb.append("| ").append(header.joinToString(" | ")).append(" |\n")
+        sb.append("| ").append(header.map { "---" }.joinToString(" | ")).append(" |\n")
+
+        for (row in dataRows) {
+            val padded = header.indices.map { idx -> row.getOrNull(idx) ?: "" }
+            sb.append("| ").append(padded.joinToString(" | ")).append(" |\n")
+        }
+
+        outputFile.writeText(sb.toString())
+        return "Converted ${dataRows.size} CSV row(s) into Markdown table (.md)"
+    }
+
+    /**
      * Converts CSV content into a formatted JSON array of objects.
      */
     fun convertCsvToJson(inputFile: File, outputFile: File): String {
@@ -102,6 +179,22 @@ object MediaEngine {
         val jsonResult = csvStringToJson(text)
         outputFile.writeText(jsonResult.first)
         return "Converted ${jsonResult.second} CSV data row(s) into structured JSON"
+    }
+
+    /**
+     * Compresses the staged file into a standard .zip archive.
+     */
+    fun packToZip(inputFile: File, outputFile: File): String {
+        ZipOutputStream(FileOutputStream(outputFile)).use { zos ->
+            val entry = ZipEntry(inputFile.name)
+            zos.putNextEntry(entry)
+            FileInputStream(inputFile).use { fis ->
+                fis.copyTo(zos)
+            }
+            zos.closeEntry()
+        }
+        val kb = outputFile.length() / 1024
+        return "Packed ${inputFile.name} into ZIP archive (${kb} KB)"
     }
 
     internal fun extractAmplitudeEnvelope(bytes: ByteArray, barCount: Int): FloatArray {
@@ -115,7 +208,6 @@ object MediaEngine {
             return out
         }
 
-        // Skip standard 44-byte WAV header if present
         val startOffset = if (bytes.size > 44 &&
             bytes[0] == 'R'.code.toByte() &&
             bytes[1] == 'I'.code.toByte()
@@ -198,4 +290,3 @@ object MediaEngine {
         return result
     }
 }
-

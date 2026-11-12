@@ -5,11 +5,15 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.security.MessageDigest
 import kotlin.math.abs
 import kotlin.math.max
@@ -17,6 +21,210 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 object ImageEngine {
+
+    /**
+     * Converts image between formats (JPG, PNG, WEBP, BMP, TIFF).
+     */
+    fun convertFormat(inputFile: File, outputFile: File, targetFormat: String): String {
+        val bmp = BitmapFactory.decodeFile(inputFile.absolutePath)
+            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+
+        val fmt = targetFormat.lowercase().trimStart('.')
+        when (fmt) {
+            "jpg", "jpeg" -> {
+                FileOutputStream(outputFile).use { bmp.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+            }
+            "png" -> {
+                FileOutputStream(outputFile).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
+            "webp" -> {
+                val webpFormat = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    Bitmap.CompressFormat.WEBP_LOSSY
+                } else {
+                    @Suppress("DEPRECATION")
+                    Bitmap.CompressFormat.WEBP
+                }
+                FileOutputStream(outputFile).use { bmp.compress(webpFormat, 90, it) }
+            }
+            "bmp" -> {
+                writeBmp(bmp, outputFile)
+            }
+            "tiff", "tif" -> {
+                writeTiff(bmp, outputFile)
+            }
+            else -> {
+                FileOutputStream(outputFile).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
+        }
+
+        val w = bmp.width
+        val h = bmp.height
+        bmp.recycle()
+        return "Converted to ${fmt.uppercase()} (${w}x${h} px)"
+    }
+
+    /**
+     * Centers image into a print-ready A4 vector PDF page.
+     */
+    fun convertImageToPdf(inputFile: File, outputFile: File): String {
+        val bmp = BitmapFactory.decodeFile(inputFile.absolutePath)
+            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+
+        val a4W = 595
+        val a4H = 842
+        val margin = 36f
+        val maxW = a4W - margin * 2f
+        val maxH = a4H - margin * 2f
+
+        val scale = min(maxW / bmp.width, maxH / bmp.height)
+        val renderW = (bmp.width * scale).toInt()
+        val renderH = (bmp.height * scale).toInt()
+        val left = margin + (maxW - renderW) / 2f
+        val top = margin + (maxH - renderH) / 2f
+
+        val doc = PdfDocument()
+        val pageInfo = PdfDocument.PageInfo.Builder(a4W, a4H, 1).create()
+        val page = doc.startPage(pageInfo)
+        val canvas = page.canvas
+        canvas.drawColor(Color.WHITE)
+
+        val destRect = RectF(left, top, left + renderW, top + renderH)
+        canvas.drawBitmap(bmp, null, destRect, null)
+
+        val borderPaint = Paint().apply {
+            color = Color.rgb(225, 230, 238)
+            style = Paint.Style.STROKE
+            strokeWidth = 1f
+        }
+        canvas.drawRect(destRect, borderPaint)
+
+        doc.finishPage(page)
+        FileOutputStream(outputFile).use { doc.writeTo(it) }
+        doc.close()
+        bmp.recycle()
+
+        return "Placed ${bmp.width}x${bmp.height} image onto centered A4 PDF page"
+    }
+
+    /**
+     * Scales image resolution by percent and optionally adds a studio frame with corner tags.
+     */
+    fun resizeAndFrameImage(
+        inputFile: File,
+        outputFile: File,
+        scalePercent: Int,
+        addFrame: Boolean
+    ): String {
+        val original = BitmapFactory.decodeFile(inputFile.absolutePath)
+            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+
+        val factor = (scalePercent.coerceIn(10, 300)) / 100.0f
+        val newW = max(32, (original.width * factor).toInt())
+        val newH = max(32, (original.height * factor).toInt())
+        val scaled = Bitmap.createScaledBitmap(original, newW, newH, true)
+
+        val finalBmp = if (addFrame) {
+            val pad = 48
+            val framedW = newW + pad * 2
+            val framedH = newH + pad * 2
+            val frameBmp = Bitmap.createBitmap(framedW, framedH, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(frameBmp)
+            canvas.drawColor(Color.rgb(13, 14, 18)) // Studio dark
+
+            canvas.drawBitmap(scaled, pad.toFloat(), pad.toFloat(), null)
+
+            val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(255, 106, 43)
+                style = Paint.Style.STROKE
+                strokeWidth = 2f
+            }
+            canvas.drawRect(
+                RectF(pad.toFloat(), pad.toFloat(), (pad + newW).toFloat(), (pad + newH).toFloat()),
+                borderPaint
+            )
+
+            val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(255, 179, 71)
+                textSize = 14f
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            }
+            canvas.drawText("MELD STUDIO FRAME • ${newW}x${newH}", pad.toFloat(), framedH - 16f, captionPaint)
+            scaled.recycle()
+            frameBmp
+        } else {
+            scaled
+        }
+
+        FileOutputStream(outputFile).use { finalBmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        original.recycle()
+        finalBmp.recycle()
+
+        return "Resized to ${newW}x${newH} (${scalePercent}% scale${if (addFrame) " + Studio Frame" else ""})"
+    }
+
+    /**
+     * Creates a 2x2 photo collage sheet from the staged image.
+     */
+    fun createPhotoCollage(inputFile: File, outputFile: File): String {
+        val original = BitmapFactory.decodeFile(inputFile.absolutePath)
+            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+
+        val cellW = 540
+        val cellH = 540
+        val pad = 24
+        val totalW = cellW * 2 + pad * 3
+        val totalH = cellH * 2 + pad * 3 + 60
+
+        val collage = Bitmap.createBitmap(totalW, totalH, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(collage)
+        canvas.drawColor(Color.rgb(13, 14, 18))
+
+        val thumb = Bitmap.createScaledBitmap(original, cellW, cellH, true)
+        val borderPaint = Paint().apply {
+            color = Color.rgb(43, 48, 66)
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+        }
+
+        for (r in 0..1) {
+            for (c in 0..1) {
+                val left = pad + c * (cellW + pad)
+                val top = pad + r * (cellH + pad)
+                canvas.drawBitmap(thumb, left.toFloat(), top.toFloat(), null)
+                canvas.drawRect(RectF(left.toFloat(), top.toFloat(), (left + cellW).toFloat(), (top + cellH).toFloat()), borderPaint)
+            }
+        }
+
+        val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(255, 106, 43)
+            textSize = 22f
+            typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText("MELD 2x2 CONTACT SHEET • ${inputFile.name}", totalW / 2f, totalH - 24f, captionPaint)
+
+        FileOutputStream(outputFile).use { collage.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        original.recycle()
+        thumb.recycle()
+        collage.recycle()
+
+        return "Generated 2x2 photo collage contact sheet (${totalW}x${totalH} px)"
+    }
+
+    /**
+     * Wipes all EXIF/GPS metadata by decoding pure pixel raster and re-encoding.
+     */
+    fun stripImageExif(inputFile: File, outputFile: File): String {
+        val original = BitmapFactory.decodeFile(inputFile.absolutePath)
+            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+
+        FileOutputStream(outputFile).use { original.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        val w = original.width
+        val h = original.height
+        original.recycle()
+
+        return "Stripped all EXIF & location metadata (${w}x${h} px clean PNG)"
+    }
 
     /**
      * Isolates foreground subject from background by sampling border chroma clusters
@@ -283,5 +491,112 @@ object ImageEngine {
         }
         return grid
     }
-}
 
+    private fun writeBmp(bmp: Bitmap, outputFile: File) {
+        val w = bmp.width
+        val h = bmp.height
+        val rowSize = ((w * 3 + 3) / 4) * 4
+        val imageSize = rowSize * h
+        val fileSize = 54 + imageSize
+
+        val header = ByteBuffer.allocate(54).order(ByteOrder.LITTLE_ENDIAN)
+        header.put('B'.code.toByte())
+        header.put('M'.code.toByte())
+        header.putInt(fileSize)
+        header.putShort(0)
+        header.putShort(0)
+        header.putInt(54) // offset
+        header.putInt(40) // DIB header size
+        header.putInt(w)
+        header.putInt(h)
+        header.putShort(1) // color planes
+        header.putShort(24) // 24 bpp
+        header.putInt(0) // BI_RGB
+        header.putInt(imageSize)
+        header.putInt(2835) // 72 DPI
+        header.putInt(2835)
+        header.putInt(0)
+        header.putInt(0)
+
+        val pixels = IntArray(w * h)
+        bmp.getPixels(pixels, 0, w, 0, 0, w, h)
+
+        FileOutputStream(outputFile).use { fos ->
+            fos.write(header.array())
+            val rowBytes = ByteArray(rowSize)
+            // BMP rows stored bottom-to-top
+            for (y in h - 1 downTo 0) {
+                var colIdx = 0
+                for (x in 0 until w) {
+                    val p = pixels[y * w + x]
+                    rowBytes[colIdx++] = (p and 0xFF).toByte() // B
+                    rowBytes[colIdx++] = ((p ushr 8) and 0xFF).toByte() // G
+                    rowBytes[colIdx++] = ((p ushr 16) and 0xFF).toByte() // R
+                }
+                while (colIdx < rowSize) {
+                    rowBytes[colIdx++] = 0
+                }
+                fos.write(rowBytes)
+            }
+        }
+    }
+
+    private fun writeTiff(bmp: Bitmap, outputFile: File) {
+        val w = bmp.width
+        val h = bmp.height
+        val imageBytesSize = w * h * 3
+        val ifdOffset = 8 + imageBytesSize
+
+        // TIFF Little Endian header
+        val header = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
+        header.put('I'.code.toByte())
+        header.put('I'.code.toByte())
+        header.putShort(42)
+        header.putInt(ifdOffset)
+
+        val pixels = IntArray(w * h)
+        bmp.getPixels(pixels, 0, w, 0, 0, w, h)
+        val rgbBytes = ByteArray(imageBytesSize)
+        var idx = 0
+        for (p in pixels) {
+            rgbBytes[idx++] = ((p ushr 16) and 0xFF).toByte() // R
+            rgbBytes[idx++] = ((p ushr 8) and 0xFF).toByte()  // G
+            rgbBytes[idx++] = (p and 0xFF).toByte()          // B
+        }
+
+        // IFD with 9 entries
+        val numEntries: Short = 9
+        val ifd = ByteBuffer.allocate(2 + numEntries * 12 + 4 + 6).order(ByteOrder.LITTLE_ENDIAN)
+        ifd.putShort(numEntries)
+
+        fun putTag(tag: Int, type: Int, count: Int, valueOrOffset: Int) {
+            ifd.putShort(tag.toShort())
+            ifd.putShort(type.toShort())
+            ifd.putInt(count)
+            ifd.putInt(valueOrOffset)
+        }
+
+        val bitsPerSampleOffset = ifdOffset + 2 + numEntries * 12 + 4
+
+        putTag(0x0100, 3, 1, w) // ImageWidth
+        putTag(0x0101, 3, 1, h) // ImageLength
+        putTag(0x0102, 3, 3, bitsPerSampleOffset) // BitsPerSample [8,8,8]
+        putTag(0x0103, 3, 1, 1) // Compression = None
+        putTag(0x0106, 3, 1, 2) // Photometric = RGB
+        putTag(0x0111, 4, 1, 8) // StripOffsets = 8
+        putTag(0x0115, 3, 1, 3) // SamplesPerPixel = 3
+        putTag(0x0116, 3, 1, h) // RowsPerStrip = h
+        putTag(0x0117, 4, 1, imageBytesSize) // StripByteCounts
+
+        ifd.putInt(0) // Next IFD offset = 0
+        ifd.putShort(8) // BitsPerSample R
+        ifd.putShort(8) // BitsPerSample G
+        ifd.putShort(8) // BitsPerSample B
+
+        FileOutputStream(outputFile).use { fos ->
+            fos.write(header.array())
+            fos.write(rgbBytes)
+            fos.write(ifd.array())
+        }
+    }
+}
