@@ -142,7 +142,7 @@ private val MeldTypography = Typography(
     labelSmall = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 11.sp,
+        fontSize = 12.sp,
         letterSpacing = 0.4.sp
     )
 )

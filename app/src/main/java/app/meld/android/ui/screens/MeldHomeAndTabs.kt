@@ -894,7 +894,7 @@ fun MeldAllToolsScreen(
                                             Text(
                                                 text = tool.badge,
                                                 style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 10.sp,
+                                                fontSize = 12.sp,
                                                 color = MeldColors.InkBlack,
                                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                             )
