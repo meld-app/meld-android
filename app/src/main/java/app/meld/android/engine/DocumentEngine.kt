@@ -65,6 +65,7 @@ object DocumentEngine {
                 canvas.drawColor(Color.WHITE)
 
                 val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                bitmap.eraseColor(Color.WHITE)
                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                 canvas.drawBitmap(bitmap, 0f, 0f, null)
                 bitmap.recycle()
@@ -388,45 +389,65 @@ object DocumentEngine {
         val outDoc = PdfDocument()
 
         val pageCount = renderer.pageCount
+        val targetBytesTotal = max(10, targetKb) * 1024L
+        if (inputFile.length() <= targetBytesTotal) {
+            inputFile.copyTo(outputFile, overwrite = true)
+            val alreadyKb = outputFile.length() / 1024
+            return "Already compact at ${alreadyKb} KB (within ≤ $targetKb KB target, $pageCount pages)".also {
+                renderer.close()
+                outDoc.close()
+                pfd.close()
+            }
+        }
+
         val targetBytesPerPage = (targetKb * 1024) / max(1, pageCount)
         val quality = when {
-            targetKb < 150 -> 45
-            targetKb < 300 -> 65
-            else -> 80
+            targetKb < 100 -> 38
+            targetKb < 200 -> 55
+            else -> 76
         }
         val scaleFactor = when {
-            targetKb < 120 -> 0.7f
-            targetKb < 250 -> 0.85f
-            else -> 1.0f
+            targetBytesPerPage < 18 * 1024 -> 0.40f
+            targetBytesPerPage < 40 * 1024 -> 0.55f
+            targetBytesPerPage < 80 * 1024 -> 0.72f
+            else -> 0.90f
         }
 
         try {
+            val decodeOpts = android.graphics.BitmapFactory.Options().apply {
+                inPreferredConfig = Bitmap.Config.RGB_565
+            }
             for (i in 0 until pageCount) {
                 val page = renderer.openPage(i)
-                val w = (page.width * scaleFactor).toInt()
-                val h = (page.height * scaleFactor).toInt()
+                val w = max(120, (page.width * scaleFactor).toInt())
+                val h = max(160, (page.height * scaleFactor).toInt())
 
                 val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                bmp.eraseColor(android.graphics.Color.WHITE)
+                bmp.eraseColor(Color.WHITE)
                 page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                 page.close()
 
                 val stream = ByteArrayOutputStream()
                 var q = quality
                 bmp.compress(Bitmap.CompressFormat.JPEG, q, stream)
-                while (stream.size() > targetBytesPerPage && q > 18) {
+                while (stream.size() > targetBytesPerPage && q > 16) {
                     stream.reset()
-                    q = (q - 12).coerceAtLeast(18)
+                    q = (q - 10).coerceAtLeast(16)
                     bmp.compress(Bitmap.CompressFormat.JPEG, q, stream)
                 }
                 val compressedBytes = stream.toByteArray()
                 bmp.recycle()
 
-                val decoded = android.graphics.BitmapFactory.decodeByteArray(compressedBytes, 0, compressedBytes.size)
+                val decoded = android.graphics.BitmapFactory.decodeByteArray(
+                    compressedBytes,
+                    0,
+                    compressedBytes.size,
+                    decodeOpts
+                )
                 val pageInfo = PdfDocument.PageInfo.Builder(A4_WIDTH, A4_HEIGHT, i + 1).create()
                 val outPage = outDoc.startPage(pageInfo)
                 val destRect = Rect(0, 0, A4_WIDTH, A4_HEIGHT)
-                outPage.canvas.drawBitmap(decoded, null, destRect, null)
+                outPage.canvas.drawBitmap(decoded, null, destRect, Paint(Paint.FILTER_BITMAP_FLAG))
                 outDoc.finishPage(outPage)
                 decoded.recycle()
             }
@@ -435,6 +456,12 @@ object DocumentEngine {
             outDoc.close()
             renderer.close()
             pfd.close()
+        }
+
+        if (outputFile.length() >= inputFile.length()) {
+            inputFile.copyTo(outputFile, overwrite = true)
+            val originalKb = outputFile.length() / 1024
+            return "Already compact at ${originalKb} KB (kept original compact vector PDF)"
         }
 
         val finalKb = outputFile.length() / 1024
@@ -458,6 +485,7 @@ object DocumentEngine {
                 val pageInfo = PdfDocument.PageInfo.Builder(w, h, i + 1).create()
                 val outPage = outDoc.startPage(pageInfo)
                 val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                bmp.eraseColor(Color.WHITE)
                 page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                 page.close()
 
@@ -495,6 +523,7 @@ object DocumentEngine {
                     val pageInfo = PdfDocument.PageInfo.Builder(w, h, outIdx++).create()
                     val outPage = outDoc.startPage(pageInfo)
                     val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                    bmp.eraseColor(Color.WHITE)
                     page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                     page.close()
 
@@ -558,6 +587,8 @@ object DocumentEngine {
         val renderer = PdfRenderer(pfd)
         val pageCount = renderer.pageCount
 
+        val safeTitle = escapeXml(inputFile.nameWithoutExtension)
+        val safeFileName = escapeXml(inputFile.name)
         val html = buildString {
             append("""
                 <!DOCTYPE html>
@@ -565,7 +596,7 @@ object DocumentEngine {
                 <head>
                   <meta charset="UTF-8">
                   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                  <title>${inputFile.nameWithoutExtension} — MELD Reader</title>
+                  <title>$safeTitle — MELD Reader</title>
                   <style>
                     body { margin: 0; padding: 24px; background: #0D0E12; color: #F5F7FA; font-family: system-ui, -apple-system, sans-serif; }
                     .header { max-width: 800px; margin: 0 auto 24px; padding: 20px; background: #151821; border: 1px solid #2B3042; border-radius: 14px; }
@@ -577,7 +608,7 @@ object DocumentEngine {
                 <body>
                   <div class="header">
                     <span class="tag">MELD HTML5 EXPORT</span>
-                    <h2>${inputFile.name}</h2>
+                    <h2>$safeFileName</h2>
                     <p style="color:#9BA3B5; font-size:13px;">Total Pages: $pageCount • 100% Offline Local Extraction</p>
                   </div>
             """.trimIndent())
@@ -615,7 +646,7 @@ object DocumentEngine {
             append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>""")
             append("""<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">""")
             append("<w:body>")
-            append("<w:p><w:pPr><w:pStyle w:val=\"Title\"/></w:pPr><w:r><w:t>${inputFile.nameWithoutExtension}</w:t></w:r></w:p>")
+            append("<w:p><w:pPr><w:pStyle w:val=\"Title\"/></w:pPr><w:r><w:t>${escapeXml(inputFile.nameWithoutExtension)}</w:t></w:r></w:p>")
             append("<w:p><w:r><w:t>Converted by MELD for Android • Total Pages: $pageCount</w:t></w:r></w:p>")
 
             for (i in 0 until pageCount) {
@@ -765,20 +796,19 @@ object DocumentEngine {
         labelPaint: Paint
     ) {
         val page = renderer.openPage(pageIndex)
-        val bmp = Bitmap.createBitmap(
-            max(1, destRect.width()),
-            max(1, destRect.height()),
-            Bitmap.Config.ARGB_8888
-        )
+        val hiScale = 2
+        val bmpW = max(2, destRect.width() * hiScale)
+        val bmpH = max(2, destRect.height() * hiScale)
+        val bmp = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
         val bmpCanvas = Canvas(bmp)
         bmpCanvas.drawColor(Color.WHITE)
 
         val scale = min(
-            destRect.width().toFloat() / max(1, page.width),
-            destRect.height().toFloat() / max(1, page.height)
+            bmpW.toFloat() / max(1, page.width),
+            bmpH.toFloat() / max(1, page.height)
         )
-        val dx = (destRect.width() - page.width * scale) / 2f
-        val dy = (destRect.height() - page.height * scale) / 2f
+        val dx = (bmpW - page.width * scale) / 2f
+        val dy = (bmpH - page.height * scale) / 2f
         val matrix = Matrix().apply {
             postScale(scale, scale)
             postTranslate(dx, dy)
@@ -787,7 +817,7 @@ object DocumentEngine {
         page.render(bmp, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
         page.close()
 
-        canvas.drawBitmap(bmp, destRect.left.toFloat(), destRect.top.toFloat(), null)
+        canvas.drawBitmap(bmp, null, destRect, Paint(Paint.FILTER_BITMAP_FLAG))
         canvas.drawRect(destRect, borderPaint)
         canvas.drawText(
             "PAGE ${pageIndex + 1}",
@@ -796,5 +826,18 @@ object DocumentEngine {
             labelPaint
         )
         bmp.recycle()
+    }
+
+    private fun escapeXml(input: String): String = buildString(input.length) {
+        for (ch in input) {
+            when (ch) {
+                '&' -> append("&amp;")
+                '<' -> append("&lt;")
+                '>' -> append("&gt;")
+                '"' -> append("&quot;")
+                '\'' -> append("&apos;")
+                else -> append(ch)
+            }
+        }
     }
 }

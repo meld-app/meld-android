@@ -7,9 +7,12 @@ import app.meld.android.model.MeldMode
 import app.meld.android.model.MeldToolId
 import app.meld.android.model.SelectedFileInfo
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.file.Files
 import java.util.zip.ZipFile
 
@@ -128,5 +131,60 @@ class MeldEngineUnitTest {
     fun byteFormatter_formatsHumanReadableSizes() {
         assertEquals("512 B", SelectedFileInfo.formatByteCount(512))
         assertEquals("2.0 KB", SelectedFileInfo.formatByteCount(2048))
+    }
+
+    @Test
+    fun emptyExtension_isNotMarkedCompatible() {
+        assertFalse(MeldToolId.COMPRESS_PDF.acceptsExtension(""))
+        assertFalse(MeldToolId.REMOVE_BG.acceptsExtension("pdf"))
+    }
+
+    @Test
+    fun speed2xAudio_preservesStereo44kHzAndFindsDataSubchunk() {
+        val tempDir = Files.createTempDirectory("meld_test_stereo").toFile()
+        val inWav = File(tempDir, "stereo44.wav")
+        // Build RIFF WAVE header + JUNK chunk + fmt chunk + data chunk (44100 Hz, 2ch, 16-bit)
+        val payload = ByteArray(1600) { idx -> (idx % 99).toByte() }
+        val junkChunkSize = 12
+        val totalBytes = 44 + 8 + junkChunkSize + payload.size
+        val bb = ByteBuffer.allocate(totalBytes).order(ByteOrder.LITTLE_ENDIAN)
+        bb.put("RIFF".toByteArray())
+        bb.putInt(totalBytes - 8)
+        bb.put("WAVE".toByteArray())
+        bb.put("fmt ".toByteArray())
+        bb.putInt(16)
+        bb.putShort(1) // PCM
+        bb.putShort(2) // Stereo
+        bb.putInt(44100)
+        bb.putInt(44100 * 4)
+        bb.putShort(4)
+        bb.putShort(16)
+        bb.put("JUNK".toByteArray())
+        bb.putInt(junkChunkSize)
+        bb.put(ByteArray(junkChunkSize))
+        bb.put("data".toByteArray())
+        bb.putInt(payload.size)
+        bb.put(payload)
+        inWav.writeBytes(bb.array())
+
+        val outWav = File(tempDir, "stereo_out.wav")
+        val summary = MediaEngine.speed2xAudio(inWav, outWav)
+        assertTrue(summary.contains("44100Hz"))
+        assertTrue(summary.contains("Stereo"))
+
+        val outBytes = outWav.readBytes()
+        val outHdr = ByteBuffer.wrap(outBytes, 0, 44).order(ByteOrder.LITTLE_ENDIAN)
+        assertEquals(2, outHdr.getShort(22).toInt())
+        assertEquals(44100, outHdr.getInt(24))
+        // 400 stereo frames * 4 bytes = 1600 -> halved -> 200 frames * 4 bytes = 800 bytes + 44 header
+        assertEquals(844, outBytes.size)
+        tempDir.deleteRecursively()
+    }
+
+    @Test
+    fun followUpTools_neverSuggestsSelf() {
+        MeldToolId.entries.forEach { tool ->
+            assertFalse("${tool.name} should not suggest itself", tool.followUpTools().contains(tool))
+        }
     }
 }

@@ -100,17 +100,48 @@ object MediaEngine {
     }
 
     /**
-     * Generates a 2.0x playback speed audio stream (decimates audio samples by 2x in PCM WAV).
+     * Generates a 2.0x playback speed audio stream (decimates audio frames by 2x in PCM WAV).
+     * Reads real RIFF WAV headers & locates the `data` subchunk cleanly when present.
      */
     fun speed2xAudio(inputFile: File, outputFile: File): String {
         val raw = if (inputFile.exists()) inputFile.readBytes() else ByteArray(0)
-        val sampleRate = 22050
-        val isWav = raw.size > 44 && raw[0] == 'R'.code.toByte() && raw[1] == 'I'.code.toByte()
-        val pcmOffset = if (isWav) 44 else 0
-        val pcmLen = max(0, raw.size - pcmOffset)
+        val isRiff = raw.size >= 44 && raw[0] == 'R'.code.toByte() && raw[1] == 'I'.code.toByte()
+        val isFullWave = isRiff && raw[8] == 'W'.code.toByte() && raw[9] == 'A'.code.toByte()
 
-        val outSamples = max(100, (pcmLen / 2) / 2) // 2x speed cuts duration in half
-        val outDataSize = outSamples * 2
+        var channels = 1
+        var sampleRate = 22050
+        var bitsPerSample = 16
+        var pcmOffset = if (isRiff) 44 else 0
+        var pcmLen = max(0, raw.size - pcmOffset)
+
+        if (isFullWave) {
+            val hdr = ByteBuffer.wrap(raw, 0, minOf(raw.size, 64)).order(ByteOrder.LITTLE_ENDIAN)
+            val parsedCh = hdr.getShort(22).toInt()
+            val parsedSr = hdr.getInt(24)
+            val parsedBps = hdr.getShort(34).toInt()
+            if (parsedCh in 1..2) channels = parsedCh
+            if (parsedSr in 8000..192000) sampleRate = parsedSr
+            if (parsedBps in listOf(8, 16)) bitsPerSample = parsedBps
+
+            // Scan subchunks starting at byte 12 for the real "data" chunk
+            var pos = 12
+            while (pos + 8 <= raw.size) {
+                val id = String(raw, pos, 4)
+                val size = ByteBuffer.wrap(raw, pos + 4, 4).order(ByteOrder.LITTLE_ENDIAN).int
+                if (id == "data" && size > 0) {
+                    pcmOffset = pos + 8
+                    pcmLen = size.coerceAtMost(raw.size - pcmOffset)
+                    break
+                }
+                if (size < 0) break
+                pos += 8 + size + (size and 1)
+            }
+        }
+
+        val bytesPerFrame = max(1, channels * (bitsPerSample / 8))
+        val inFrames = max(2, pcmLen / bytesPerFrame)
+        val outFrames = max(100, inFrames / 2)
+        val outDataSize = outFrames * bytesPerFrame
         val buffer = ByteBuffer.allocate(44 + outDataSize).order(ByteOrder.LITTLE_ENDIAN)
 
         buffer.put("RIFF".toByteArray())
@@ -119,27 +150,31 @@ object MediaEngine {
         buffer.put("fmt ".toByteArray())
         buffer.putInt(16)
         buffer.putShort(1) // PCM
-        buffer.putShort(1) // Mono
+        buffer.putShort(channels.toShort())
         buffer.putInt(sampleRate)
-        buffer.putInt(sampleRate * 2)
-        buffer.putShort(2)
-        buffer.putShort(16)
+        buffer.putInt(sampleRate * bytesPerFrame)
+        buffer.putShort(bytesPerFrame.toShort())
+        buffer.putShort(bitsPerSample.toShort())
         buffer.put("data".toByteArray())
         buffer.putInt(outDataSize)
 
         var srcIdx = pcmOffset
-        for (i in 0 until outSamples) {
-            if (srcIdx + 1 < raw.size) {
-                buffer.put(raw[srcIdx])
-                buffer.put(raw[srcIdx + 1])
-                srcIdx += 4 // skip every second sample for 2x speed
+        val stepBytes = bytesPerFrame * 2 // skip every second audio frame for 2.0x speed
+        for (i in 0 until outFrames) {
+            if (srcIdx + bytesPerFrame <= pcmOffset + pcmLen && srcIdx + bytesPerFrame <= raw.size) {
+                for (b in 0 until bytesPerFrame) {
+                    buffer.put(raw[srcIdx + b])
+                }
+                srcIdx += stepBytes
             } else {
-                buffer.putShort(0)
+                for (b in 0 until bytesPerFrame) {
+                    buffer.put(0.toByte())
+                }
             }
         }
 
         FileOutputStream(outputFile).use { it.write(buffer.array()) }
-        return "Sped up audio stream to 2.0x speed (${outSamples} samples, PCM WAV)"
+        return "Sped up audio stream to 2.0x speed (${sampleRate}Hz ${if (channels == 2) "Stereo" else "Mono"}, PCM WAV)"
     }
 
     /**

@@ -14,9 +14,16 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -55,6 +62,7 @@ fun MeldAppRoot(
     onOpenResult: (app.meld.android.model.ConversionResult) -> Unit,
     onNavigateHome: () -> Unit,
     onSetFileSheetVisible: (Boolean) -> Unit,
+    onClearBanner: () -> Unit = {},
     onPickExternalFile: () -> Unit,
     onLoadSample: (SamplePreset) -> Unit,
     onSelectMode: (MeldMode) -> Unit,
@@ -105,6 +113,7 @@ fun MeldAppRoot(
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
+                .imePadding()
                 .onGloballyPositioned { coords ->
                     openingDriver.rootOrigin = coords.positionInRoot()
                 }
@@ -214,6 +223,7 @@ fun MeldAppRoot(
                                         uiState = uiState,
                                         onBack = onNavigateHome,
                                         onRunTool = { onRunTool(route.tool) },
+                                        onOpenChangeFile = { onSetFileSheetVisible(true) },
                                         onUpdateTargetKb = onUpdateTargetKb,
                                         onUpdateResizePercent = onUpdateResizePercent,
                                         onToggleStudioFrame = onToggleStudioFrame,
@@ -252,6 +262,29 @@ fun MeldAppRoot(
                     onBrowseStorage = onPickExternalFile,
                     onPickSample = onLoadSample
                 )
+            }
+
+            if (uiState.route == MeldScreenRoute.Home && uiState.bannerMessage != null && !openingDriver.showOverlay) {
+                LaunchedEffect(uiState.bannerMessage) {
+                    kotlinx.coroutines.delay(2800L)
+                    onClearBanner()
+                }
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 10.dp, start = 20.dp, end = 20.dp)
+                        .clickable { onClearBanner() },
+                    shape = CircleShape,
+                    color = MeldColors.InkBlack,
+                    shadowElevation = 6.dp
+                ) {
+                    Text(
+                        text = uiState.bannerMessage,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MeldColors.PureWhite,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp)
+                    )
+                }
             }
         }
     }

@@ -34,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Compress
@@ -60,6 +61,7 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -91,6 +93,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
+import app.meld.android.BuildConfig
 import app.meld.android.R
 import app.meld.android.model.ConversionResult
 import app.meld.android.model.MeldCategory
@@ -684,6 +687,17 @@ fun MeldAllToolsScreen(
                         tint = MeldColors.InkBlack
                     )
                 },
+                trailingIcon = if (uiState.searchQuery.isNotEmpty()) {
+                    {
+                        IconButton(onClick = { onSearchChange("") }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Clear search",
+                                tint = MeldColors.InkBlack
+                            )
+                        }
+                    }
+                } else null,
                 singleLine = true,
                 shape = CircleShape,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -969,7 +983,12 @@ fun MeldSettingsScreen(
                         style = MaterialTheme.typography.titleMedium,
                         color = MeldColors.InkBlack
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         listOf(2 to "2-up + notes", 3 to "3-up notes", 4 to "4-up grid").forEach { (n, label) ->
                             TactileChipPill(
                                 label = label,
@@ -1034,7 +1053,7 @@ fun MeldSettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
-                        text = "MELD for Android v2.1.0-beta.1",
+                        text = "MELD for Android v${BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.titleMedium,
                         color = MeldColors.InkBlack
                     )

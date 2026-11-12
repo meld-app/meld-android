@@ -79,6 +79,9 @@ import app.meld.android.ui.theme.rememberReduceMotion
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.zip.ZipFile
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -591,7 +594,7 @@ fun ResultShowcaseCard(
         when {
             !result.outputFile.exists() -> null
             ext in setOf("png", "jpg", "jpeg", "webp") ->
-                BitmapFactory.decodeFile(result.outputFile.absolutePath)
+                decodeBoundedBitmap(result.outputFile, maxDim = 1080)
             ext == "pdf" ->
                 renderFirstPdfPage(result.outputFile)
             else -> null
@@ -743,13 +746,8 @@ fun ResultShowcaseCard(
                     }
                 }
             } else {
-                val previewText = remember(result.outputFile.absolutePath) {
-                    val ext = result.outputFile.extension.lowercase()
-                    if (ext in setOf("json", "md", "txt", "html") && result.outputFile.exists()) {
-                        result.outputFile.readText().take(240)
-                    } else {
-                        "${result.tool.title}\nOutput: ${result.outputFile.name}"
-                    }
+                val previewText = remember(result.outputFile.absolutePath, result.outputSizeBytes) {
+                    buildRichOutputPreview(result)
                 }
                 Box(
                     modifier = Modifier
@@ -844,6 +842,57 @@ fun ResultShowcaseCard(
             }
         }
     }
+}
+
+private fun decodeBoundedBitmap(file: File, maxDim: Int = 1080): Bitmap? {
+    return runCatching {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(file.absolutePath, bounds)
+        val largest = maxOf(bounds.outWidth, bounds.outHeight)
+        var sample = 1
+        while (largest / sample > maxDim && maxDim > 0) {
+            sample *= 2
+        }
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        BitmapFactory.decodeFile(file.absolutePath, opts)
+    }.getOrNull()
+}
+
+private fun buildRichOutputPreview(result: ConversionResult): String {
+    val file = result.outputFile
+    val ext = file.extension.lowercase()
+    return runCatching {
+        when {
+            !file.exists() -> result.summary
+            ext in setOf("json", "md", "txt", "html") ->
+                file.readText().take(240)
+            ext == "zip" -> ZipFile(file).use { zf ->
+                val entries = zf.entries().toList().take(4).joinToString("\n") { "• ${it.name}" }
+                "ZIP Archive (${zf.size()} item${if (zf.size() == 1) "" else "s"})\n$entries"
+            }
+            ext == "wav" && file.length() >= 44 -> {
+                val hdr = ByteArray(44)
+                file.inputStream().use { it.read(hdr) }
+                val bb = ByteBuffer.wrap(hdr).order(ByteOrder.LITTLE_ENDIAN)
+                val ch = bb.getShort(22).toInt().coerceAtLeast(1)
+                val sr = bb.getInt(24).coerceAtLeast(8000)
+                val dataBytes = (file.length() - 44L).coerceAtLeast(0L)
+                val secs = dataBytes.toDouble() / (sr * ch * 2.0)
+                "PCM WAV Audio\n${sr} Hz · ${if (ch == 2) "Stereo" else "Mono"} · ${String.format("%.1fs", secs)}"
+            }
+            ext == "docx" -> ZipFile(file).use { zf ->
+                val docEntry = zf.getEntry("word/document.xml")
+                val plain = if (docEntry != null) {
+                    zf.getInputStream(docEntry).bufferedReader().readText()
+                        .replace(Regex("<[^>]+>"), " ")
+                        .replace(Regex("\\s+"), " ")
+                        .trim()
+                } else ""
+                "OpenXML Word (.docx)\n${plain.take(180)}"
+            }
+            else -> "${result.tool.title}\n${result.summary}"
+        }
+    }.getOrElse { result.summary }
 }
 
 private fun renderFirstPdfPage(pdfFile: File): Bitmap? {

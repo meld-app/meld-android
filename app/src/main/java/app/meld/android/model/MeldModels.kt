@@ -390,13 +390,13 @@ enum class MeldToolId(
 
     fun acceptsExtension(ext: String): Boolean {
         val clean = ext.lowercase().trimStart('.')
-        return clean.isEmpty() || supportedExtensions.contains(clean)
+        return clean.isNotEmpty() && supportedExtensions.contains(clean)
     }
 
     fun followUpTools(): List<MeldToolId> = when (outputExtension) {
         "pdf" -> listOf(COMPRESS_PDF, PDF_EXTRACT, LOCK_STAMP).filter { it != this }
         "png", "jpg", "jpeg", "webp" -> listOf(COMPRESS, RESIZE_IMAGE, IMG_TO_PDF).filter { it != this }
-        else -> listOf(PACK_ZIP)
+        else -> listOf(PACK_ZIP).filter { it != this }
     }
 }
 
