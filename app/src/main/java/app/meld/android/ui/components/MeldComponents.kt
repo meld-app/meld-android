@@ -4,6 +4,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -12,6 +15,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -605,13 +612,13 @@ fun ResultShowcaseCard(
     val reduceMotion = rememberReduceMotion()
     val haptic = LocalHapticFeedback.current
 
-    val previewBitmap by produceState<Bitmap?>(
-        initialValue = null,
+    val previewState by produceState<Pair<Boolean, Bitmap?>>(
+        initialValue = false to null,
         result.outputFile.absolutePath,
         result.outputSizeBytes,
         result.durationMs
     ) {
-        value = withContext(Dispatchers.IO) {
+        val bmp = withContext(Dispatchers.IO) {
             val ext = result.outputFile.extension.lowercase()
             when {
                 !result.outputFile.exists() -> null
@@ -622,7 +629,9 @@ fun ResultShowcaseCard(
                 else -> null
             }
         }
+        value = true to bmp
     }
+    val (previewLoaded, previewBitmap) = previewState
 
     DisposableEffect(previewBitmap) {
         val bmp = previewBitmap
@@ -698,6 +707,13 @@ fun ResultShowcaseCard(
 
     val density = LocalDensity.current
     val renderedPreview = previewBitmap
+    val ext = result.outputFile.extension.lowercase()
+    val expectsBitmapPreview = ext in setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif", "pdf")
+    val showcaseState = when {
+        renderedPreview != null && !renderedPreview.isRecycled -> 2
+        !previewLoaded && expectsBitmapPreview -> 0
+        else -> 1
+    }
 
     Box(modifier = modifier.fillMaxWidth()) {
         TactileCard(
@@ -707,120 +723,154 @@ fun ResultShowcaseCard(
                 .fillMaxWidth()
                 .height(225.dp)
         ) {
-            if (renderedPreview != null) {
-                val leftOffPx = with(density) { (-46f * fanProgress.value).dp.toPx() }
-                val rightOffPx = with(density) { (32f * fanProgress.value).dp.toPx() }
+            AnimatedContent(
+                targetState = showcaseState,
+                transitionSpec = {
+                    if (reduceMotion) {
+                        EnterTransition.None togetherWith ExitTransition.None
+                    } else {
+                        (fadeIn(tween(durationMillis = 180, easing = MeldMotion.EaseOut)) +
+                            scaleIn(
+                                initialScale = 0.96f,
+                                animationSpec = tween(durationMillis = 180, easing = MeldMotion.EaseOut)
+                            )) togetherWith
+                            fadeOut(tween(durationMillis = 120, easing = MeldMotion.EaseOut))
+                    }
+                },
+                label = "resultPreviewEntrance"
+            ) { state ->
+                if (state == 2 && renderedPreview != null && !renderedPreview.isRecycled) {
+                    val leftOffPx = with(density) { (-46f * fanProgress.value).dp.toPx() }
+                    val rightOffPx = with(density) { (32f * fanProgress.value).dp.toPx() }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(18.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Surface(
+                    Box(
                         modifier = Modifier
-                            .fillMaxHeight(0.88f)
-                            .width(145.dp)
-                            .graphicsLayer {
-                                translationX = leftOffPx
-                                rotationZ = -5f * fanProgress.value
-                                alpha = 0.6f + 0.4f * fanProgress.value
-                            },
-                        shape = RoundedCornerShape(14.dp),
-                        color = MeldColors.PureWhite,
-                        border = BorderStroke(2.dp, MeldColors.InkBlack)
+                            .fillMaxSize()
+                            .padding(18.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxHeight(0.88f)
+                                .width(145.dp)
+                                .graphicsLayer {
+                                    translationX = leftOffPx
+                                    rotationZ = -5f * fanProgress.value
+                                    alpha = 0.6f + 0.4f * fanProgress.value
+                                },
+                            shape = RoundedCornerShape(14.dp),
+                            color = MeldColors.PureWhite,
+                            border = BorderStroke(2.dp, MeldColors.InkBlack)
                         ) {
-                            Text(
-                                text = "MELD STUDIO",
-                                fontSize = 8.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MeldColors.InkBlack
+                            Column(
+                                modifier = Modifier.padding(10.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "MELD STUDIO",
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MeldColors.InkBlack
+                                )
+                                repeat(4) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(20.dp)
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(MeldColors.WarmSurface)
+                                    )
+                                }
+                            }
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxHeight(0.92f)
+                                .width(155.dp)
+                                .graphicsLayer {
+                                    translationX = rightOffPx
+                                    translationY = 2.5.dp.toPx() * idleBob
+                                    rotationZ = 3.5f * fanProgress.value + 1.0f * idleBob
+                                    val s = 0.94f + 0.06f * fanProgress.value
+                                    scaleX = s
+                                    scaleY = s
+                                },
+                            shape = RoundedCornerShape(14.dp),
+                            color = MeldColors.PureWhite,
+                            border = BorderStroke(2.dp, MeldColors.InkBlack)
+                        ) {
+                            Image(
+                                bitmap = renderedPreview.asImageBitmap(),
+                                contentDescription = "Result preview",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(6.dp)
                             )
-                            repeat(4) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(20.dp)
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(MeldColors.WarmSurface)
+                        }
+                    }
+                } else if (state == 1) {
+                    val previewText by produceState(
+                        initialValue = result.summary,
+                        result.outputFile.absolutePath,
+                        result.outputSizeBytes,
+                        result.durationMs
+                    ) {
+                        value = withContext(Dispatchers.IO) {
+                            buildRichOutputPreview(result)
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(20.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        TactileCard(
+                            backgroundColor = MeldColors.PureWhite,
+                            cornerRadius = 16.dp,
+                            elevationOffset = 2.dp,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    val s = 0.94f + 0.06f * fanProgress.value
+                                    scaleX = s
+                                    scaleY = s
+                                }
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = result.outputFile.extension.uppercase(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MeldColors.CoralOrange
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = previewText,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MeldColors.InkBlack,
+                                    maxLines = 5
                                 )
                             }
                         }
                     }
-
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxHeight(0.92f)
-                            .width(155.dp)
-                            .graphicsLayer {
-                                translationX = rightOffPx
-                                translationY = 2.5.dp.toPx() * idleBob
-                                rotationZ = 3.5f * fanProgress.value + 1.0f * idleBob
-                                val s = 0.94f + 0.06f * fanProgress.value
-                                scaleX = s
-                                scaleY = s
-                            },
-                        shape = RoundedCornerShape(14.dp),
-                        color = MeldColors.PureWhite,
-                        border = BorderStroke(2.dp, MeldColors.InkBlack)
-                    ) {
-                        Image(
-                            bitmap = renderedPreview.asImageBitmap(),
-                            contentDescription = "Result preview",
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(6.dp)
-                        )
-                    }
-                }
-            } else {
-                val previewText by produceState(
-                    initialValue = result.summary,
-                    result.outputFile.absolutePath,
-                    result.outputSizeBytes,
-                    result.durationMs
-                ) {
-                    value = withContext(Dispatchers.IO) {
-                        buildRichOutputPreview(result)
-                    }
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(20.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    TactileCard(
-                        backgroundColor = MeldColors.PureWhite,
-                        cornerRadius = 16.dp,
-                        elevationOffset = 2.dp,
+                } else {
+                    // Blank paper frame while bitmap decodes on Dispatchers.IO so text card doesn't flash.
+                    Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .graphicsLayer {
-                                val s = 0.94f + 0.06f * fanProgress.value
-                                scaleX = s
-                                scaleY = s
-                            }
+                            .padding(18.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Text(
-                                text = result.outputFile.extension.uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MeldColors.CoralOrange
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = previewText,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MeldColors.InkBlack,
-                                maxLines = 5
-                            )
-                        }
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxHeight(0.92f)
+                                .width(155.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            color = MeldColors.PureWhite.copy(alpha = 0.72f),
+                            border = BorderStroke(2.dp, MeldColors.InkBlack.copy(alpha = 0.25f))
+                        ) {}
                     }
                 }
             }
