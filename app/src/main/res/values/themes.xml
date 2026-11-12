@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.MELD" parent="android:Theme.Material.NoActionBar">
-        <item name="android:statusBarColor">#0D0E12</item>
-        <item name="android:navigationBarColor">#0D0E12</item>
+    <style name="Theme.MELD" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#FAF4EC</item>
+        <item name="android:navigationBarColor">#FAF4EC</item>
     </style>
 </resources>
-

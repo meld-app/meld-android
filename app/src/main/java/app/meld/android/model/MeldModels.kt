@@ -3,80 +3,94 @@ package app.meld.android.model
 import java.io.File
 
 enum class MeldMode(val label: String) {
-    ALL("ALL STUDIO"),
-    CONVERT("⇧ CONVERT"),
-    TOOLS("⌘ TOOLS")
+    ALL("All"),
+    CONVERT("Convert"),
+    TOOLS("Tools")
 }
 
 enum class MeldCategory(val label: String) {
-    ALL("ALL"),
-    PDF_DOCS("PDF & DOCS"),
-    IMAGE_STUDIO("IMAGE"),
-    AUDIO_VIDEO("AUDIO & VIDEO"),
-    DATA_TABLES("TABLES & ZIP")
+    ALL("All"),
+    PDF_DOCS("PDFs"),
+    IMAGE_STUDIO("Images"),
+    AUDIO_VIDEO("Audio"),
+    DATA_TABLES("Tables & Zip")
 }
 
 enum class MeldToolId(
     val title: String,
     val badge: String,
     val subtitle: String,
+    val ctaLabel: String,
+    val resultHeadline: String,
     val mode: MeldMode,
     val category: MeldCategory,
     val supportedExtensions: Set<String>,
     val outputExtension: String
 ) {
     // ========================
-    // IMAGE CONVERSIONS (⇧ CONVERT)
+    // IMAGE CONVERSIONS
     // ========================
     IMG_TO_JPG(
-        title = "CONVERT -> JPG",
+        title = "To JPG",
         badge = "JPG",
-        subtitle = "Convert PNG, WebP, BMP, or TIFF image to standard JPEG",
+        subtitle = "Save any PNG, WebP, BMP, or TIFF as a compact JPEG",
+        ctaLabel = "Convert to JPG",
+        resultHeadline = "JPEG ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.IMAGE_STUDIO,
         supportedExtensions = setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif"),
         outputExtension = "jpg"
     ),
     IMG_TO_PNG(
-        title = "CONVERT -> PNG",
+        title = "To PNG",
         badge = "PNG",
-        subtitle = "Convert any image to lossless 32-bit PNG",
+        subtitle = "Convert into a crisp lossless 32-bit PNG",
+        ctaLabel = "Convert to PNG",
+        resultHeadline = "PNG ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.IMAGE_STUDIO,
         supportedExtensions = setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif"),
         outputExtension = "png"
     ),
     IMG_TO_WEBP(
-        title = "CONVERT -> WEBP",
-        badge = "WEBP",
-        subtitle = "Convert image to modern high-efficiency WebP format",
+        title = "To WebP",
+        badge = "WebP",
+        subtitle = "Turn an image into a lighter modern WebP file",
+        ctaLabel = "Convert to WebP",
+        resultHeadline = "WebP ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.IMAGE_STUDIO,
         supportedExtensions = setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif"),
         outputExtension = "webp"
     ),
     IMG_TO_BMP(
-        title = "CONVERT -> BMP",
+        title = "To BMP",
         badge = "BMP",
-        subtitle = "Export uncompressed 32-bit Windows Bitmap (.bmp)",
+        subtitle = "Export uncompressed 24-bit Windows Bitmap",
+        ctaLabel = "Convert to BMP",
+        resultHeadline = "Bitmap ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.IMAGE_STUDIO,
         supportedExtensions = setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif"),
         outputExtension = "bmp"
     ),
     IMG_TO_TIFF(
-        title = "CONVERT -> TIFF",
+        title = "To TIFF",
         badge = "TIFF",
-        subtitle = "Export archival uncompressed RGB TIFF (.tiff) image",
+        subtitle = "Export archival uncompressed RGB TIFF",
+        ctaLabel = "Convert to TIFF",
+        resultHeadline = "TIFF ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.IMAGE_STUDIO,
         supportedExtensions = setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif"),
         outputExtension = "tiff"
     ),
     IMG_TO_PDF(
-        title = "IMAGE -> PDF",
+        title = "Image to PDF",
         badge = "A4 PDF",
-        subtitle = "Convert image into a centered, print-ready A4 PDF document",
+        subtitle = "Center an image cleanly onto a print-ready A4 page",
+        ctaLabel = "Create PDF",
+        resultHeadline = "PDF ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.IMAGE_STUDIO,
         supportedExtensions = setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff"),
@@ -84,57 +98,69 @@ enum class MeldToolId(
     ),
 
     // ========================
-    // IMAGE STUDIO TOOLS (⌘ TOOLS)
+    // IMAGE STUDIO TOOLS
     // ========================
     REMOVE_BG(
-        title = "REMOVE BG",
-        badge = "PNG ALPHA",
-        subtitle = "Isolate subject & strip background into a transparent PNG",
+        title = "Remove BG",
+        badge = "Alpha",
+        subtitle = "Lift the subject cleanly onto a transparent PNG",
+        ctaLabel = "Remove background",
+        resultHeadline = "Background removed.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.IMAGE_STUDIO,
         supportedExtensions = setOf("png", "jpg", "jpeg", "webp"),
         outputExtension = "png"
     ),
     COMPRESS(
-        title = "COMPRESS IMG",
-        badge = "TARGET KB",
-        subtitle = "Binary-search compress image to exact portal KB limit",
+        title = "Compress Img",
+        badge = "Target KB",
+        subtitle = "Squeeze an image under any portal upload limit",
+        ctaLabel = "Compress image",
+        resultHeadline = "Compressed cleanly.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.IMAGE_STUDIO,
         supportedExtensions = setOf("png", "jpg", "jpeg", "webp"),
         outputExtension = "jpg"
     ),
     RESIZE_IMAGE(
-        title = "RESIZE & FRAME",
-        badge = "SCALE %",
-        subtitle = "Scale image resolution & add optional studio border frame",
+        title = "Resize & Frame",
+        badge = "Scale",
+        subtitle = "Scale dimensions & add an optional studio border",
+        ctaLabel = "Resize image",
+        resultHeadline = "Resized cleanly.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.IMAGE_STUDIO,
         supportedExtensions = setOf("png", "jpg", "jpeg", "webp"),
         outputExtension = "png"
     ),
     COLLAGE(
-        title = "PHOTO COLLAGE",
-        badge = "2x2 GRID",
-        subtitle = "Generate a 2x2 studio contact sheet collage with MELD caption",
+        title = "Photo Collage",
+        badge = "2x2 Grid",
+        subtitle = "Arrange a 2x2 studio contact sheet with borders",
+        ctaLabel = "Build collage",
+        resultHeadline = "Collage ready.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.IMAGE_STUDIO,
         supportedExtensions = setOf("png", "jpg", "jpeg", "webp"),
         outputExtension = "png"
     ),
     STRIP_EXIF(
-        title = "STRIP EXIF",
-        badge = "PRIVACY",
-        subtitle = "Wipe GPS, camera serial & EXIF metadata into a clean PNG",
+        title = "Strip EXIF",
+        badge = "Privacy",
+        subtitle = "Wipe GPS location & camera tags before sharing",
+        ctaLabel = "Strip metadata",
+        resultHeadline = "Metadata wiped.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.IMAGE_STUDIO,
         supportedExtensions = setOf("png", "jpg", "jpeg", "webp"),
         outputExtension = "png"
     ),
     SCAN_QR(
-        title = "QR STUDIO",
-        badge = "QR MATRIX",
-        subtitle = "Generate high-contrast 960x960 offline QR payload cards",
+        title = "QR Studio",
+        badge = "QR Card",
+        subtitle = "Generate a crisp offline QR card for any link",
+        ctaLabel = "Create QR card",
+        resultHeadline = "QR card ready.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.IMAGE_STUDIO,
         supportedExtensions = setOf("png", "jpg", "jpeg", "pdf", "txt", "csv"),
@@ -142,57 +168,69 @@ enum class MeldToolId(
     ),
 
     // ========================
-    // PDF CONVERSIONS (⇧ CONVERT)
+    // PDF CONVERSIONS
     // ========================
     PDF_TO_PNG(
-        title = "PDF -> PNG",
+        title = "PDF to PNG",
         badge = "HD PNG",
-        subtitle = "Render PDF page as high-resolution lossless PNG image",
+        subtitle = "Render PDF pages as crisp lossless images",
+        ctaLabel = "Export PNG",
+        resultHeadline = "Image ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.PDF_DOCS,
         supportedExtensions = setOf("pdf"),
         outputExtension = "png"
     ),
     PDF_TO_JPG(
-        title = "PDF -> JPG",
+        title = "PDF to JPG",
         badge = "HD JPG",
-        subtitle = "Render PDF page as high-resolution JPEG image",
+        subtitle = "Save PDF pages as shareable JPEG photos",
+        ctaLabel = "Export JPG",
+        resultHeadline = "JPEG ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.PDF_DOCS,
         supportedExtensions = setOf("pdf"),
         outputExtension = "jpg"
     ),
     PDF_TO_MD(
-        title = "PDF -> MARKDOWN",
-        badge = "MD DOC",
-        subtitle = "Convert PDF document structure & pages into clean Markdown (.md)",
+        title = "PDF to Markdown",
+        badge = "MD",
+        subtitle = "Extract document structure into clean Markdown notes",
+        ctaLabel = "Convert to Markdown",
+        resultHeadline = "Markdown ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.PDF_DOCS,
         supportedExtensions = setOf("pdf"),
         outputExtension = "md"
     ),
     PDF_TO_HTML(
-        title = "PDF -> HTML5",
-        badge = "WEB DOC",
-        subtitle = "Export PDF as a dark-mode standalone HTML5 reader with page cards",
+        title = "PDF to HTML5",
+        badge = "Web Doc",
+        subtitle = "Build a standalone offline HTML5 reader page",
+        ctaLabel = "Export HTML5",
+        resultHeadline = "Reader ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.PDF_DOCS,
         supportedExtensions = setOf("pdf"),
         outputExtension = "html"
     ),
     PDF_TO_DOCX(
-        title = "PDF -> WORD",
+        title = "PDF to Word",
         badge = "DOCX",
-        subtitle = "Export PDF into an OpenXML Microsoft Word (.docx) document",
+        subtitle = "Convert PDF into an editable Microsoft Word file",
+        ctaLabel = "Export to Word",
+        resultHeadline = "Word file ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.PDF_DOCS,
         supportedExtensions = setOf("pdf"),
         outputExtension = "docx"
     ),
     PDF_TO_TXT(
-        title = "PDF -> TEXT",
-        badge = "PLAIN TXT",
-        subtitle = "Extract plain-text summary & page manifest from PDF",
+        title = "PDF to Text",
+        badge = "TXT",
+        subtitle = "Pull plain text & page summary from your PDF",
+        ctaLabel = "Extract text",
+        resultHeadline = "Text extracted.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.PDF_DOCS,
         supportedExtensions = setOf("pdf"),
@@ -200,66 +238,80 @@ enum class MeldToolId(
     ),
 
     // ========================
-    // PDF STUDIO TOOLS (⌘ TOOLS)
+    // PDF STUDIO TOOLS
     // ========================
     COMPRESS_PDF(
-        title = "COMPRESS PDF",
-        badge = "TARGET KB",
-        subtitle = "Downsample & re-encode PDF pages to fit portal upload limits",
+        title = "Compress",
+        badge = "Target KB",
+        subtitle = "Squeeze a PDF under any upload limit",
+        ctaLabel = "Compress PDF",
+        resultHeadline = "Compressed cleanly.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.PDF_DOCS,
         supportedExtensions = setOf("pdf"),
         outputExtension = "pdf"
     ),
     HANDOUT(
-        title = "HANDOUT",
-        badge = "2/3/4-UP",
-        subtitle = "Arrange slides into 2-up, 3-up (with notes), or 4-up study sheets",
-        mode = MeldMode.TOOLS,
-        category = MeldCategory.PDF_DOCS,
-        supportedExtensions = setOf("pdf"),
-        outputExtension = "pdf"
-    ),
-    LOCK_STAMP(
-        title = "LOCK / STAMP",
-        badge = "WATERMARK",
-        subtitle = "Stamp diagonal security watermark & flatten PDF pages",
-        mode = MeldMode.TOOLS,
-        category = MeldCategory.PDF_DOCS,
-        supportedExtensions = setOf("pdf"),
-        outputExtension = "pdf"
-    ),
-    REDACT(
-        title = "REDACT PDF",
-        badge = "SANITIZE",
-        subtitle = "Burn tamper-proof redaction bars over sensitive regions & flatten",
+        title = "Handout",
+        badge = "2/3/4-up",
+        subtitle = "Arrange slides into 2, 3, or 4-up notes sheets",
+        ctaLabel = "Create handout",
+        resultHeadline = "Handout ready.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.PDF_DOCS,
         supportedExtensions = setOf("pdf"),
         outputExtension = "pdf"
     ),
     PDF_EXTRACT(
-        title = "SPLIT PDF",
-        badge = "PAGES",
-        subtitle = "Extract selected page range into a clean standalone PDF",
+        title = "Split",
+        badge = "Pages",
+        subtitle = "Keep just the page range you actually need",
+        ctaLabel = "Extract pages",
+        resultHeadline = "Pages split.",
+        mode = MeldMode.TOOLS,
+        category = MeldCategory.PDF_DOCS,
+        supportedExtensions = setOf("pdf"),
+        outputExtension = "pdf"
+    ),
+    LOCK_STAMP(
+        title = "Lock & Stamp",
+        badge = "Watermark",
+        subtitle = "Stamp a diagonal security watermark across pages",
+        ctaLabel = "Stamp PDF",
+        resultHeadline = "PDF stamped.",
+        mode = MeldMode.TOOLS,
+        category = MeldCategory.PDF_DOCS,
+        supportedExtensions = setOf("pdf"),
+        outputExtension = "pdf"
+    ),
+    REDACT(
+        title = "Redact",
+        badge = "Sanitize",
+        subtitle = "Black out private zones & flatten pages permanently",
+        ctaLabel = "Redact & flatten",
+        resultHeadline = "PDF redacted.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.PDF_DOCS,
         supportedExtensions = setOf("pdf"),
         outputExtension = "pdf"
     ),
     PDF_MERGE(
-        title = "MERGE / BOOKLET",
-        badge = "COMBINE",
-        subtitle = "Combine & duplicate PDF pages into a unified multi-page deck",
+        title = "Merge Booklet",
+        badge = "Combine",
+        subtitle = "Combine pages into a unified multi-page deck",
+        ctaLabel = "Build booklet",
+        resultHeadline = "Booklet merged.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.PDF_DOCS,
         supportedExtensions = setOf("pdf"),
         outputExtension = "pdf"
     ),
     STRIP_PDF_META(
-        title = "SANITIZE PDF",
-        badge = "NO META",
-        subtitle = "Strip author, producer & hidden XMP metadata by raster-rebuilding",
+        title = "Sanitize PDF",
+        badge = "No Meta",
+        subtitle = "Strip author, producer & hidden XMP properties",
+        ctaLabel = "Strip PDF metadata",
+        resultHeadline = "Metadata stripped.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.PDF_DOCS,
         supportedExtensions = setOf("pdf"),
@@ -267,57 +319,69 @@ enum class MeldToolId(
     ),
 
     // ========================
-    // AUDIO, VIDEO, TABLES & ARCHIVE
+    // AUDIO, TABLES & ARCHIVE
     // ========================
     VISUALIZE(
-        title = "VISUALIZE",
-        badge = "WAVEFORM",
-        subtitle = "Render 1920x600 studio gradient audio waveform PNG from media",
+        title = "Waveform PNG",
+        badge = "Waveform",
+        subtitle = "Turn audio into a high-res gradient waveform banner",
+        ctaLabel = "Render waveform",
+        resultHeadline = "Waveform ready.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.AUDIO_VIDEO,
         supportedExtensions = setOf("wav", "mp3", "m4a", "aac", "mp4", "ogg"),
         outputExtension = "png"
     ),
     SPEED_2X(
-        title = "SPEED 2X",
-        badge = "2.0x FAST",
-        subtitle = "Double playback speed (2x time-decimated WAV audio stream)",
+        title = "Speed 2x",
+        badge = "2.0x",
+        subtitle = "Double audio playback speed locally in WAV",
+        ctaLabel = "Speed up 2x",
+        resultHeadline = "2x audio ready.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.AUDIO_VIDEO,
         supportedExtensions = setOf("wav", "mp3", "m4a", "mp4"),
         outputExtension = "wav"
     ),
     SHEET_TO_PDF(
-        title = "TABLE -> PDF",
-        badge = "VECTOR PDF",
-        subtitle = "Render CSV/TSV spreadsheet into a formatted A4 vector table PDF",
+        title = "Table to PDF",
+        badge = "A4 PDF",
+        subtitle = "Render CSV data into a crisp printable table PDF",
+        ctaLabel = "Export table PDF",
+        resultHeadline = "Table PDF ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.DATA_TABLES,
         supportedExtensions = setOf("csv", "tsv", "txt"),
         outputExtension = "pdf"
     ),
     SHEET_TO_MD(
-        title = "TABLE -> MD",
-        badge = "MARKDOWN",
-        subtitle = "Convert CSV spreadsheet rows into a GitHub Markdown table (.md)",
+        title = "Table to MD",
+        badge = "Markdown",
+        subtitle = "Format spreadsheet rows into a Markdown table",
+        ctaLabel = "Convert to Markdown",
+        resultHeadline = "Markdown table ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.DATA_TABLES,
         supportedExtensions = setOf("csv", "tsv", "txt"),
         outputExtension = "md"
     ),
     TABLE_CONVERT(
-        title = "TABLE -> JSON",
-        badge = "STRUCTURED",
-        subtitle = "Convert CSV spreadsheet rows into structured JSON objects",
+        title = "Table to JSON",
+        badge = "JSON",
+        subtitle = "Parse spreadsheet rows into clean structured JSON",
+        ctaLabel = "Convert to JSON",
+        resultHeadline = "JSON ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.DATA_TABLES,
         supportedExtensions = setOf("csv", "tsv", "txt"),
         outputExtension = "json"
     ),
     PACK_ZIP(
-        title = "ARCHIVE -> ZIP",
-        badge = "ZIP PACK",
-        subtitle = "Compress staged file into a standard .zip archive",
+        title = "Zip Archive",
+        badge = "ZIP",
+        subtitle = "Pack your working file into a neat .zip archive",
+        ctaLabel = "Create ZIP",
+        resultHeadline = "Archive packed.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.DATA_TABLES,
         supportedExtensions = setOf("pdf", "png", "jpg", "jpeg", "webp", "csv", "txt", "wav", "json", "md"),
@@ -328,10 +392,16 @@ enum class MeldToolId(
         val clean = ext.lowercase().trimStart('.')
         return clean.isEmpty() || supportedExtensions.contains(clean)
     }
+
+    fun followUpTools(): List<MeldToolId> = when (outputExtension) {
+        "pdf" -> listOf(COMPRESS_PDF, PDF_EXTRACT, LOCK_STAMP).filter { it != this }
+        "png", "jpg", "jpeg", "webp" -> listOf(COMPRESS, RESIZE_IMAGE, IMG_TO_PDF).filter { it != this }
+        else -> listOf(PACK_ZIP)
+    }
 }
 
 data class ToolOptions(
-    val targetKb: Int = 180,
+    val targetKb: Int = 40,
     val resizePercent: Int = 75,
     val addStudioFrame: Boolean = true,
     val stampText: String = "CONFIDENTIAL • MELD VERIFIED",
@@ -346,10 +416,25 @@ data class SelectedFileInfo(
     val file: File,
     val displayName: String,
     val extension: String,
-    val sizeBytes: Long
+    val sizeBytes: Long,
+    val pageCount: Int? = null
 ) {
+    val cleanTitle: String
+        get() = displayName
+            .substringBeforeLast('.')
+            .removePrefix("MELD_")
+            .removeSuffix("_4Pages")
+            .replace('_', ' ')
+
     val formattedSize: String
         get() = formatByteCount(sizeBytes)
+
+    val formattedMetaLine: String
+        get() = if (pageCount != null && pageCount > 0) {
+            "$pageCount page${if (pageCount == 1) "" else "s"} · $formattedSize"
+        } else {
+            "${extension.uppercase()} · $formattedSize"
+        }
 
     companion object {
         fun formatByteCount(bytes: Long): String {

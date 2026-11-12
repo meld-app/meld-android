@@ -10,10 +10,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.FileProvider
-import app.meld.android.ui.MeldDashboardScreen
+import app.meld.android.ui.MeldAppRoot
 import app.meld.android.ui.MeldViewModel
 import app.meld.android.ui.theme.MeldTheme
 import java.io.File
@@ -24,9 +25,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val creamColor = android.graphics.Color.parseColor("#FAF4EC")
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.parseColor("#0D0E12")),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.parseColor("#0D0E12"))
+            statusBarStyle = SystemBarStyle.light(creamColor, creamColor),
+            navigationBarStyle = SystemBarStyle.light(creamColor, creamColor)
         )
 
         // Handle incoming "Share to MELD" intent from other Android apps
@@ -42,6 +44,10 @@ class MainActivity : ComponentActivity() {
             MeldTheme {
                 val uiState by viewModel.uiState.collectAsState()
 
+                LaunchedEffect(Unit) {
+                    viewModel.ensureDefaultFileLoaded(this@MainActivity)
+                }
+
                 val filePickerLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.OpenDocument()
                 ) { uri: Uri? ->
@@ -50,17 +56,29 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                MeldDashboardScreen(
+                MeldAppRoot(
                     uiState = uiState,
-                    onSelectMode = viewModel::selectMode,
-                    onSelectCategory = viewModel::selectCategory,
-                    onSelectTool = viewModel::selectTool,
-                    onPickFile = { filePickerLauncher.launch(arrayOf("*/*")) },
+                    onSelectTab = viewModel::selectDockTab,
+                    onOpenTask = viewModel::openTask,
+                    onOpenResult = viewModel::openResult,
+                    onNavigateHome = viewModel::navigateHome,
+                    onSetFileSheetVisible = viewModel::setFileSheetVisible,
+                    onPickExternalFile = {
+                        viewModel.setFileSheetVisible(false)
+                        filePickerLauncher.launch(arrayOf("*/*"))
+                    },
                     onLoadSample = { preset ->
                         viewModel.loadSamplePreset(this@MainActivity, preset)
                     },
-                    onRunTool = {
-                        viewModel.executeSelectedTool(this@MainActivity)
+                    onSelectMode = viewModel::selectMode,
+                    onSelectCategory = viewModel::selectCategory,
+                    onSearchChange = viewModel::updateSearchQuery,
+                    onRunTool = { tool ->
+                        viewModel.executeTool(this@MainActivity, tool)
+                    },
+                    onContinueTool = viewModel::continueWithResult,
+                    onSaveToDownloads = { file ->
+                        viewModel.saveToDownloads(this@MainActivity, file)
                     },
                     onShareResult = { outputFile ->
                         shareOutputFile(outputFile)
@@ -85,7 +103,11 @@ class MainActivity : ComponentActivity() {
                     },
                     onUpdatePageRange = { start, end ->
                         viewModel.updateOptions { it.copy(pageRangeStart = start, pageRangeEnd = end) }
-                    }
+                    },
+                    onUpdateChromaTolerance = { tol ->
+                        viewModel.updateOptions { it.copy(chromaTolerance = tol) }
+                    },
+                    onToggleAutoDownloads = viewModel::toggleAutoDownloads
                 )
             }
         }
@@ -121,4 +143,3 @@ class MainActivity : ComponentActivity() {
         startActivity(Intent.createChooser(shareIntent, "Share MELD Output"))
     }
 }
-
