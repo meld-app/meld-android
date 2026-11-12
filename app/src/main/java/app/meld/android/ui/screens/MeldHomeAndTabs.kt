@@ -1,5 +1,10 @@
 package app.meld.android.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -22,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
@@ -44,6 +50,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.TableChart
@@ -61,19 +68,26 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
 import app.meld.android.R
 import app.meld.android.model.ConversionResult
 import app.meld.android.model.MeldCategory
@@ -83,6 +97,7 @@ import app.meld.android.model.SelectedFileInfo
 import app.meld.android.ui.DockTab
 import app.meld.android.ui.MeldUiState
 import app.meld.android.ui.SamplePreset
+import app.meld.android.ui.components.MeldOpeningDriver
 import app.meld.android.ui.components.TactileCard
 import app.meld.android.ui.components.TactileChipPill
 import app.meld.android.ui.components.TactileCircleIconButton
@@ -90,16 +105,20 @@ import app.meld.android.ui.components.WorkingDocumentIllustration
 import app.meld.android.ui.theme.MeldColors
 import java.io.File
 import java.util.Calendar
+import kotlin.math.hypot
 
 @Composable
 fun MeldStudioHomeScreen(
     uiState: MeldUiState,
+    openingDriver: MeldOpeningDriver,
+    onReplayIntro: () -> Unit,
     onOpenChangeFile: () -> Unit,
     onOpenTask: (MeldToolId) -> Unit,
     onSeeAllTools: () -> Unit,
     onOpenResult: (ConversionResult) -> Unit,
     onShareFile: (File) -> Unit
 ) {
+    val density = LocalDensity.current
     val greeting = remember {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         when {
@@ -123,19 +142,34 @@ fun MeldStudioHomeScreen(
         }
     }
 
+    val slide22Px = with(density) { 22.dp.toPx() }
+    val slide26Px = with(density) { 26.dp.toPx() }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 112.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
-        // Top Brand Row: M meld + Works offline badge
+        // Top Brand Row: M meld (tap to replay opening!) + Works offline pill
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .onGloballyPositioned { coords ->
+                            openingDriver.brandTarget = coords.boundsInRoot()
+                        }
+                        .graphicsLayer {
+                            alpha = if (!openingDriver.showOverlay || openingDriver.dockToHome.value >= 0.96f) 1f else 0f
+                        }
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onReplayIntro() }
+                        .padding(end = 6.dp)
+                ) {
                     Surface(
                         modifier = Modifier.size(38.dp),
                         shape = RoundedCornerShape(11.dp),
@@ -159,6 +193,9 @@ fun MeldStudioHomeScreen(
                 }
 
                 Surface(
+                    modifier = Modifier.graphicsLayer {
+                        alpha = if (!openingDriver.showOverlay) 1f else openingDriver.pillAlpha.value.coerceIn(0f, 1f)
+                    },
                     shape = CircleShape,
                     color = MeldColors.PureWhite,
                     border = BorderStroke(1.8.dp, MeldColors.InkBlack)
@@ -184,86 +221,137 @@ fun MeldStudioHomeScreen(
             }
         }
 
-        // Human Greeting Header
+        // Human Greeting Header (staggered rh + rp from Opening.dc.html)
         item {
+            val rhT = if (!openingDriver.showOverlay) 1f else openingDriver.rhAnim.value
+            val rpT = if (!openingDriver.showOverlay) 1f else openingDriver.rpAnim.value
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = greeting,
                     style = MaterialTheme.typography.displayMedium,
-                    color = MeldColors.InkBlack
+                    color = MeldColors.InkBlack,
+                    modifier = Modifier.graphicsLayer {
+                        alpha = rhT.coerceIn(0f, 1f)
+                        translationY = (1f - rhT) * slide22Px
+                    }
                 )
                 Text(
                     text = "What needs sorting today?",
                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
-                    color = MeldColors.TextSecondary
+                    color = MeldColors.TextSecondary,
+                    modifier = Modifier.graphicsLayer {
+                        alpha = rpT.coerceIn(0f, 1f)
+                        translationY = (1f - rpT) * slide22Px
+                    }
                 )
             }
         }
 
-        // Hero Coral WORKING ON Card
+        // Hero Coral WORKING ON Card with Circular Clip Reveal expanding from sheet center!
         item {
             val file = uiState.selectedFile
-            TactileCard(
-                backgroundColor = MeldColors.CoralOrange,
-                cornerRadius = 26.dp,
-                modifier = Modifier.fillMaxWidth()
+            val clipFrac = if (!openingDriver.showOverlay) 1f else openingDriver.heroClip.value.coerceIn(0f, 1f)
+            val heroRevealShape = GenericShape { size, _ ->
+                if (clipFrac >= 0.99f) {
+                    addRect(Rect(0f, 0f, size.width, size.height))
+                } else if (clipFrac > 0.005f) {
+                    val cx = with(density) { 56.dp.toPx() }
+                    val cy = size.height / 2f
+                    val maxRadius = hypot(size.width, size.height) * 1.1f
+                    val radius = maxRadius * clipFrac
+                    addOval(Rect(cx - radius, cy - radius, cx + radius, cy + radius))
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer { alpha = if (clipFrac > 0.005f) 1f else 0f }
+                    .clip(heroRevealShape)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 20.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                TactileCard(
+                    backgroundColor = MeldColors.CoralOrange,
+                    cornerRadius = 26.dp,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    WorkingDocumentIllustration(extension = file?.extension ?: "pdf")
-                    Spacer(modifier = Modifier.width(20.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "WORKING ON",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MeldColors.InkBlack.copy(alpha = 0.72f)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = file?.cleanTitle ?: "Lecture Deck",
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MeldColors.InkBlack,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = file?.formattedMetaLine ?: "Tap Change file to pick one",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MeldColors.InkBlack.copy(alpha = 0.85f)
-                        )
-                        Spacer(modifier = Modifier.height(14.dp))
-                        Surface(
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 20.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
                             modifier = Modifier
-                                .clip(CircleShape)
-                                .clickable { onOpenChangeFile() },
-                            shape = CircleShape,
-                            color = MeldColors.PureWhite,
-                            border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+                                .onGloballyPositioned { coords ->
+                                    openingDriver.sheetTarget = coords.boundsInRoot()
+                                }
+                                .graphicsLayer {
+                                    alpha = if (!openingDriver.showOverlay || openingDriver.dockToHome.value >= 0.97f) 1f else 0f
+                                    rotationZ = -3f
+                                }
                         ) {
+                            WorkingDocumentIllustration(extension = file?.extension ?: "pdf")
+                        }
+                        Spacer(modifier = Modifier.width(20.dp))
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Change file",
-                                style = MaterialTheme.typography.labelMedium,
+                                text = "WORKING ON",
+                                style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = MeldColors.InkBlack,
-                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp)
+                                color = MeldColors.InkBlack.copy(alpha = 0.72f)
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = file?.cleanTitle ?: "Lecture Deck",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MeldColors.InkBlack,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = file?.formattedMetaLine ?: "Tap Change file to pick one",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MeldColors.InkBlack.copy(alpha = 0.85f)
+                            )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Surface(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .clickable { onOpenChangeFile() },
+                                shape = CircleShape,
+                                color = MeldColors.PureWhite,
+                                border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+                            ) {
+                                Text(
+                                    text = "Change file",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MeldColors.InkBlack,
+                                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp)
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Quick Tools Section + All 31 Link
+        // Quick Tools Section + All 31 Link (staggered qt, t1, t2, t3)
         item {
+            val qtT = if (!openingDriver.showOverlay) 1f else openingDriver.qtAnim.value
+            val t1T = if (!openingDriver.showOverlay) 1f else openingDriver.t1Anim.value
+            val t2T = if (!openingDriver.showOverlay) 1f else openingDriver.t2Anim.value
+            val t3T = if (!openingDriver.showOverlay) 1f else openingDriver.t3Anim.value
+
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer {
+                            alpha = qtT.coerceIn(0f, 1f)
+                            translationY = (1f - qtT) * slide22Px
+                        },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -292,7 +380,7 @@ fun MeldStudioHomeScreen(
                         .height(236.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Left Tall Yellow Card
+                    // Left Tall Yellow Card (`t1`)
                     val primaryTool = quickTriple.first
                     TactileCard(
                         backgroundColor = MeldColors.ButterYellow,
@@ -301,6 +389,13 @@ fun MeldStudioHomeScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
+                            .graphicsLayer {
+                                alpha = t1T.coerceIn(0f, 1f)
+                                translationY = (1f - t1T) * slide26Px
+                                val sc = lerp(0.92f, 1f, t1T)
+                                scaleX = sc
+                                scaleY = sc
+                            }
                     ) {
                         Column(
                             modifier = Modifier
@@ -342,7 +437,7 @@ fun MeldStudioHomeScreen(
                         }
                     }
 
-                    // Right Column: 2 Stacked Pastel Cards
+                    // Right Column: 2 Stacked Pastel Cards (`t2` & `t3`)
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -357,6 +452,13 @@ fun MeldStudioHomeScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
+                                .graphicsLayer {
+                                    alpha = t2T.coerceIn(0f, 1f)
+                                    translationY = (1f - t2T) * slide26Px
+                                    val sc = lerp(0.92f, 1f, t2T)
+                                    scaleX = sc
+                                    scaleY = sc
+                                }
                         ) {
                             Column(
                                 modifier = Modifier
@@ -395,6 +497,13 @@ fun MeldStudioHomeScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
+                                .graphicsLayer {
+                                    alpha = t3T.coerceIn(0f, 1f)
+                                    translationY = (1f - t3T) * slide26Px
+                                    val sc = lerp(0.92f, 1f, t3T)
+                                    scaleX = sc
+                                    scaleY = sc
+                                }
                         ) {
                             Column(
                                 modifier = Modifier
@@ -429,14 +538,20 @@ fun MeldStudioHomeScreen(
             }
         }
 
-        // Most Recent Result Strip (matching Reference Page 1 bottom white card)
+        // Most Recent Result Strip (`rec`)
         uiState.recentResults.firstOrNull()?.let { latest ->
             item {
+                val recT = if (!openingDriver.showOverlay) 1f else openingDriver.recAnim.value
                 TactileCard(
                     backgroundColor = MeldColors.PureWhite,
                     cornerRadius = 22.dp,
                     onClick = { onOpenResult(latest) },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer {
+                            alpha = recT.coerceIn(0f, 1f)
+                            translationY = (1f - recT) * slide22Px
+                        }
                 ) {
                     Row(
                         modifier = Modifier
@@ -688,7 +803,8 @@ fun MeldAllToolsScreen(
 fun MeldSettingsScreen(
     uiState: MeldUiState,
     onToggleAutoDownloads: (Boolean) -> Unit,
-    onUpdateDefaultHandout: (Int) -> Unit
+    onUpdateDefaultHandout: (Int) -> Unit,
+    onReplayIntro: () -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -818,6 +934,50 @@ fun MeldSettingsScreen(
 
         item {
             TactileCard(
+                backgroundColor = MeldColors.ButterYellow,
+                cornerRadius = 22.dp,
+                onClick = onReplayIntro,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = CircleShape,
+                        color = MeldColors.PureWhite,
+                        border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = MeldColors.InkBlack
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = "Replay Opening Animation",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MeldColors.InkBlack
+                        )
+                        Text(
+                            text = "Watch the MELD sheet fold & dock choreography",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MeldColors.InkBlack.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            TactileCard(
                 backgroundColor = MeldColors.WarmSurface,
                 cornerRadius = 22.dp,
                 modifier = Modifier.fillMaxWidth()
@@ -843,12 +1003,21 @@ fun MeldSettingsScreen(
 @Composable
 fun MeldFloatingBottomDock(
     activeTab: DockTab,
+    openingDriver: MeldOpeningDriver,
     onSelectTab: (DockTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val density = LocalDensity.current
+    val slide90Px = with(density) { 90.dp.toPx() }
+    val dockT = if (!openingDriver.showOverlay) 1f else openingDriver.navDockAnim.value
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .graphicsLayer {
+                alpha = dockT.coerceIn(0f, 1f)
+                translationY = (1f - dockT) * slide90Px
+            }
             .padding(horizontal = 20.dp, vertical = 14.dp),
         shape = CircleShape,
         color = MeldColors.DockInk,
@@ -869,12 +1038,26 @@ fun MeldFloatingBottomDock(
             )
             items.forEach { (tab, label, icon) ->
                 val selected = tab == activeTab
+                val pillBg by animateColorAsState(
+                    targetValue = if (selected) MeldColors.CoralOrange else Color.Transparent,
+                    animationSpec = spring(stiffness = Spring.StiffnessMedium),
+                    label = "dockPillBg"
+                )
+                val iconScale by animateFloatAsState(
+                    targetValue = if (selected) 1.08f else 1f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessMedium
+                    ),
+                    label = "dockIconScale"
+                )
+
                 Surface(
                     modifier = Modifier
                         .clip(CircleShape)
                         .clickable { onSelectTab(tab) },
                     shape = CircleShape,
-                    color = if (selected) MeldColors.CoralOrange else Color.Transparent
+                    color = pillBg
                 ) {
                     Row(
                         modifier = Modifier.padding(
@@ -887,16 +1070,23 @@ fun MeldFloatingBottomDock(
                             imageVector = icon,
                             contentDescription = label,
                             tint = if (selected) MeldColors.InkBlack else MeldColors.PureWhite.copy(alpha = 0.85f),
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier
+                                .size(20.dp)
+                                .graphicsLayer {
+                                    scaleX = iconScale
+                                    scaleY = iconScale
+                                }
                         )
-                        if (selected) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MeldColors.InkBlack
-                            )
+                        AnimatedVisibility(visible = selected) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MeldColors.InkBlack
+                                )
+                            }
                         }
                     }
                 }
