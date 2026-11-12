@@ -1,6 +1,9 @@
 package app.meld.android.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -69,6 +72,7 @@ import app.meld.android.ui.components.ResultShowcaseCard
 import app.meld.android.ui.components.TactileCard
 import app.meld.android.ui.components.TactileChipPill
 import app.meld.android.ui.components.TactileCircleIconButton
+import app.meld.android.ui.components.TactilePillButton
 import app.meld.android.ui.components.TactileRulerSlider
 import app.meld.android.ui.theme.MeldColors
 import java.io.File
@@ -222,57 +226,43 @@ fun MeldTaskScreen(
             }
         }
 
-        // Fixed Bottom Tactile Coral Action Button
+        // Fixed Bottom Tactile Coral Action Button with Hard Shadow & Press Bounce
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MeldColors.CreamCanvas)
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(58.dp)
-                    .clip(CircleShape)
-                    .clickable(enabled = !uiState.isProcessing) { onRunTool() },
-                shape = CircleShape,
-                color = MeldColors.CoralOrange,
-                border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (uiState.isProcessing) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.4.dp,
-                            color = MeldColors.InkBlack
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Working on it...",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MeldColors.InkBlack
-                        )
-                    } else {
-                        Icon(
-                            imageVector = iconForTool(tool),
-                            contentDescription = null,
-                            tint = MeldColors.InkBlack,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = tool.ctaLabel,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MeldColors.InkBlack
-                        )
+            TactilePillButton(
+                text = tool.ctaLabel,
+                icon = iconForTool(tool),
+                backgroundColor = MeldColors.CoralOrange,
+                enabled = !uiState.isProcessing,
+                onClick = onRunTool,
+                height = 56.dp,
+                modifier = Modifier.fillMaxWidth(),
+                customContent = if (uiState.isProcessing) {
+                    {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(20.dp),
+                                strokeWidth = 2.4.dp,
+                                color = MeldColors.InkBlack
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Working on it...",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MeldColors.InkBlack
+                            )
+                        }
                     }
-                }
-            }
+                } else null
+            )
         }
     }
 }
@@ -286,6 +276,11 @@ private fun CompressTaskControls(
     val sourceKb = max(72, (sourceBytes / 1024.0).toInt())
     val maxSliderKb = max(120, sourceKb.coerceAtMost(800))
     var showCustomInput by remember { mutableStateOf(false) }
+    val displayKb by animateIntAsState(
+        targetValue = targetKb,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "displayTargetKb"
+    )
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // Signature Butter Yellow Card with Tick Ruler
@@ -308,7 +303,7 @@ private fun CompressTaskControls(
                 Spacer(modifier = Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        text = "$targetKb",
+                        text = "$displayKb",
                         fontSize = 54.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = MeldColors.InkBlack,
@@ -1095,7 +1090,7 @@ fun MeldResultScreen(
             }
         }
 
-        // Fixed Dual Bottom Buttons: Save (Coral) + Share (White)
+        // Fixed Dual Bottom Tactile Buttons: Save (Coral) + Share (White)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1103,67 +1098,21 @@ fun MeldResultScreen(
                 .padding(horizontal = 20.dp, vertical = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(56.dp)
-                    .clip(CircleShape)
-                    .clickable { onSaveToDownloads(result.outputFile) },
-                shape = CircleShape,
-                color = MeldColors.CoralOrange,
-                border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = null,
-                        tint = MeldColors.InkBlack,
-                        modifier = Modifier.size(19.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Save",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MeldColors.InkBlack
-                    )
-                }
-            }
+            TactilePillButton(
+                text = "Save",
+                icon = Icons.Default.Download,
+                backgroundColor = MeldColors.CoralOrange,
+                onClick = { onSaveToDownloads(result.outputFile) },
+                modifier = Modifier.weight(1f)
+            )
 
-            Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(56.dp)
-                    .clip(CircleShape)
-                    .clickable { onShare(result.outputFile) },
-                shape = CircleShape,
-                color = MeldColors.PureWhite,
-                border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.IosShare,
-                        contentDescription = null,
-                        tint = MeldColors.InkBlack,
-                        modifier = Modifier.size(19.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Share",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MeldColors.InkBlack
-                    )
-                }
-            }
+            TactilePillButton(
+                text = "Share",
+                icon = Icons.Default.IosShare,
+                backgroundColor = MeldColors.PureWhite,
+                onClick = { onShare(result.outputFile) },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
