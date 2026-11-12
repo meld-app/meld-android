@@ -22,7 +22,10 @@ import app.meld.android.model.MeldMode
 import app.meld.android.model.MeldToolId
 import app.meld.android.model.SelectedFileInfo
 import app.meld.android.model.ToolOptions
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.atomic.AtomicInteger
 
 enum class SamplePreset(val label: String, val badge: String) {
     PDF_DECK("Lecture Deck.pdf", "4 pages"),
@@ -63,47 +67,100 @@ data class MeldUiState(
     val isProcessing: Boolean = false,
     val showFileSheet: Boolean = false,
     val bannerMessage: String? = null,
+    val isBannerError: Boolean = false,
     val recentResults: List<ConversionResult> = emptyList(),
-    val defaultSaveToDownloads: Boolean = true
+    val defaultSaveToDownloads: Boolean = false
 )
 
 class MeldViewModel : ViewModel() {
 
+    private companion object {
+        const val PREFS_NAME = "meld_prefs"
+        const val KEY_AUTO_DOWNLOADS = "default_save_to_downloads"
+        const val KEY_HANDOUT_PAGES = "handout_pages_per_sheet"
+        const val MAX_IMPORT_BYTES = 100L * 1024L * 1024L // 100 MB safety cap
+        const val MAX_CACHED_FILES = 16
+        val VALID_EXT_REGEX = Regex("^[A-Za-z0-9]{1,8}$")
+    }
+
     private val _uiState = MutableStateFlow(MeldUiState())
     val uiState: StateFlow<MeldUiState> = _uiState.asStateFlow()
 
+    private val importInFlightCount = AtomicInteger(0)
+    private var activeToolJob: Job? = null
+    private var activeImportJob: Job? = null
+    private var prefsLoaded = false
+
+    fun loadPersistedPreferences(context: Context) {
+        if (prefsLoaded) return
+        prefsLoaded = true
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedAuto = prefs.getBoolean(KEY_AUTO_DOWNLOADS, false)
+        val savedHandout = prefs.getInt(KEY_HANDOUT_PAGES, 3).coerceIn(2, 4)
+        _uiState.update { state ->
+            state.copy(
+                defaultSaveToDownloads = savedAuto,
+                options = state.options.copy(handoutPagesPerSheet = savedHandout)
+            )
+        }
+    }
+
     fun ensureDefaultFileLoaded(context: Context) {
-        if (_uiState.value.selectedFile != null) return
+        if (_uiState.value.selectedFile != null || importInFlightCount.get() > 0) return
         viewModelScope.launch {
             val info = withContext(Dispatchers.IO) {
                 val sampleDir = File(context.cacheDir, "samples").apply { mkdirs() }
                 val pdf = SampleFileFactory.createSamplePdf(sampleDir)
                 buildFileInfo(pdf)
             }
-            _uiState.update {
-                it.copy(
-                    selectedFile = info,
-                    isSelectedFileSample = true,
-                    options = clampOptionsForFile(info, it.options)
-                )
+            _uiState.update { state ->
+                // Never overwrite an incoming ACTION_SEND or user-picked file loaded concurrently
+                if (state.selectedFile != null || importInFlightCount.get() > 0) {
+                    state
+                } else {
+                    state.copy(
+                        selectedFile = info,
+                        isSelectedFileSample = true,
+                        options = clampOptionsForFile(info, state.options)
+                    )
+                }
             }
         }
     }
 
     fun selectDockTab(tab: DockTab) {
-        _uiState.update { it.copy(activeTab = tab, route = MeldScreenRoute.Home, bannerMessage = null) }
+        activeToolJob?.cancel()
+        activeToolJob = null
+        _uiState.update {
+            it.copy(
+                activeTab = tab,
+                route = MeldScreenRoute.Home,
+                isProcessing = false,
+                bannerMessage = null,
+                isBannerError = false
+            )
+        }
     }
 
     fun openTask(tool: MeldToolId) {
-        _uiState.update { it.copy(route = MeldScreenRoute.Task(tool), bannerMessage = null) }
+        _uiState.update { it.copy(route = MeldScreenRoute.Task(tool), bannerMessage = null, isBannerError = false) }
     }
 
     fun openResult(conversion: ConversionResult) {
-        _uiState.update { it.copy(route = MeldScreenRoute.Result(conversion), bannerMessage = null) }
+        _uiState.update { it.copy(route = MeldScreenRoute.Result(conversion), bannerMessage = null, isBannerError = false) }
     }
 
     fun navigateHome() {
-        _uiState.update { it.copy(route = MeldScreenRoute.Home, bannerMessage = null) }
+        activeToolJob?.cancel()
+        activeToolJob = null
+        _uiState.update {
+            it.copy(
+                route = MeldScreenRoute.Home,
+                isProcessing = false,
+                bannerMessage = null,
+                isBannerError = false
+            )
+        }
     }
 
     fun setFileSheetVisible(visible: Boolean) {
@@ -126,15 +183,29 @@ class MeldViewModel : ViewModel() {
         _uiState.update { it.copy(options = transform(it.options)) }
     }
 
-    fun toggleAutoDownloads(enabled: Boolean) {
+    fun updateHandoutPagesPerSheet(context: Context, pagesPerSheet: Int) {
+        val clamped = pagesPerSheet.coerceIn(2, 4)
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(KEY_HANDOUT_PAGES, clamped)
+            .apply()
+        _uiState.update { it.copy(options = it.options.copy(handoutPagesPerSheet = clamped)) }
+    }
+
+    fun toggleAutoDownloads(context: Context, enabled: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_AUTO_DOWNLOADS, enabled)
+            .apply()
         _uiState.update { it.copy(defaultSaveToDownloads = enabled) }
     }
 
     fun clearBanner() {
-        _uiState.update { it.copy(bannerMessage = null) }
+        _uiState.update { it.copy(bannerMessage = null, isBannerError = false) }
     }
 
     fun continueWithResult(conversion: ConversionResult, nextTool: MeldToolId) {
+        if (_uiState.value.isProcessing) return
         viewModelScope.launch {
             val info = withContext(Dispatchers.IO) { buildFileInfo(conversion.outputFile) }
             _uiState.update {
@@ -143,15 +214,17 @@ class MeldViewModel : ViewModel() {
                     isSelectedFileSample = false,
                     options = clampOptionsForFile(info, it.options),
                     route = MeldScreenRoute.Task(nextTool),
-                    bannerMessage = null
+                    bannerMessage = null,
+                    isBannerError = false
                 )
             }
         }
     }
 
     fun loadSamplePreset(context: Context, preset: SamplePreset) {
+        if (_uiState.value.isProcessing) return
         viewModelScope.launch {
-            _uiState.update { it.copy(isProcessing = true, showFileSheet = false) }
+            _uiState.update { it.copy(isProcessing = true, showFileSheet = false, bannerMessage = null, isBannerError = false) }
             val result = runCatching {
                 withContext(Dispatchers.IO) {
                     val sampleDir = File(context.cacheDir, "samples").apply { mkdirs() }
@@ -171,71 +244,142 @@ class MeldViewModel : ViewModel() {
                         selectedFile = info,
                         isSelectedFileSample = true,
                         options = clampOptionsForFile(info, it.options),
-                        bannerMessage = "Loaded ${info.cleanTitle}"
+                        bannerMessage = "Loaded ${info.cleanTitle}",
+                        isBannerError = false
                     )
                 }
             }.onFailure { err ->
                 _uiState.update {
-                    it.copy(isProcessing = false, bannerMessage = err.message ?: "Failed to create sample")
+                    it.copy(
+                        isProcessing = false,
+                        bannerMessage = err.message ?: "Failed to create sample",
+                        isBannerError = true
+                    )
                 }
             }
         }
     }
 
     fun importExternalUri(context: Context, uri: Uri) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isProcessing = true, showFileSheet = false) }
-            val result = runCatching {
-                withContext(Dispatchers.IO) {
-                    val resolver = context.contentResolver
-                    var displayName = "document"
-                    resolver.query(uri, null, null, null, null)?.use { cursor ->
-                        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                        if (nameIndex >= 0 && cursor.moveToFirst()) {
-                            displayName = cursor.getString(nameIndex) ?: displayName
-                        }
-                    }
-                    val safeName = displayName.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "document" }
-                    val withExt = if (safeName.contains('.')) {
-                        safeName
-                    } else {
-                        val mime = resolver.getType(uri)
-                        val inferred = mime?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
-                        if (!inferred.isNullOrBlank()) "$safeName.$inferred" else safeName
-                    }
+        activeToolJob?.cancel()
+        activeToolJob = null
+        activeImportJob?.cancel()
 
-                    val importDir = File(context.cacheDir, "imports").apply { mkdirs() }
-                    val destFile = File(importDir, withExt)
-                    val stream = resolver.openInputStream(uri)
-                        ?: throw IllegalStateException("Cannot read selected file permission or stream")
-                    stream.use { input ->
-                        FileOutputStream(destFile).use { output ->
-                            input.copyTo(output)
+        importInFlightCount.incrementAndGet()
+        activeImportJob = viewModelScope.launch {
+            _uiState.update { it.copy(isProcessing = true, showFileSheet = false, bannerMessage = null, isBannerError = false) }
+            try {
+                val result = runCatching {
+                    withContext(Dispatchers.IO) {
+                        val scheme = uri.scheme?.lowercase()
+                        require(scheme == "content") {
+                            "Only content:// URIs can be imported safely."
                         }
+                        val selfAuthority = "${context.packageName}.fileprovider"
+                        require(!uri.authority.equals(selfAuthority, ignoreCase = true)) {
+                            "Cannot import internal MELD FileProvider URI."
+                        }
+
+                        val resolver = context.contentResolver
+                        var displayName = "document"
+                        var declaredSize = -1L
+                        resolver.query(uri, null, null, null, null)?.use { cursor ->
+                            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                            if (cursor.moveToFirst()) {
+                                if (nameIndex >= 0) {
+                                    displayName = cursor.getString(nameIndex) ?: displayName
+                                }
+                                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) {
+                                    declaredSize = cursor.getLong(sizeIndex)
+                                }
+                            }
+                        }
+                        if (declaredSize > MAX_IMPORT_BYTES) {
+                            throw IllegalArgumentException("File exceeds the 100 MB offline safety limit.")
+                        }
+
+                        val sanitized = displayName
+                            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                            .trim('.')
+                            .let { candidate ->
+                                if (candidate.isBlank() || candidate == "." || candidate == "..") "document" else candidate
+                            }
+
+                        val candidateExt = if (sanitized.contains('.')) sanitized.substringAfterLast('.', "") else ""
+                        val withExt = if (VALID_EXT_REGEX.matches(candidateExt)) {
+                            sanitized
+                        } else {
+                            val mime = resolver.getType(uri)
+                            val inferred = mime?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+                            val baseOnly = sanitized.substringBeforeLast('.').ifBlank { "document" }
+                            if (!inferred.isNullOrBlank()) "$baseOnly.$inferred" else sanitized
+                        }
+
+                        val importDir = File(context.cacheDir, "imports").apply { mkdirs() }
+                        pruneOldCacheFiles(importDir, maxKeep = MAX_CACHED_FILES)
+
+                        val destFile = File.createTempFile("imp_", "_$withExt", importDir)
+                        val stream = resolver.openInputStream(uri)
+                            ?: run {
+                                destFile.delete()
+                                throw IllegalStateException("Cannot read selected file permission or stream")
+                            }
+
+                        var copyCompleted = false
+                        try {
+                            stream.use { input ->
+                                FileOutputStream(destFile).use { output ->
+                                    val buffer = ByteArray(16 * 1024)
+                                    var totalBytes = 0L
+                                    while (true) {
+                                        ensureActive()
+                                        val read = input.read(buffer)
+                                        if (read == -1) break
+                                        totalBytes += read
+                                        if (totalBytes > MAX_IMPORT_BYTES) {
+                                            throw IllegalArgumentException("Imported stream exceeds 100 MB safety cap.")
+                                        }
+                                        output.write(buffer, 0, read)
+                                    }
+                                    output.flush()
+                                }
+                            }
+                            if (!destFile.exists() || destFile.length() == 0L) {
+                                throw IllegalStateException("Selected file appears to be empty")
+                            }
+                            copyCompleted = true
+                        } finally {
+                            if (!copyCompleted) {
+                                destFile.delete()
+                            }
+                        }
+                        buildFileInfo(destFile, friendlyDisplayName = withExt)
                     }
-                    if (!destFile.exists() || destFile.length() == 0L) {
-                        throw IllegalStateException("Selected file appears to be empty")
+                }
+                result.onSuccess { imported ->
+                    _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            selectedFile = imported,
+                            isSelectedFileSample = false,
+                            options = clampOptionsForFile(imported, it.options),
+                            bannerMessage = "Ready: ${imported.cleanTitle}",
+                            isBannerError = false
+                        )
                     }
-                    buildFileInfo(destFile)
+                }.onFailure { err ->
+                    if (err is CancellationException) throw err
+                    _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            bannerMessage = err.message ?: "Could not open the selected file.",
+                            isBannerError = true
+                        )
+                    }
                 }
-            }
-            result.onSuccess { imported ->
-                _uiState.update {
-                    it.copy(
-                        isProcessing = false,
-                        selectedFile = imported,
-                        isSelectedFileSample = false,
-                        options = clampOptionsForFile(imported, it.options),
-                        bannerMessage = "Ready: ${imported.cleanTitle}"
-                    )
-                }
-            }.onFailure { err ->
-                _uiState.update {
-                    it.copy(
-                        isProcessing = false,
-                        bannerMessage = err.message ?: "Could not open the selected file."
-                    )
-                }
+            } finally {
+                importInFlightCount.decrementAndGet()
             }
         }
     }
@@ -245,19 +389,29 @@ class MeldViewModel : ViewModel() {
         if (current.isProcessing) return
         val opts = current.options
 
-        viewModelScope.launch {
-            _uiState.update { it.copy(isProcessing = true, bannerMessage = null) }
+        activeToolJob = viewModelScope.launch {
+            _uiState.update { it.copy(isProcessing = true, bannerMessage = null, isBannerError = false) }
 
-            runCatching {
+            val outcome = runCatching {
                 withContext(Dispatchers.IO) {
                     val startMs = System.currentTimeMillis()
                     val outDir = File(context.cacheDir, "outputs").apply { mkdirs() }
+                    pruneOldCacheFiles(outDir, maxKeep = MAX_CACHED_FILES)
 
                     val inputFile = current.selectedFile?.file ?: autoProvideSampleForTool(context, tool)
-                    val baseName = inputFile.nameWithoutExtension
+                    val qrSlug = opts.qrPayloadText.trim().ifBlank { "meld.app" }
+                        .replace(Regex("[^A-Za-z0-9_-]"), "_")
+                        .take(24)
+                        .ifBlank { "qr" }
+                    val baseName = if (tool == MeldToolId.SCAN_QR) {
+                        "qr_$qrSlug"
+                    } else {
+                        inputFile.nameWithoutExtension.ifBlank { "output" }
+                    }
+                    val uniqueTag = System.currentTimeMillis() % 100000L
                     val outFile = File(
                         outDir,
-                        "${baseName}_${tool.name.lowercase()}.${tool.outputExtension}"
+                        "${baseName}_${tool.name.lowercase()}_${uniqueTag}.${tool.outputExtension}"
                     )
 
                     val summary = when (tool) {
@@ -302,7 +456,8 @@ class MeldViewModel : ViewModel() {
                             ImageEngine.stripImageExif(imgFile, outFile)
                         }
                         MeldToolId.SCAN_QR -> {
-                            ImageEngine.generateQrStudioCard(opts.qrPayloadText, outFile)
+                            val payload = opts.qrPayloadText.trim().ifBlank { "meld.app" }
+                            ImageEngine.generateQrStudioCard(payload, outFile)
                         }
 
                         // PDF Conversions
@@ -346,7 +501,7 @@ class MeldViewModel : ViewModel() {
                         }
                         MeldToolId.REDACT -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
-                            DocumentEngine.redactAndFlattenPdf(pdfFile, outFile)
+                            DocumentEngine.redactAndFlattenPdf(pdfFile, outFile, opts.redactionZones)
                         }
                         MeldToolId.PDF_EXTRACT -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
@@ -388,21 +543,39 @@ class MeldViewModel : ViewModel() {
                             MediaEngine.convertCsvToJson(csvFile, outFile)
                         }
                         MeldToolId.PACK_ZIP -> {
-                            MediaEngine.packToZip(inputFile, outFile)
+                            val targetForZip = if (tool.acceptsExtension(inputFile.extension) && inputFile.isFile) {
+                                inputFile
+                            } else {
+                                autoProvideSampleForTool(context, tool)
+                            }
+                            MediaEngine.packToZip(targetForZip, outFile)
                         }
                     }
 
+                    ensureActive()
                     val elapsed = (System.currentTimeMillis() - startMs).coerceAtLeast(1L)
+                    val recordedInputSize = if (tool == MeldToolId.SCAN_QR) {
+                        opts.qrPayloadText.trim().ifBlank { "meld.app" }.length.toLong()
+                    } else {
+                        inputFile.length()
+                    }
                     ConversionResult(
                         tool = tool,
                         outputFile = outFile,
-                        inputSizeBytes = inputFile.length(),
+                        inputSizeBytes = recordedInputSize,
                         outputSizeBytes = outFile.length(),
                         summary = "$summary. Took $elapsed ms.",
                         durationMs = elapsed
                     )
                 }
-            }.onSuccess { result ->
+            }
+
+            outcome.onSuccess { result ->
+                // Respect user navigation away / cancellation cleanly
+                if (_uiState.value.route !is MeldScreenRoute.Task) {
+                    _uiState.update { it.copy(isProcessing = false) }
+                    return@launch
+                }
                 val autoSavedPath = if (current.defaultSaveToDownloads) {
                     withContext(Dispatchers.IO) { persistToDownloads(context, result.outputFile) }
                 } else null
@@ -411,14 +584,20 @@ class MeldViewModel : ViewModel() {
                         isProcessing = false,
                         route = MeldScreenRoute.Result(result),
                         recentResults = (listOf(result) + state.recentResults).take(12),
-                        bannerMessage = autoSavedPath?.let { "Auto-saved to $it" }
+                        bannerMessage = autoSavedPath?.let { "Auto-saved to $it" },
+                        isBannerError = false
                     )
                 }
             }.onFailure { err ->
+                if (err is CancellationException) {
+                    _uiState.update { it.copy(isProcessing = false) }
+                    return@launch
+                }
                 _uiState.update {
                     it.copy(
                         isProcessing = false,
-                        bannerMessage = err.message ?: "Something went wrong while running ${tool.title}."
+                        bannerMessage = err.message ?: "Something went wrong while running ${tool.title}.",
+                        isBannerError = true
                     )
                 }
             }
@@ -434,7 +613,8 @@ class MeldViewModel : ViewModel() {
                         "Saved to $savedPath"
                     } else {
                         "Saved locally — tap Share to export"
-                    }
+                    },
+                    isBannerError = false
                 )
             }
         }
@@ -472,6 +652,17 @@ class MeldViewModel : ViewModel() {
         }.getOrNull()
     }
 
+    private fun pruneOldCacheFiles(dir: File, maxKeep: Int) {
+        val files = dir.listFiles()?.filter { it.isFile }?.sortedByDescending { it.lastModified() } ?: return
+        val activeInputPath = _uiState.value.selectedFile?.file?.absolutePath
+        val recentPaths = _uiState.value.recentResults.map { it.outputFile.absolutePath }.toSet()
+        files.drop(maxKeep).forEach { candidate ->
+            if (candidate.absolutePath != activeInputPath && candidate.absolutePath !in recentPaths) {
+                candidate.delete()
+            }
+        }
+    }
+
     private fun clampOptionsForFile(info: SelectedFileInfo, current: ToolOptions): ToolOptions {
         val pages = (info.pageCount ?: 4).coerceAtLeast(1)
         val start = current.pageRangeStart.coerceIn(1, pages)
@@ -489,12 +680,13 @@ class MeldViewModel : ViewModel() {
         )
     }
 
-    private fun buildFileInfo(file: File): SelectedFileInfo {
+    private fun buildFileInfo(file: File, friendlyDisplayName: String? = null): SelectedFileInfo {
+        val nameToUse = friendlyDisplayName ?: file.name
         val ext = file.extension.lowercase()
         val pages = if (ext == "pdf") countPdfPages(file) else null
         return SelectedFileInfo(
             file = file,
-            displayName = file.name,
+            displayName = nameToUse,
             extension = ext,
             sizeBytes = file.length(),
             pageCount = pages
@@ -528,7 +720,7 @@ class MeldViewModel : ViewModel() {
 
     private fun ensureImageInput(context: Context, file: File): File {
         val ext = file.extension.lowercase()
-        return if (ext in setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff")) {
+        return if (ext in setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif") && file.isFile) {
             file
         } else {
             SampleFileFactory.createSampleImage(File(context.cacheDir, "samples").apply { mkdirs() })
@@ -536,7 +728,7 @@ class MeldViewModel : ViewModel() {
     }
 
     private fun ensurePdfInput(context: Context, file: File): File {
-        return if (file.extension.lowercase() == "pdf") {
+        return if (file.extension.lowercase() == "pdf" && file.isFile) {
             file
         } else {
             SampleFileFactory.createSamplePdf(File(context.cacheDir, "samples").apply { mkdirs() })
@@ -544,7 +736,7 @@ class MeldViewModel : ViewModel() {
     }
 
     private fun ensureCsvInput(context: Context, file: File): File {
-        return if (file.extension.lowercase() in setOf("csv", "tsv", "txt")) {
+        return if (file.extension.lowercase() in setOf("csv", "tsv", "txt") && file.isFile) {
             file
         } else {
             SampleFileFactory.createSampleCsv(File(context.cacheDir, "samples").apply { mkdirs() })
@@ -552,7 +744,7 @@ class MeldViewModel : ViewModel() {
     }
 
     private fun ensureAudioInput(context: Context, file: File): File {
-        return if (file.extension.lowercase() in setOf("wav", "pcm", "mp3", "m4a", "aac", "ogg")) {
+        return if (file.extension.lowercase() in setOf("wav", "pcm", "mp3", "m4a", "aac", "ogg", "mp4") && file.isFile) {
             file
         } else {
             SampleFileFactory.createSampleAudioWav(File(context.cacheDir, "samples").apply { mkdirs() })

@@ -80,6 +80,7 @@ fun MeldAppRoot(
     onUpdateQrPayload: (String) -> Unit,
     onUpdatePageRange: (Int, Int) -> Unit,
     onUpdateChromaTolerance: (Int) -> Unit,
+    onUpdateRedactionZones: (List<app.meld.android.model.RedactionRect>) -> Unit = {},
     onToggleAutoDownloads: (Boolean) -> Unit
 ) {
     val openingDriver = remember { MeldOpeningDriver() }
@@ -231,7 +232,8 @@ fun MeldAppRoot(
                                         onUpdateHandoutMode = onUpdateHandoutMode,
                                         onUpdateQrPayload = onUpdateQrPayload,
                                         onUpdatePageRange = onUpdatePageRange,
-                                        onUpdateChromaTolerance = onUpdateChromaTolerance
+                                        onUpdateChromaTolerance = onUpdateChromaTolerance,
+                                        onUpdateRedactionZones = onUpdateRedactionZones
                                     )
                                 }
                             }
@@ -275,7 +277,7 @@ fun MeldAppRoot(
                         .padding(top = 10.dp, start = 20.dp, end = 20.dp)
                         .clickable { onClearBanner() },
                     shape = CircleShape,
-                    color = MeldColors.InkBlack,
+                    color = if (uiState.isBannerError) androidx.compose.ui.graphics.Color(0xFFC62828) else MeldColors.InkBlack,
                     shadowElevation = 6.dp
                 ) {
                     Text(

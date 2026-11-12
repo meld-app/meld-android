@@ -32,14 +32,18 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(creamColor, creamColor)
         )
 
-        // Handle incoming "Share to MELD" intent from other Android apps
-        handleIncomingIntent(intent)
+        // Handle incoming "Share to MELD" intent on fresh launch (skip on rotation/history relaunch)
+        val fromHistory = ((intent?.flags ?: 0) and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
+        if (savedInstanceState == null && !fromHistory) {
+            handleIncomingIntent(intent)
+        }
 
         setContent {
             MeldTheme {
                 val uiState by viewModel.uiState.collectAsState()
 
                 LaunchedEffect(Unit) {
+                    viewModel.loadPersistedPreferences(this@MainActivity)
                     viewModel.ensureDefaultFileLoaded(this@MainActivity)
                 }
 
@@ -91,9 +95,6 @@ class MainActivity : ComponentActivity() {
                     onUpdateStampText = { text ->
                         viewModel.updateOptions { it.copy(stampText = text) }
                     },
-                    onUpdateHandoutMode = { pagesPerSheet ->
-                        viewModel.updateOptions { it.copy(handoutPagesPerSheet = pagesPerSheet) }
-                    },
                     onUpdateQrPayload = { payload ->
                         viewModel.updateOptions { it.copy(qrPayloadText = payload) }
                     },
@@ -103,7 +104,15 @@ class MainActivity : ComponentActivity() {
                     onUpdateChromaTolerance = { tol ->
                         viewModel.updateOptions { it.copy(chromaTolerance = tol) }
                     },
-                    onToggleAutoDownloads = viewModel::toggleAutoDownloads
+                    onUpdateRedactionZones = { zones ->
+                        viewModel.updateOptions { it.copy(redactionZones = zones) }
+                    },
+                    onToggleAutoDownloads = { enabled ->
+                        viewModel.toggleAutoDownloads(this@MainActivity, enabled)
+                    },
+                    onUpdateHandoutMode = { pagesPerSheet ->
+                        viewModel.updateHandoutPagesPerSheet(this@MainActivity, pagesPerSheet)
+                    }
                 )
             }
         }
@@ -118,6 +127,8 @@ class MainActivity : ComponentActivity() {
     private fun handleIncomingIntent(incoming: Intent?) {
         if (incoming?.action == Intent.ACTION_SEND) {
             val sharedUri = IntentCompat.getParcelableExtra(incoming, Intent.EXTRA_STREAM, Uri::class.java)
+            // Mark consumed so configuration changes will not re-import stale intents
+            incoming.action = null
             if (sharedUri != null) {
                 viewModel.importExternalUri(this, sharedUri)
             }
