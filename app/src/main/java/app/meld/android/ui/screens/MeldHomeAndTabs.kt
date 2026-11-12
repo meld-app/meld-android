@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -544,6 +545,66 @@ fun MeldStudioHomeScreen(
                                     color = MeldColors.InkBlack
                                 )
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // More tools that also work on the current file (fills the lower Home area)
+        item {
+            val shown = setOf(quickTriple.first, quickTriple.second, quickTriple.third)
+            val moreTools = remember(ext) {
+                MeldToolId.entries.filter { it.acceptsExtension(ext) && it !in shown && it != MeldToolId.SCAN_QR }.take(4)
+            }
+            if (moreTools.isNotEmpty()) {
+                val tints = listOf(
+                    MeldColors.SoftLavender, MeldColors.PeachCream,
+                    MeldColors.PeriwinkleBlue, MeldColors.MintSage
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "More for this file",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MeldColors.InkBlack
+                    )
+                    moreTools.chunked(2).forEachIndexed { rowIdx, pair ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            pair.forEachIndexed { colIdx, tool ->
+                                TactileCard(
+                                    backgroundColor = tints[(rowIdx * 2 + colIdx) % tints.size],
+                                    cornerRadius = 20.dp,
+                                    onClick = { onOpenTask(tool) },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .defaultMinSize(minHeight = 64.dp)
+                                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = iconForTool(tool),
+                                            contentDescription = null,
+                                            tint = MeldColors.InkBlack,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = tool.title,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = MeldColors.InkBlack,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                            if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
