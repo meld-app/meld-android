@@ -1,6 +1,8 @@
 package app.meld.android.ui.components
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -13,6 +15,8 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -28,6 +32,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -40,21 +45,27 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -70,6 +81,7 @@ import app.meld.android.model.SelectedFileInfo
 import app.meld.android.ui.theme.MeldColors
 import app.meld.android.ui.theme.MeldMotion
 import app.meld.android.ui.theme.rememberReduceMotion
+import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.max
@@ -83,39 +95,94 @@ private val StageWordBlue = Color(0xFF5B8CFF)
 private val StageLimeCode = Color(0xFFC6F432)
 private val StagePinkCode = Color(0xFFFF5CA8)
 
-@Composable
-private fun rememberLoopPhase(durationMs: Int = 3200): Float {
-    val reduceMotion = rememberReduceMotion()
-    if (reduceMotion) return 0.55f
-    val infinite = rememberInfiniteTransition(label = "meldToolStageLoop")
-    val phase by infinite.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = durationMs, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "stagePhase"
-    )
-    return phase
-}
+// Exact ToolMotion.dc.html S-curve & overshoot easing curves
+private val TravelCurve = CubicBezierEasing(0.65f, 0f, 0.35f, 1f)
+private val PopCurve = CubicBezierEasing(0.34f, 1.56f, 0.64f, 1f)
 
-/** Normalized segment helper mapped smoothly into 0f..1f for timeline keyframes. */
+/** Maps normalized progress within [start..end] through a non-linear easing curve. */
 private fun seg(phase: Float, start: Float, end: Float): Float =
     ((phase - start) / (end - start)).coerceIn(0f, 1f)
 
-/** Recessed Warm-Sand kinetic stage container shared across tool motion previews. */
+private fun easeTravel(phase: Float, start: Float, end: Float): Float =
+    TravelCurve.transform(seg(phase, start, end))
+
+private fun easePop(phase: Float, start: Float, end: Float): Float =
+    PopCurve.transform(seg(phase, start, end))
+
+private fun easeOutSeg(phase: Float, start: Float, end: Float): Float =
+    MeldMotion.EaseOut.transform(seg(phase, start, end))
+
+private val LeftHalfClip = GenericShape { size, _ ->
+    addRect(Rect(0f, 0f, size.width * 0.505f, size.height))
+}
+
+private val RightHalfClip = GenericShape { size, _ ->
+    addRect(Rect(size.width * 0.495f, 0f, size.width, size.height))
+}
+
+/**
+ * Driven 0f..1f cycle that resets cleanly whenever `replayKey` is bumped (tap-to-replay!).
+ */
+@Composable
+private fun rememberLoopPhase(durationMs: Int = 3200, replayKey: Int = 0): Float {
+    val reduceMotion = rememberReduceMotion()
+    if (reduceMotion) return 0.56f
+    val anim = remember(replayKey, durationMs) { Animatable(0f) }
+    LaunchedEffect(replayKey, durationMs) {
+        while (true) {
+            anim.snapTo(0f)
+            anim.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = durationMs, easing = LinearEasing)
+            )
+        }
+    }
+    return anim.value
+}
+
+/**
+ * Recessed Warm-Sand kinetic stage container shared across all tool previews.
+ * Supports tap-to-replay with tactile press physics so every tool stage feels interactive.
+ */
 @Composable
 fun MeldStageViewport(
     modifier: Modifier = Modifier,
-    height: Dp = 148.dp,
+    height: Dp = 156.dp,
     backgroundColor: Color = StageSand,
+    onTapReplay: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val reduceMotion = rememberReduceMotion()
+    val haptic = LocalHapticFeedback.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (!reduceMotion && onTapReplay != null && isPressed) 0.985f else 1f,
+        animationSpec = tween(durationMillis = MeldMotion.PRESS_MS, easing = MeldMotion.EaseOut),
+        label = "stagePressScale"
+    )
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(height),
+            .height(height)
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
+            .clip(RoundedCornerShape(14.dp))
+            .then(
+                if (onTapReplay != null) {
+                    Modifier.clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onTapReplay()
+                        }
+                    )
+                } else Modifier
+            ),
         shape = RoundedCornerShape(14.dp),
         color = backgroundColor,
         border = BorderStroke(1.8.dp, MeldColors.InkBlack),
@@ -123,17 +190,19 @@ fun MeldStageViewport(
     )
 }
 
-/** Reusable crisp miniature paper sheet glyph styled after ToolMotion.dc.html `.s`. */
+/** Crisp miniature stationery sheet glyph matching ToolMotion.dc.html `.s`. */
 @Composable
 private fun MiniSheetGlyph(
     modifier: Modifier = Modifier,
+    width: Dp = 58.dp,
+    height: Dp = 74.dp,
     accentHeader: Color = MeldColors.InkBlack,
     lineFractions: List<Float> = listOf(1f, 1f, 1f, 1f),
     badgeText: String? = null,
     badgeColor: Color = MeldColors.CoralOrange
 ) {
     Surface(
-        modifier = modifier.size(width = 58.dp, height = 74.dp),
+        modifier = modifier.size(width = width, height = height),
         shape = RoundedCornerShape(7.dp),
         color = MeldColors.PureWhite,
         border = BorderStroke(1.8.dp, MeldColors.InkBlack)
@@ -183,18 +252,18 @@ private fun MiniSheetGlyph(
     }
 }
 
-/** Miniature sunlit sky + sun + mountain Polaroid illustration used by photo/image stages. */
+/** Sunlit sky + golden sun + mint mountain Polaroid illustration. */
 @Composable
 private fun MiniPolaroidGlyph(
     modifier: Modifier = Modifier,
     formatBadge: String? = null,
     badgeColor: Color = MeldColors.CoralOrange
 ) {
-    Box(modifier = modifier.size(width = 76.dp, height = 92.dp)) {
+    Box(modifier = modifier.size(width = 78.dp, height = 94.dp)) {
         Surface(
             modifier = Modifier
                 .align(Alignment.Center)
-                .size(width = 66.dp, height = 84.dp),
+                .size(width = 68.dp, height = 88.dp),
             shape = RoundedCornerShape(8.dp),
             color = MeldColors.PureWhite,
             border = BorderStroke(1.8.dp, MeldColors.InkBlack)
@@ -213,9 +282,9 @@ private fun MiniPolaroidGlyph(
                         radius = size.minDimension * 0.16f,
                         center = Offset(size.width * 0.25f, size.height * 0.26f)
                     )
-                    val hill = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(size.width * 0.12f, size.height)
-                        lineTo(size.width * 0.56f, size.height * 0.42f)
+                    val hill = Path().apply {
+                        moveTo(size.width * 0.08f, size.height)
+                        lineTo(size.width * 0.56f, size.height * 0.38f)
                         lineTo(size.width, size.height)
                         close()
                     }
@@ -304,8 +373,10 @@ fun CompressionRatioPill(
 }
 
 /**
- * 1. COMPRESS & COMPRESS_PDF: Opposing press plates physically clamp the document sheet
- * while the pill badge below swaps from current KB (white) to target KB (Mint Sage).
+ * 1. COMPRESS & COMPRESS_PDF (`ToolMotion.dc.html` Compress):
+ * Plates start wide at ±76dp, travel inward on `TravelCurve` to clamp flush at the edges of the
+ * squashed sheet (`scale(0.55x, 1.08y)` impact over-squash -> `0.60x, 1.04y` settle),
+ * while the pill cross-dissolves from white source KB to Mint Sage target KB.
  */
 @Composable
 fun CompressPlatesStage(
@@ -313,99 +384,153 @@ fun CompressPlatesStage(
     targetKb: Int,
     modifier: Modifier = Modifier
 ) {
-    val phase = rememberLoopPhase(3200)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
 
-    val clampIn = seg(phase, 0.18f, 0.42f)
-    val releaseOut = seg(phase, 0.84f, 0.98f)
-    val clamp = if (reduceMotion) 1f else (clampIn * (1f - releaseOut))
-    val swapped = if (reduceMotion) true else phase in 0.36f..0.88f
-
     val ratio = (targetKb * 1024f / max(1024f, sourceBytes.toFloat())).coerceIn(0.18f, 0.96f)
-    val targetScaleX = lerp(0.56f, 0.84f, (ratio - 0.18f) / 0.78f)
+    val settledScaleX = lerp(0.56f, 0.80f, (ratio - 0.18f) / 0.78f)
+    val squashDipScaleX = (settledScaleX - 0.06f).coerceAtLeast(0.48f)
 
-    MeldStageViewport(modifier = modifier, height = 140.dp) {
-        val travelPx = with(density) { 46.dp.toPx() * clamp }
+    // Keyframe matching ToolMotion.dc.html: 0..25% open -> 25..40% slam in -> 40..46% settle -> 85..100% release
+    val plateNorm = when {
+        reduceMotion -> 1f
+        phase < 0.24f -> 0f
+        phase < 0.42f -> easeTravel(phase, 0.24f, 0.42f)
+        phase < 0.85f -> 1f
+        else -> 1f - easeTravel(phase, 0.85f, 0.99f)
+    }
+    val sheetScaleX = when {
+        reduceMotion -> settledScaleX
+        phase < 0.24f -> 1f
+        phase < 0.40f -> lerp(1f, squashDipScaleX, easeTravel(phase, 0.24f, 0.40f))
+        phase < 0.48f -> lerp(squashDipScaleX, settledScaleX, easeOutSeg(phase, 0.40f, 0.48f))
+        phase < 0.85f -> settledScaleX
+        else -> lerp(settledScaleX, 1f, easeTravel(phase, 0.85f, 0.99f))
+    }
+    val sheetScaleY = when {
+        reduceMotion -> 1.04f
+        phase < 0.24f -> 1f
+        phase < 0.40f -> lerp(1f, 1.09f, easeTravel(phase, 0.24f, 0.40f))
+        phase < 0.48f -> lerp(1.09f, 1.04f, easeOutSeg(phase, 0.40f, 0.48f))
+        phase < 0.85f -> 1.04f
+        else -> lerp(1.04f, 1f, easeTravel(phase, 0.85f, 0.99f))
+    }
+    val pillSwap = when {
+        reduceMotion -> 1f
+        phase < 0.32f -> 0f
+        phase < 0.40f -> easeOutSeg(phase, 0.32f, 0.40f)
+        phase < 0.88f -> 1f
+        else -> 1f - easeOutSeg(phase, 0.88f, 0.96f)
+    }
 
-        // Left squeeze plate (`cpl`)
+    MeldStageViewport(modifier = modifier, height = 152.dp, onTapReplay = { replay++ }) {
+        // Center-anchored plates track exact edge of the squeezed 58dp sheet
+        val sheetHalfW = 29.dp * sheetScaleX
+        val outerGap = lerp(46f, 6f, plateNorm).dp
+
         Box(
             modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 52.dp)
+                .align(Alignment.Center)
+                .offset(x = -(sheetHalfW + outerGap + 4.dp), y = (-10).dp)
                 .width(8.dp)
-                .height(78.dp)
-                .graphicsLayer { translationX = travelPx }
+                .height(84.dp)
                 .clip(RoundedCornerShape(4.dp))
                 .background(MeldColors.InkBlack)
         )
 
-        // Right squeeze plate (`cpr`)
         Box(
             modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 52.dp)
+                .align(Alignment.Center)
+                .offset(x = (sheetHalfW + outerGap + 4.dp), y = (-10).dp)
                 .width(8.dp)
-                .height(78.dp)
-                .graphicsLayer { translationX = -travelPx }
+                .height(84.dp)
                 .clip(RoundedCornerShape(4.dp))
                 .background(MeldColors.InkBlack)
         )
 
-        // Squeezing document sheet (`cps`)
         MiniSheetGlyph(
             modifier = Modifier
                 .align(Alignment.Center)
-                .offset(y = (-8).dp)
+                .offset(y = (-10).dp)
                 .graphicsLayer {
-                    scaleX = lerp(1f, targetScaleX, clamp)
-                    scaleY = lerp(1f, 1.07f, clamp)
+                    scaleX = sheetScaleX
+                    scaleY = sheetScaleY
                 }
         )
 
-        // Swapping Size Pill below (`cpa` -> `cpb`)
-        Surface(
+        // Swapping pills at bottom (cross-fade opacity + gentle scale settle)
+        Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 10.dp),
-            shape = CircleShape,
-            color = if (swapped) MeldColors.MintSage else MeldColors.PureWhite,
-            border = BorderStroke(1.6.dp, MeldColors.InkBlack)
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = if (swapped) "$targetKb KB" else SelectedFileInfo.formatByteCount(sourceBytes),
-                style = TextStyle(
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontFeatureSettings = "tnum"
-                ),
-                color = MeldColors.InkBlack,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 3.dp)
-            )
+            Surface(
+                modifier = Modifier.graphicsLayer {
+                    alpha = (1f - pillSwap).coerceIn(0f, 1f)
+                    val s = 0.94f + 0.06f * (1f - pillSwap)
+                    scaleX = s
+                    scaleY = s
+                },
+                shape = CircleShape,
+                color = MeldColors.PureWhite,
+                border = BorderStroke(1.6.dp, MeldColors.InkBlack)
+            ) {
+                Text(
+                    text = SelectedFileInfo.formatByteCount(sourceBytes),
+                    style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum"),
+                    color = MeldColors.InkBlack,
+                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 3.dp)
+                )
+            }
+            Surface(
+                modifier = Modifier.graphicsLayer {
+                    alpha = pillSwap.coerceIn(0f, 1f)
+                    val s = 0.92f + 0.08f * pillSwap
+                    scaleX = s
+                    scaleY = s
+                },
+                shape = CircleShape,
+                color = MeldColors.MintSage,
+                border = BorderStroke(1.6.dp, MeldColors.InkBlack)
+            ) {
+                Text(
+                    text = "$targetKb KB",
+                    style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum"),
+                    color = MeldColors.InkBlack,
+                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 3.dp)
+                )
+            }
         }
     }
 }
 
 /**
- * 2. HANDOUT: Stepped frame drop (`hf1..hfN`) + sweeping ruled lecture lines (`hl1..hlN`)
- * that immediately re-choreograph across 2-up, 3-up, and 4-up modes.
+ * 2. HANDOUT (`ToolMotion.dc.html` Handout):
+ * Spring-eased (`PopCurve`) frame drops from above + `TravelCurve` ruled note-line sweep draw
+ * across 2-up, 3-up, and 4-up modes.
  */
 @Composable
 fun AnimatedHandoutDiagram(
     pagesPerSheet: Int,
     modifier: Modifier = Modifier
 ) {
+    var replay by remember { mutableIntStateOf(0) }
     val reduceMotion = rememberReduceMotion()
-    val phase = rememberLoopPhase(3200)
+    val phase = rememberLoopPhase(3200, replay)
     val density = LocalDensity.current
 
     TactileCard(
         backgroundColor = MeldColors.PureWhite,
         cornerRadius = MeldColors.SubCardCorner,
+        onClick = { replay++ },
         modifier = modifier
             .fillMaxWidth()
             .height(175.dp)
     ) {
+        val outT = if (reduceMotion) 0f else easeTravel(phase, 0.88f, 0.98f)
         if (pagesPerSheet <= 3) {
             val rows = pagesPerSheet.coerceIn(2, 3)
             Column(
@@ -415,11 +540,11 @@ fun AnimatedHandoutDiagram(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 for (r in 0 until rows) {
-                    val dropStart = 0.06f + r * 0.11f
-                    val dropT = if (reduceMotion) 1f else seg(phase, dropStart, dropStart + 0.16f)
-                    val outT = if (reduceMotion) 0f else seg(phase, 0.88f, 0.98f)
-                    val frameVis = dropT * (1f - outT)
-                    val lineDraw = if (reduceMotion) 1f else seg(phase, dropStart + 0.10f, dropStart + 0.26f) * (1f - outT)
+                    val start = 0.06f + r * 0.10f
+                    val dropPop = if (reduceMotion) 1f else easePop(phase, start, start + 0.15f)
+                    val dropVis = if (reduceMotion) 1f else (seg(phase, start, start + 0.10f) * (1f - outT))
+                    val dropY = with(density) { (-30.dp.toPx()) * (1f - dropPop) * (1f - outT) + (-24.dp.toPx() * outT) }
+                    val lineDraw = if (reduceMotion) 1f else (easeTravel(phase, start + 0.10f, start + 0.25f) * (1f - outT))
 
                     Row(
                         modifier = Modifier
@@ -433,11 +558,8 @@ fun AnimatedHandoutDiagram(
                                 .weight(0.44f)
                                 .fillMaxHeight()
                                 .graphicsLayer {
-                                    alpha = frameVis
-                                    translationY = with(density) { (-18.dp.toPx()) * (1f - frameVis) }
-                                    val sc = 0.90f + 0.10f * frameVis
-                                    scaleX = sc
-                                    scaleY = sc
+                                    alpha = dropVis.coerceIn(0f, 1f)
+                                    translationY = dropY
                                 },
                             shape = RoundedCornerShape(6.dp),
                             color = MeldColors.WarmSurface,
@@ -447,7 +569,7 @@ fun AnimatedHandoutDiagram(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(4.dp)
-                                    .background(MeldColors.CoralOrange)
+                                    .background(MeldColors.InkBlack)
                             )
                         }
 
@@ -457,8 +579,8 @@ fun AnimatedHandoutDiagram(
                                 .fillMaxHeight()
                                 .graphicsLayer {
                                     transformOrigin = TransformOrigin(0f, 0.5f)
-                                    scaleX = lineDraw.coerceAtLeast(0.01f)
-                                    alpha = lineDraw
+                                    scaleX = lineDraw.coerceAtLeast(0.005f)
+                                    alpha = lineDraw.coerceIn(0f, 1f)
                                 },
                             verticalArrangement = Arrangement.SpaceEvenly
                         ) {
@@ -475,7 +597,6 @@ fun AnimatedHandoutDiagram(
                 }
             }
         } else {
-            // 4-up grid staggered drop
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -492,19 +613,15 @@ fun AnimatedHandoutDiagram(
                         for (c in 0..1) {
                             val idx = r * 2 + c
                             val start = 0.05f + idx * 0.08f
-                            val dropT = if (reduceMotion) 1f else seg(phase, start, start + 0.15f)
-                            val outT = if (reduceMotion) 0f else seg(phase, 0.88f, 0.98f)
-                            val vis = dropT * (1f - outT)
+                            val dropPop = if (reduceMotion) 1f else easePop(phase, start, start + 0.14f)
+                            val vis = if (reduceMotion) 1f else (seg(phase, start, start + 0.09f) * (1f - outT))
                             Surface(
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight()
                                     .graphicsLayer {
-                                        alpha = vis
-                                        translationY = with(density) { (-14.dp.toPx()) * (1f - vis) }
-                                        val sc = 0.90f + 0.10f * vis
-                                        scaleX = sc
-                                        scaleY = sc
+                                        alpha = vis.coerceIn(0f, 1f)
+                                        translationY = with(density) { (-20.dp.toPx()) * (1f - dropPop) }
                                     },
                                 shape = RoundedCornerShape(6.dp),
                                 color = MeldColors.WarmSurface,
@@ -514,7 +631,7 @@ fun AnimatedHandoutDiagram(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(4.dp)
-                                        .background(MeldColors.CoralOrange)
+                                        .background(MeldColors.InkBlack)
                                 )
                             }
                         }
@@ -526,8 +643,10 @@ fun AnimatedHandoutDiagram(
 }
 
 /**
- * 3. SPLIT PDF: Dashed Coral cut sweeps down & slices the sheet in two (`-7°` / `+7°`),
- * above interactive tappable page pills P1..PN.
+ * 3. SPLIT PDF (`ToolMotion.dc.html` Split):
+ * True clipped left/right halves of ONE single sheet (`LeftHalfClip` + `RightHalfClip`):
+ * glowing dashed red laser cuts vertically from top to bottom, then the two halves smoothly slice
+ * apart (`-22dp / -8°` left, `+22dp / +8°` right) and spring back flush!
  */
 @Composable
 fun SplitPageSpreadStage(
@@ -538,13 +657,20 @@ fun SplitPageSpreadStage(
     modifier: Modifier = Modifier
 ) {
     val visiblePages = minOf(totalPages.coerceAtLeast(2), 6)
+    var replay by remember { mutableIntStateOf(0) }
     val reduceMotion = rememberReduceMotion()
-    val phase = rememberLoopPhase(3200)
+    val phase = rememberLoopPhase(3200, replay)
     val density = LocalDensity.current
 
-    val cutDraw = if (reduceMotion) 1f else seg(phase, 0.10f, 0.34f)
-    val cutFade = if (reduceMotion) 0f else seg(phase, 0.38f, 0.48f)
-    val splitOut = if (reduceMotion) 1f else (seg(phase, 0.36f, 0.58f) * (1f - seg(phase, 0.82f, 0.96f)))
+    val cutDraw = if (reduceMotion) 1f else easeTravel(phase, 0.10f, 0.34f)
+    val cutFade = if (reduceMotion) 0f else seg(phase, 0.38f, 0.46f)
+    val apart = when {
+        reduceMotion -> 0.85f
+        phase < 0.36f -> 0f
+        phase < 0.56f -> easeTravel(phase, 0.36f, 0.56f)
+        phase < 0.84f -> 1f
+        else -> 1f - easeTravel(phase, 0.84f, 0.98f)
+    }
 
     TactileCard(
         backgroundColor = MeldColors.PeriwinkleBlue,
@@ -552,43 +678,48 @@ fun SplitPageSpreadStage(
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            // Laser Cut Visual Stage (`ToolMotion.dc.html` Split)
-            MeldStageViewport(height = 116.dp) {
-                val sepPx = with(density) { 18.dp.toPx() * splitOut }
-                // Left half sheet (`sL`)
+            MeldStageViewport(height = 132.dp, onTapReplay = { replay++ }) {
+                val slidePx = with(density) { 21.dp.toPx() * apart }
+
+                // Left clipped half of the SAME sheet (`sL`)
                 MiniSheetGlyph(
+                    width = 64.dp,
+                    height = 82.dp,
                     modifier = Modifier
                         .align(Alignment.Center)
                         .graphicsLayer {
-                            translationX = -sepPx - 2.dp.toPx()
-                            rotationZ = -7f * splitOut
-                        },
-                    lineFractions = listOf(0.95f, 0.9f, 0.85f)
+                            translationX = -slidePx
+                            rotationZ = -8f * apart
+                        }
+                        .clip(LeftHalfClip)
                 )
-                // Right half sheet (`sR`) peeking right
+
+                // Right clipped half of the SAME sheet (`sR`)
                 MiniSheetGlyph(
+                    width = 64.dp,
+                    height = 82.dp,
                     modifier = Modifier
                         .align(Alignment.Center)
                         .graphicsLayer {
-                            translationX = sepPx + 2.dp.toPx()
-                            rotationZ = 7f * splitOut
-                        },
-                    accentHeader = MeldColors.CoralOrange,
-                    lineFractions = listOf(0.8f, 0.9f, 0.7f)
+                            translationX = slidePx
+                            rotationZ = 8f * apart
+                        }
+                        .clip(RightHalfClip)
                 )
-                // Sweeping dashed laser cut (`cut`)
+
+                // Top-to-bottom dashed coral-red cut seam (`cut`)
                 val dashPx = with(density) { 5.dp.toPx() }
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val x = size.width / 2f
-                    val topY = 14.dp.toPx()
-                    val fullLen = size.height - 28.dp.toPx()
-                    val currentAlpha = (if (cutDraw > 0.02f) 1f - cutFade else 0f).coerceIn(0f, 1f)
-                    if (currentAlpha > 0.01f) {
+                    val topY = 16.dp.toPx()
+                    val fullLen = size.height - 32.dp.toPx()
+                    val cutAlpha = (if (cutDraw > 0.02f) 1f - cutFade else 0f).coerceIn(0f, 1f)
+                    if (cutAlpha > 0.01f) {
                         drawLine(
-                            color = StageLaserRed.copy(alpha = currentAlpha),
+                            color = StageLaserRed.copy(alpha = cutAlpha),
                             start = Offset(x, topY),
                             end = Offset(x, topY + fullLen * cutDraw),
-                            strokeWidth = 2.2.dp.toPx(),
+                            strokeWidth = 2.4.dp.toPx(),
                             pathEffect = PathEffect.dashPathEffect(floatArrayOf(dashPx, dashPx * 0.7f))
                         )
                     }
@@ -665,38 +796,43 @@ fun SplitPageSpreadStage(
 }
 
 /**
- * 4. LOCK_STAMP: Bordered watermark stamp slams down onto sheet, triggers a 3-step micro-shake,
- * and pops a Coral padlock badge onto the corner (`ToolMotion.dc.html` Lock / Stamp).
+ * 4. LOCK_STAMP (`ToolMotion.dc.html` Lock / Stamp):
+ * Heavy bordered stamp slams down from `scale(2.5)` -> `scale(0.92)` overshoot -> `1.0`,
+ * shaking the entire sheet stage cleanly on impact before the Coral padlock circle pops on.
  */
 @Composable
 fun StampSlamPreview(
     stampText: String,
     modifier: Modifier = Modifier
 ) {
+    var replay by remember { mutableIntStateOf(0) }
     val reduceMotion = rememberReduceMotion()
-    val phase = rememberLoopPhase(3200)
-    val keyBounce = remember { Animatable(1f) }
+    val phase = rememberLoopPhase(3200, replay)
     val density = LocalDensity.current
 
     LaunchedEffect(stampText) {
-        if (!reduceMotion) {
-            keyBounce.snapTo(1.18f)
-            keyBounce.animateTo(1f, tween(220, easing = MeldMotion.EaseOvershoot))
-        }
+        if (stampText.isNotEmpty()) replay++
     }
 
-    val slamIn = if (reduceMotion) 1f else seg(phase, 0.16f, 0.30f)
-    val slamFade = if (reduceMotion) 0f else seg(phase, 0.90f, 0.98f)
-    val stampAlpha = (slamIn * (1f - slamFade)).coerceIn(0f, 1f)
-    val stampScale = if (reduceMotion) 1f else lerp(1.75f, 1.0f, slamIn) * keyBounce.value
+    val fadeOutEnd = if (reduceMotion) 0f else easeOutSeg(phase, 0.90f, 0.98f)
+    val slamT = if (reduceMotion) 1f else easePop(phase, 0.16f, 0.34f)
+    val stampAlpha = if (reduceMotion) 1f else (seg(phase, 0.16f, 0.23f) * (1f - fadeOutEnd))
+    val stampScale = if (reduceMotion) 1f else lerp(2.45f, 1.0f, slamT)
 
-    // Micro-shake right at impact (`0.29..0.36`)
-    val shakePx = if (!reduceMotion && phase in 0.29f..0.36f) {
-        val dir = if (((phase * 1000).toInt() % 2) == 0) 1f else -1f
-        with(density) { 2.5.dp.toPx() * dir }
+    // 4-step damped impact shake (`shk`: 29%..37%)
+    val shakeX = if (!reduceMotion && phase in 0.28f..0.37f) {
+        val step = ((phase - 0.28f) / 0.022f).toInt()
+        when (step) {
+            0 -> 3.5f
+            1 -> -3.5f
+            2 -> 2.0f
+            else -> -1.5f
+        }
     } else 0f
+    val shakeY = if (!reduceMotion && phase in 0.28f..0.37f) shakeX * 0.65f else 0f
 
-    val lockVis = if (reduceMotion) 1f else (seg(phase, 0.48f, 0.60f) * (1f - seg(phase, 0.88f, 0.98f)))
+    val lockPop = if (reduceMotion) 1f else easePop(phase, 0.48f, 0.62f)
+    val lockAlpha = if (reduceMotion) 1f else (seg(phase, 0.48f, 0.54f) * (1f - fadeOutEnd))
 
     TactileCard(
         backgroundColor = MeldColors.PeachCream,
@@ -708,53 +844,51 @@ fun StampSlamPreview(
                 .fillMaxWidth()
                 .padding(18.dp)
         ) {
-            MeldStageViewport(height = 148.dp) {
+            MeldStageViewport(height = 156.dp, onTapReplay = { replay++ }) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            translationX = shakePx
-                            translationY = shakePx * 0.6f
+                            translationX = with(density) { shakeX.dp.toPx() }
+                            translationY = with(density) { shakeY.dp.toPx() }
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    MiniSheetGlyph(
-                        modifier = Modifier.size(width = 88.dp, height = 108.dp)
-                    )
+                    MiniSheetGlyph(width = 76.dp, height = 98.dp)
 
                     Surface(
                         modifier = Modifier.graphicsLayer {
                             scaleX = stampScale
                             scaleY = stampScale
-                            rotationZ = -14f
-                            alpha = stampAlpha
+                            rotationZ = -18f
+                            alpha = stampAlpha.coerceIn(0f, 1f)
                         },
-                        shape = RoundedCornerShape(6.dp),
-                        color = MeldColors.PureWhite.copy(alpha = 0.88f),
+                        shape = RoundedCornerShape(5.dp),
+                        color = MeldColors.PureWhite.copy(alpha = 0.85f),
                         border = BorderStroke(2.2.dp, StageLaserRed)
                     ) {
                         Text(
-                            text = stampText.ifBlank { "CONFIDENTIAL" }.uppercase(),
+                            text = stampText.ifBlank { "LOCKED" }.uppercase(),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.1.sp,
+                            letterSpacing = 1.2.sp,
                             color = StageLaserRed,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                         )
                     }
 
-                    // Lock badge popping onto upper-right sheet corner
+                    // Coral padlock popping onto corner (starts from 0.88f, never scale(0))
                     Surface(
                         modifier = Modifier
-                            .offset(x = 38.dp, y = (-42).dp)
+                            .offset(x = 34.dp, y = (-38).dp)
                             .size(34.dp)
                             .graphicsLayer {
-                                val sc = 0.90f + 0.10f * lockVis
-                                scaleX = sc
-                                scaleY = sc
-                                alpha = lockVis.coerceIn(0f, 1f)
+                                val s = 0.88f + 0.12f * lockPop
+                                scaleX = s
+                                scaleY = s
+                                alpha = lockAlpha.coerceIn(0f, 1f)
                             },
                         shape = CircleShape,
                         color = MeldColors.CoralOrange,
@@ -775,26 +909,28 @@ fun StampSlamPreview(
     }
 }
 
-/** 5. REMOVE_BG: Checkerboard alpha stage with horizontal ink curtain sweep. */
+/** 5. REMOVE_BG: Checkerboard alpha wipe + breathing subject square. */
 @Composable
 fun RemoveBgCurtainStage(
     tolerance: Int,
     modifier: Modifier = Modifier
 ) {
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(2800, replay)
     val reduceMotion = rememberReduceMotion()
-    val targetSweep = ((tolerance - 15) / 80f).coerceIn(0.20f, 0.95f)
+    val targetSweep = ((tolerance - 15) / 80f).coerceIn(0.22f, 0.95f)
     val animatedSweep by animateFloatAsState(
-        targetValue = if (reduceMotion) targetSweep else targetSweep,
+        targetValue = targetSweep,
         animationSpec = tween(durationMillis = MeldMotion.UI_MS, easing = MeldMotion.EaseOut),
         label = "curtainSweep"
     )
-    val phase = rememberLoopPhase(3200)
-    val pulse = if (reduceMotion) 1f else 0.96f + 0.04f * sin(phase * 2f * PI.toFloat())
+    val breathe = if (reduceMotion) 1f else 0.96f + 0.04f * sin(phase * 2f * PI.toFloat())
 
     MeldStageViewport(
         modifier = modifier,
-        height = 112.dp,
-        backgroundColor = MeldColors.PureWhite
+        height = 120.dp,
+        backgroundColor = MeldColors.PureWhite,
+        onTapReplay = { replay++ }
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val sq = 11.dp.toPx()
@@ -823,10 +959,10 @@ fun RemoveBgCurtainStage(
         Surface(
             modifier = Modifier
                 .align(Alignment.Center)
-                .size(54.dp)
+                .size(56.dp)
                 .graphicsLayer {
-                    scaleX = pulse
-                    scaleY = pulse
+                    scaleX = breathe
+                    scaleY = breathe
                 },
             shape = RoundedCornerShape(14.dp),
             color = MeldColors.CoralOrange,
@@ -844,13 +980,14 @@ fun RemoveBgCurtainStage(
     }
 }
 
-/** 6. RESIZE_IMAGE: Live aspect scale + dark studio border frame toggle inside warm-sand stage. */
+/** 6. RESIZE_IMAGE: Live scaled frame with dashed crop bounds & dark border toggle. */
 @Composable
 fun ResizeFrameStage(
     percent: Int,
     addFrame: Boolean,
     modifier: Modifier = Modifier
 ) {
+    var replay by remember { mutableIntStateOf(0) }
     val reduceMotion = rememberReduceMotion()
     val norm = ((percent - 25) / 175f).coerceIn(0f, 1f)
     val frameScale by animateFloatAsState(
@@ -865,7 +1002,7 @@ fun ResizeFrameStage(
     )
     val density = LocalDensity.current
 
-    MeldStageViewport(modifier = modifier, height = 108.dp) {
+    MeldStageViewport(modifier = modifier, height = 114.dp, onTapReplay = { replay++ }) {
         val dashPx = with(density) { 5.dp.toPx() }
         Canvas(modifier = Modifier.fillMaxSize()) {
             val boxW = size.width * 0.56f
@@ -908,7 +1045,7 @@ fun ResizeFrameStage(
     }
 }
 
-/** 7. SCAN_QR: 21x21 live matrix with vertical scanner laser & subtle coral finder pulse. */
+/** 7. SCAN_QR: 21x21 staggered ripple reveal + live vertical scanner sweep. */
 @Composable
 fun QrMatrixStage(
     payload: String,
@@ -917,9 +1054,10 @@ fun QrMatrixStage(
     val matrix = remember(payload) { ImageEngine.buildQrMatrix21(payload.ifEmpty { "meld.app" }) }
     val reduceMotion = rememberReduceMotion()
     val reveal = remember(payload) { Animatable(if (reduceMotion) 1f else 0.15f) }
-    val phase = rememberLoopPhase(2600)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(2600, replay)
 
-    LaunchedEffect(payload, reduceMotion) {
+    LaunchedEffect(payload, reduceMotion, replay) {
         if (reduceMotion) {
             reveal.snapTo(1f)
         } else {
@@ -942,6 +1080,7 @@ fun QrMatrixStage(
             TactileCard(
                 backgroundColor = MeldColors.PureWhite,
                 cornerRadius = MeldColors.SubCardCorner,
+                onClick = { replay++ },
                 modifier = Modifier.size(168.dp)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -970,7 +1109,7 @@ fun QrMatrixStage(
                         if (!reduceMotion) {
                             val scanY = size.height * phase
                             drawLine(
-                                color = MeldColors.CoralOrange.copy(alpha = 0.65f),
+                                color = MeldColors.CoralOrange.copy(alpha = 0.72f),
                                 start = Offset(0f, scanY),
                                 end = Offset(size.width, scanY),
                                 strokeWidth = 2.dp.toPx()
@@ -983,10 +1122,7 @@ fun QrMatrixStage(
     }
 }
 
-/**
- * Master animated stage dispatcher covering EVERY remaining tool in `MeldToolId`
- * (zero generic fallbacks!).
- */
+/** Master animated stage dispatcher covering EVERY remaining tool in `MeldToolId`. */
 @Composable
 fun SpecializedToolShowcaseCard(
     tool: MeldToolId,
@@ -1045,7 +1181,7 @@ fun SpecializedToolShowcaseCard(
                     color = MeldColors.InkBlack
                 )
                 Text(
-                    text = "Runs completely offline on your phone with studio print precision.",
+                    text = "Runs completely offline on your phone · Tap stage to replay.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MeldColors.InkBlack.copy(alpha = 0.8f)
                 )
@@ -1054,125 +1190,160 @@ fun SpecializedToolShowcaseCard(
     }
 }
 
-/** 8. REDACT: Sequential left-to-right ink blackout bars over sensitive lines. */
+/** 8. REDACT (`ToolMotion.dc.html` Redact): Keeps top context visible while ink marker strokes whip over middle lines. */
 @Composable
 private fun RedactSweepStage() {
-    val phase = rememberLoopPhase(3200)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
-    val reset = if (reduceMotion) 0f else seg(phase, 0.88f, 0.98f)
-    val b1 = if (reduceMotion) 1f else seg(phase, 0.14f, 0.30f) * (1f - reset)
-    val b2 = if (reduceMotion) 1f else seg(phase, 0.28f, 0.44f) * (1f - reset)
-    val b3 = if (reduceMotion) 1f else seg(phase, 0.42f, 0.58f) * (1f - reset)
+    val reset = if (reduceMotion) 0f else easeTravel(phase, 0.88f, 0.98f)
+    val b1 = if (reduceMotion) 1f else easeTravel(phase, 0.15f, 0.30f) * (1f - reset)
+    val b2 = if (reduceMotion) 1f else easeTravel(phase, 0.27f, 0.42f) * (1f - reset)
 
-    MeldStageViewport(height = 144.dp) {
+    MeldStageViewport(height = 152.dp, onTapReplay = { replay++ }) {
         Surface(
             modifier = Modifier
                 .align(Alignment.Center)
-                .size(width = 88.dp, height = 108.dp),
-            shape = RoundedCornerShape(10.dp),
+                .size(width = 74.dp, height = 96.dp),
+            shape = RoundedCornerShape(8.dp),
             color = MeldColors.PureWhite,
             border = BorderStroke(1.8.dp, MeldColors.InkBlack)
         ) {
             Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                modifier = Modifier.padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(7.dp)
             ) {
+                // Header
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(0.55f)
+                        .fillMaxWidth(0.56f)
                         .height(7.dp)
-                        .clip(RoundedCornerShape(3.dp))
+                        .clip(RoundedCornerShape(2.dp))
                         .background(MeldColors.InkBlack)
                 )
-                listOf(b1, b2, b3).forEachIndexed { idx, sweep ->
-                    Box(modifier = Modifier.fillMaxWidth().height(10.dp)) {
+                // Context line 1 stays intact
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .height(3.5.dp)
+                        .background(StageDarkLine)
+                )
+                // Sensitive lines 2 & 3 get whipped black by blackout bars
+                listOf(b1, b2).forEach { sweep ->
+                    Box(modifier = Modifier.fillMaxWidth().height(9.dp)) {
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth(if (idx == 2) 0.72f else 0.92f)
-                                .height(4.dp)
+                                .fillMaxWidth(0.94f)
+                                .height(3.5.dp)
                                 .align(Alignment.CenterStart)
                                 .background(StageDarkLine)
                         )
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth(if (idx == 2) 0.76f else 1f)
+                                .fillMaxWidth(0.96f)
                                 .fillMaxHeight()
                                 .graphicsLayer {
                                     transformOrigin = TransformOrigin(0f, 0.5f)
                                     scaleX = sweep.coerceAtLeast(0.001f)
                                 }
-                                .clip(RoundedCornerShape(3.dp))
+                                .clip(RoundedCornerShape(2.dp))
                                 .background(MeldColors.InkBlack)
                         )
                     }
                 }
+                // Footer context line stays clean
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.75f)
+                        .height(3.5.dp)
+                        .background(StageDarkLine)
+                )
             }
         }
     }
 }
 
-/** 9. SANITIZE (`STRIP_PDF_META` / `STRIP_EXIF`): Laser beam sweeps down, pill tags peel away & vanish. */
+/**
+ * 9. SANITIZE (`ToolMotion.dc.html` Sanitize):
+ * Coral laser scan beam (`scn`) with warm glow trail sweeps top-to-bottom across sheet/Polaroid;
+ * once scanned, metadata pills (`author`/`producer`/`xmp` or `camera`/`gps`/`exif`) peel diagonally outward & vanish.
+ */
 @Composable
 private fun SanitizeScanStage(isExif: Boolean) {
-    val phase = rememberLoopPhase(3200)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
     val labels = if (isExif) listOf("camera", "gps", "exif") else listOf("author", "producer", "xmp")
     val density = LocalDensity.current
 
-    val scanSweep = if (reduceMotion) 0.5f else seg(phase, 0.12f, 0.48f)
-    val scanVisible = if (reduceMotion) true else phase in 0.12f..0.52f
+    val scanSweep = if (reduceMotion) 0.55f else easeTravel(phase, 0.14f, 0.46f)
+    val scanVisible = if (reduceMotion) true else phase in 0.14f..0.50f
 
-    MeldStageViewport(height = 148.dp) {
+    MeldStageViewport(height = 156.dp, onTapReplay = { replay++ }) {
         if (isExif) {
             MiniPolaroidGlyph(modifier = Modifier.align(Alignment.Center))
         } else {
             MiniSheetGlyph(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(width = 74.dp, height = 96.dp)
+                width = 68.dp,
+                height = 90.dp,
+                modifier = Modifier.align(Alignment.Center)
             )
         }
 
-        // Laser scan bar (`scn`)
         if (scanVisible) {
-            val topOff = with(density) { (18.dp.toPx() + 106.dp.toPx() * scanSweep).roundToInt() }
-            Box(
+            val topOff = with(density) { (18.dp.toPx() + 108.dp.toPx() * scanSweep).roundToInt() }
+            Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .offset { IntOffset(0, topOff) }
-                    .width(96.dp)
-                    .height(3.dp)
-                    .clip(CircleShape)
-                    .background(MeldColors.CoralOrange)
-            )
+                    .offset { IntOffset(0, topOff - with(density) { 10.dp.toPx().roundToInt() }) }
+                    .width(96.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(10.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, MeldColors.CoralOrange.copy(alpha = 0.28f))
+                            )
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(CircleShape)
+                        .background(MeldColors.CoralOrange)
+                )
+            }
         }
 
-        // Metadata pills peeling outward (`tg1`, `tg2`, `tg3`)
         val tagConfigs = listOf(
-            Triple(Alignment.TopStart, Offset(-22f, -14f), -12f),
-            Triple(Alignment.CenterEnd, Offset(22f, -8f), 12f),
-            Triple(Alignment.BottomStart, Offset(-16f, 16f), 10f)
+            Triple(Alignment.TopStart, Offset(-28f, -18f), -12f),
+            Triple(Alignment.CenterEnd, Offset(28f, -10f), 12f),
+            Triple(Alignment.BottomStart, Offset(-20f, 20f), 10f)
         )
         labels.forEachIndexed { idx, label ->
-            val start = 0.44f + idx * 0.05f
-            val peelT = if (reduceMotion) 0.35f else seg(phase, start, start + 0.22f)
-            val resetT = if (reduceMotion) 0f else seg(phase, 0.90f, 0.99f)
-            val away = peelT * (1f - resetT)
+            val start = 0.46f + idx * 0.05f
+            val away = if (reduceMotion) 0.4f else easeTravel(phase, start, start + 0.24f)
+            val reenter = if (reduceMotion) 1f else easeOutSeg(phase, 0.90f, 0.99f)
+            val visAlpha = if (reduceMotion) 0.7f else if (phase < 0.88f) (1f - away) else reenter
             val (align, vec, rot) = tagConfigs[idx]
-            val padModifier = when (idx) {
-                0 -> Modifier.padding(start = 24.dp, top = 26.dp)
-                1 -> Modifier.padding(end = 20.dp)
-                else -> Modifier.padding(start = 34.dp, bottom = 22.dp)
+            val padMod = when (idx) {
+                0 -> Modifier.padding(start = 28.dp, top = 28.dp)
+                1 -> Modifier.padding(end = 22.dp)
+                else -> Modifier.padding(start = 40.dp, bottom = 24.dp)
             }
             Surface(
                 modifier = Modifier
                     .align(align)
-                    .then(padModifier)
+                    .then(padMod)
                     .graphicsLayer {
-                        translationX = with(density) { vec.x.dp.toPx() * away }
-                        translationY = with(density) { vec.y.dp.toPx() * away }
-                        rotationZ = rot * away
-                        alpha = (1f - away).coerceIn(0f, 1f)
+                        translationX = with(density) { vec.x.dp.toPx() * away * (1f - reenter) }
+                        translationY = with(density) { vec.y.dp.toPx() * away * (1f - reenter) }
+                        rotationZ = rot * away * (1f - reenter)
+                        alpha = visAlpha.coerceIn(0f, 1f)
                     },
                 shape = CircleShape,
                 color = MeldColors.PureWhite,
@@ -1190,26 +1361,39 @@ private fun SanitizeScanStage(isExif: Boolean) {
     }
 }
 
-/** 10. PDF_MERGE: Three sheets converge from left/top/right, ink spine draws down, stack tilts. */
+/**
+ * 10. PDF_MERGE (`ToolMotion.dc.html` Merge / Booklet):
+ * Three distinct sheets start wide apart (`-84dp / -10°`, `-34dp Y`, `+84dp / +10°`),
+ * spring-join tightly together (`PopCurve`), a thick ink spine zips down the left binding seam (`TravelCurve`),
+ * and the bound booklet kicks into `-4° / 1.09x`.
+ */
 @Composable
 private fun MergeBookletStage() {
-    val phase = rememberLoopPhase(3200)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
 
-    val inT = if (reduceMotion) 1f else seg(phase, 0.08f, 0.36f)
-    val outT = if (reduceMotion) 0f else seg(phase, 0.84f, 0.98f)
+    val inT = if (reduceMotion) 1f else easePop(phase, 0.08f, 0.36f)
+    val outT = if (reduceMotion) 0f else easeTravel(phase, 0.82f, 0.97f)
     val join = inT * (1f - outT)
-    val spineDraw = if (reduceMotion) 1f else (seg(phase, 0.44f, 0.56f) * (1f - outT))
-    val tiltT = if (reduceMotion) 1f else (seg(phase, 0.56f, 0.68f) * (1f - outT))
+    val spineDraw = if (reduceMotion) 1f else (easeTravel(phase, 0.44f, 0.56f) * (1f - outT))
+    val tiltKick = when {
+        reduceMotion -> 1f
+        phase < 0.56f -> 0f
+        phase < 0.65f -> lerp(0f, 1.25f, easeOutSeg(phase, 0.56f, 0.65f))
+        phase < 0.74f -> lerp(1.25f, 1.0f, easeOutSeg(phase, 0.65f, 0.74f))
+        phase < 0.85f -> 1f
+        else -> 1f - easeTravel(phase, 0.85f, 0.96f)
+    }
 
-    MeldStageViewport(height = 148.dp) {
+    MeldStageViewport(height = 156.dp, onTapReplay = { replay++ }) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    rotationZ = -4f * tiltT
-                    val s = 1f + 0.08f * tiltT
+                    rotationZ = -4f * tiltKick
+                    val s = 1f + 0.09f * tiltKick
                     scaleX = s
                     scaleY = s
                 },
@@ -1217,33 +1401,33 @@ private fun MergeBookletStage() {
         ) {
             MiniSheetGlyph(
                 modifier = Modifier.graphicsLayer {
-                    translationX = with(density) { lerp(-72f, -6f, join).dp.toPx() }
-                    rotationZ = lerp(-9f, -4f, join)
+                    translationX = with(density) { lerp(-88f, -5f, join).dp.toPx() }
+                    rotationZ = lerp(-10f, -5f, join)
                 }
             )
             MiniSheetGlyph(
                 modifier = Modifier.graphicsLayer {
-                    translationX = with(density) { lerp(72f, 6f, join).dp.toPx() }
-                    rotationZ = lerp(9f, 4f, join)
+                    translationX = with(density) { lerp(88f, 5f, join).dp.toPx() }
+                    rotationZ = lerp(10f, 5f, join)
                 },
                 accentHeader = MeldColors.CoralOrange
             )
             MiniSheetGlyph(
                 modifier = Modifier.graphicsLayer {
-                    translationY = with(density) { lerp(-24f, 0f, join).dp.toPx() }
-                    alpha = join.coerceAtLeast(0.25f)
+                    translationY = with(density) { lerp(-32f, 0f, join).dp.toPx() }
+                    alpha = (0.35f + 0.65f * join).coerceIn(0f, 1f)
                 }
             )
-            // Ink binding spine (`sp`)
+            // Left binding seam spine (`sp`)
             Box(
                 modifier = Modifier
-                    .offset(x = (-28).dp)
+                    .offset(x = (-27).dp)
                     .width(5.dp)
                     .height(74.dp)
                     .graphicsLayer {
                         transformOrigin = TransformOrigin(0.5f, 0f)
                         scaleY = spineDraw.coerceAtLeast(0.001f)
-                        alpha = spineDraw
+                        alpha = spineDraw.coerceIn(0f, 1f)
                     }
                     .clip(RoundedCornerShape(2.dp))
                     .background(MeldColors.InkBlack)
@@ -1252,27 +1436,28 @@ private fun MergeBookletStage() {
     }
 }
 
-/** 11. PDF_TO_PNG / PDF_TO_JPG / IMG_TO_*: Flash -> sheet becomes framed Polaroid + Format Sticker. */
+/** 11. PDF_TO_PNG / PDF_TO_JPG / IMG_TO_*: Camera flash morph -> sunlit Polaroid + angled format sticker. */
 @Composable
 private fun PolaroidFormatMorphStage(
     sourceExt: String,
     targetExt: String
 ) {
-    val phase = rememberLoopPhase(3200)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
-    val reset = if (reduceMotion) 0f else seg(phase, 0.90f, 0.99f)
-    val polaroidIn = if (reduceMotion) 1f else (seg(phase, 0.28f, 0.42f) * (1f - reset))
-    val sheetVis = if (reduceMotion) 0f else (1f - seg(phase, 0.28f, 0.38f)).coerceAtLeast(reset)
-    val flashAlpha = if (reduceMotion || phase !in 0.24f..0.38f) 0f else sin(((phase - 0.24f) / 0.14f) * PI.toFloat()) * 0.85f
-    val stickerIn = if (reduceMotion) 1f else (seg(phase, 0.48f, 0.62f) * (1f - reset))
+    val reset = if (reduceMotion) 0f else easeTravel(phase, 0.90f, 0.99f)
+    val polaroidIn = if (reduceMotion) 1f else (easePop(phase, 0.30f, 0.44f) * (1f - reset))
+    val sheetVis = if (reduceMotion) 0f else (1f - easeTravel(phase, 0.28f, 0.36f)).coerceAtLeast(reset)
+    val flashAlpha = if (reduceMotion || phase !in 0.25f..0.40f) 0f else sin(((phase - 0.25f) / 0.15f) * PI.toFloat()) * 0.92f
+    val stickerIn = if (reduceMotion) 1f else (easePop(phase, 0.50f, 0.64f) * (1f - reset))
 
-    MeldStageViewport(height = 148.dp) {
+    MeldStageViewport(height = 156.dp, onTapReplay = { replay++ }) {
         if (sheetVis > 0.02f) {
             MiniSheetGlyph(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .graphicsLayer {
-                        alpha = sheetVis
+                        alpha = sheetVis.coerceIn(0f, 1f)
                         val sc = 0.85f + 0.15f * sheetVis
                         scaleX = sc
                         scaleY = sc
@@ -1286,11 +1471,11 @@ private fun PolaroidFormatMorphStage(
                 modifier = Modifier
                     .align(Alignment.Center)
                     .graphicsLayer {
-                        alpha = polaroidIn
-                        val sc = 0.78f + 0.22f * polaroidIn
+                        alpha = polaroidIn.coerceIn(0f, 1f)
+                        val sc = 0.72f + 0.28f * polaroidIn
                         scaleX = sc
                         scaleY = sc
-                        rotationZ = lerp(-8f, 3f, polaroidIn)
+                        rotationZ = lerp(-10f, 3f, polaroidIn)
                     }
             )
         }
@@ -1301,11 +1486,11 @@ private fun PolaroidFormatMorphStage(
                     .align(Alignment.Center)
                     .offset(x = 34.dp, y = (-34).dp)
                     .graphicsLayer {
-                        val sc = lerp(0.82f, 1.0f, stickerIn)
+                        val sc = 0.86f + 0.14f * stickerIn
                         scaleX = sc
                         scaleY = sc
                         rotationZ = 8f
-                        alpha = stickerIn
+                        alpha = stickerIn.coerceIn(0f, 1f)
                     },
                 shape = RoundedCornerShape(8.dp),
                 color = MeldColors.CoralOrange,
@@ -1331,15 +1516,16 @@ private fun PolaroidFormatMorphStage(
     }
 }
 
-/** 12. IMG_TO_PDF: Polaroid card folds smoothly into crisp PDF sheet. */
+/** 12. IMG_TO_PDF: Polaroid slides into a clean corner-folded PDF sheet with Coral sticker. */
 @Composable
 private fun PhotoToPdfStackStage(sourceExt: String) {
-    val phase = rememberLoopPhase(3200)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
-    val morph = if (reduceMotion) 1f else (seg(phase, 0.22f, 0.44f) * (1f - seg(phase, 0.86f, 0.98f)))
+    val morph = if (reduceMotion) 1f else (easePop(phase, 0.20f, 0.44f) * (1f - easeTravel(phase, 0.86f, 0.98f)))
     val density = LocalDensity.current
 
-    MeldStageViewport(height = 148.dp) {
+    MeldStageViewport(height = 156.dp, onTapReplay = { replay++ }) {
         Row(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.Center,
@@ -1359,16 +1545,16 @@ private fun PhotoToPdfStackStage(sourceExt: String) {
                 tint = MeldColors.InkBlack,
                 modifier = Modifier
                     .padding(horizontal = 10.dp)
-                    .graphicsLayer { scaleX = 0.85f + 0.15f * morph }
+                    .graphicsLayer { scaleX = 0.88f + 0.12f * morph }
             )
             MiniSheetGlyph(
-                modifier = Modifier
-                    .size(width = 66.dp, height = 84.dp)
-                    .graphicsLayer {
-                        val sc = 0.90f + 0.10f * morph
-                        scaleX = sc
-                        scaleY = sc
-                    },
+                width = 66.dp,
+                height = 84.dp,
+                modifier = Modifier.graphicsLayer {
+                    val sc = 0.90f + 0.10f * morph
+                    scaleX = sc
+                    scaleY = sc
+                },
                 badgeText = "PDF",
                 badgeColor = MeldColors.CoralOrange
             )
@@ -1376,31 +1562,36 @@ private fun PhotoToPdfStackStage(sourceExt: String) {
     }
 }
 
-/** 13. PDF_TO_DOCX: True 3D Y-axis perspective card flip (`white PDF sheet` -> `blue W Word page`). */
+/**
+ * 13. PDF_TO_DOCX (`ToolMotion.dc.html` PDF to Word):
+ * Fast 2.6s 3D perspective card flip (`rotationY`): white PDF sheet snaps 0° -> 90° (`TravelCurve`),
+ * then Cobalt `#5B8CFF` W Word page snaps `-90° -> 0°` with `PopCurve` spring bounce!
+ */
 @Composable
 private fun SheetFlipWordStage() {
-    val phase = rememberLoopPhase(3200)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(2600, replay)
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
 
-    val flipOut = if (reduceMotion) 1f else seg(phase, 0.20f, 0.42f)
-    val backIn = if (reduceMotion) 1f else seg(phase, 0.42f, 0.62f)
-    val returnBack = if (reduceMotion) 0f else seg(phase, 0.86f, 0.98f)
-    val showWord = if (reduceMotion) true else (phase in 0.42f..0.92f)
-
+    val showWord = if (reduceMotion) true else (phase in 0.34f..0.90f)
     val rotY = when {
         reduceMotion -> 0f
-        phase < 0.42f -> lerp(0f, 90f, flipOut)
-        phase < 0.86f -> lerp(-90f, 0f, backIn)
-        else -> lerp(0f, -90f, returnBack)
+        phase < 0.14f -> 0f
+        phase < 0.34f -> lerp(0f, 90f, easeTravel(phase, 0.14f, 0.34f))
+        phase < 0.54f -> lerp(-90f, 0f, easePop(phase, 0.34f, 0.54f))
+        phase < 0.84f -> 0f
+        phase < 0.92f -> lerp(0f, 90f, easeTravel(phase, 0.84f, 0.92f))
+        else -> lerp(-90f, 0f, easeOutSeg(phase, 0.92f, 1.0f))
     }
 
-    MeldStageViewport(height = 148.dp) {
+    MeldStageViewport(height = 156.dp, onTapReplay = { replay++ }) {
         if (!showWord) {
             MiniSheetGlyph(
+                width = 76.dp,
+                height = 98.dp,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .size(width = 76.dp, height = 98.dp)
                     .graphicsLayer {
                         cameraDistance = 12f * density.density
                         rotationY = rotY
@@ -1424,7 +1615,7 @@ private fun SheetFlipWordStage() {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = "W",
-                        fontSize = 36.sp,
+                        fontSize = 38.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = MeldColors.InkBlack
                     )
@@ -1434,19 +1625,20 @@ private fun SheetFlipWordStage() {
     }
 }
 
-/** 14. PDF_TO_MD / PDF_TO_HTML / PDF_TO_TXT: Mini-sheet -> Dark Code Card typing neon lines + syntax glyph. */
+/** 14. PDF_TO_MD / PDF_TO_HTML / PDF_TO_TXT: Mini-sheet -> dark code terminal typing neon syntax lines + blinking cursor. */
 @Composable
 private fun SheetToCodeTerminalStage(
     tag: String,
     accentColor: Color
 ) {
-    val phase = rememberLoopPhase(3200)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
-    val reset = if (reduceMotion) 0f else seg(phase, 0.88f, 0.98f)
+    val reset = if (reduceMotion) 0f else easeTravel(phase, 0.88f, 0.98f)
     val lineFracs = listOf(0.62f, 0.86f, 0.50f, 0.76f)
     val lineColors = listOf(StageLimeCode, MeldColors.PeriwinkleBlue, StagePinkCode, MeldColors.MintSage)
 
-    MeldStageViewport(height = 148.dp) {
+    MeldStageViewport(height = 152.dp, onTapReplay = { replay++ }) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -1464,7 +1656,7 @@ private fun SheetToCodeTerminalStage(
             Surface(
                 modifier = Modifier
                     .weight(1f)
-                    .height(92.dp),
+                    .height(94.dp),
                 shape = RoundedCornerShape(10.dp),
                 color = MeldColors.InkBlack
             ) {
@@ -1475,14 +1667,14 @@ private fun SheetToCodeTerminalStage(
                     ) {
                         lineFracs.forEachIndexed { idx, w ->
                             val start = 0.08f + idx * 0.08f
-                            val draw = if (reduceMotion) 1f else (seg(phase, start, start + 0.14f) * (1f - reset))
+                            val draw = if (reduceMotion) 1f else (easeTravel(phase, start, start + 0.14f) * (1f - reset))
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth(w)
                                     .height(5.dp)
                                     .graphicsLayer {
                                         transformOrigin = TransformOrigin(0f, 0.5f)
-                                        scaleX = draw.coerceAtLeast(0.01f)
+                                        scaleX = draw.coerceAtLeast(0.005f)
                                     }
                                     .clip(CircleShape)
                                     .background(lineColors[idx])
@@ -1503,16 +1695,20 @@ private fun SheetToCodeTerminalStage(
     }
 }
 
-/** 15. COLLAGE: Four tilted Polaroids glide smoothly into a 2x2 locked grid. */
+/** 15. COLLAGE: Four scattered tilted Polaroids spring-snap into a tight 2x2 contact grid. */
 @Composable
 private fun CollageGridAssembleStage() {
-    val phase = rememberLoopPhase(3200)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
-    val snap = if (reduceMotion) 1f else (seg(phase, 0.12f, 0.38f) * (1f - seg(phase, 0.86f, 0.98f)))
+    val snap = if (reduceMotion) 1f else (easePop(phase, 0.12f, 0.40f) * (1f - easeTravel(phase, 0.86f, 0.98f)))
     val colors = listOf(MeldColors.ButterYellow, MeldColors.MintSage, MeldColors.PeriwinkleBlue, MeldColors.PeachCream)
-    val tilts = listOf(-8f, 6f, 7f, -6f)
+    val tilts = listOf(-12f, 10f, 11f, -9f)
+    val spreadX = listOf(-16f, 16f, -16f, 16f)
+    val spreadY = listOf(-12f, -12f, 12f, 12f)
+    val density = LocalDensity.current
 
-    MeldStageViewport(height = 148.dp) {
+    MeldStageViewport(height = 156.dp, onTapReplay = { replay++ }) {
         Column(
             modifier = Modifier
                 .align(Alignment.Center)
@@ -1531,6 +1727,8 @@ private fun CollageGridAssembleStage() {
                                 .weight(1f)
                                 .fillMaxHeight()
                                 .graphicsLayer {
+                                    translationX = with(density) { lerp(spreadX[idx], 0f, snap).dp.toPx() }
+                                    translationY = with(density) { lerp(spreadY[idx], 0f, snap).dp.toPx() }
                                     rotationZ = lerp(tilts[idx], 0f, snap)
                                     val sc = lerp(0.84f, 1.0f, snap)
                                     scaleX = sc
@@ -1557,12 +1755,14 @@ private fun CollageGridAssembleStage() {
     }
 }
 
-/** 16. VISUALIZE: 18 pulsing studio equalizer gradient bars inside dark viewport. */
+/** 16. VISUALIZE: 18 pulsing studio equalizer gradient bars inside dark studio viewport. */
 @Composable
 private fun AudioWaveformStage() {
-    val phase = rememberLoopPhase(1800)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(1800, replay)
     val reduceMotion = rememberReduceMotion()
-    MeldStageViewport(height = 148.dp, backgroundColor = MeldColors.InkBlack) {
+
+    MeldStageViewport(height = 152.dp, backgroundColor = MeldColors.InkBlack, onTapReplay = { replay++ }) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1577,7 +1777,7 @@ private fun AudioWaveformStage() {
             Canvas(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp)
+                    .height(68.dp)
             ) {
                 val count = 18
                 val gap = 4.dp.toPx()
@@ -1611,15 +1811,16 @@ private fun AudioWaveformStage() {
     }
 }
 
-/** 17. SPEED_2X: Dual tempo playhead streams comparing 1.0x vs 2.0x throughput. */
+/** 17. SPEED_2X: Dual playhead tempo comparison streams (`1.0x` vs `2.0x`). */
 @Composable
 private fun SpeedRaceStage() {
-    val phase = rememberLoopPhase(2400)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(2400, replay)
     val reduceMotion = rememberReduceMotion()
     val slow = if (reduceMotion) 0.45f else phase
     val fast = if (reduceMotion) 0.90f else (phase * 2f) % 1f
 
-    MeldStageViewport(height = 144.dp) {
+    MeldStageViewport(height = 148.dp, onTapReplay = { replay++ }) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1688,17 +1889,18 @@ private fun SpeedRaceStage() {
     }
 }
 
-/** 18. SHEET_TO_PDF / SHEET_TO_MD / TABLE_CONVERT: 3x3 spreadsheet lights up & exports formatted card. */
+/** 18. SHEET_TO_PDF / SHEET_TO_MD / TABLE_CONVERT: Structured 3x3 spreadsheet row scan -> output badge. */
 @Composable
 private fun TableTransformStage(
     targetExt: String,
     badgeColor: Color
 ) {
-    val phase = rememberLoopPhase(2800)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(2800, replay)
     val reduceMotion = rememberReduceMotion()
     val activeRow = if (reduceMotion) 1 else ((phase * 3f).toInt() % 3)
 
-    MeldStageViewport(height = 144.dp) {
+    MeldStageViewport(height = 148.dp, onTapReplay = { replay++ }) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -1762,14 +1964,15 @@ private fun TableTransformStage(
     }
 }
 
-/** 19. PACK_ZIP: File pills drop into Lavender archive while interlocking zipper teeth clasp. */
+/** 19. PACK_ZIP: File pills ease smoothly into Lavender archive as zipper teeth clasp top-to-bottom. */
 @Composable
 private fun ZipPackStage() {
-    val phase = rememberLoopPhase(2800)
+    var replay by remember { mutableIntStateOf(0) }
+    val phase = rememberLoopPhase(2800, replay)
     val reduceMotion = rememberReduceMotion()
     val density = LocalDensity.current
 
-    MeldStageViewport(height = 148.dp) {
+    MeldStageViewport(height = 152.dp, onTapReplay = { replay++ }) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
@@ -1786,7 +1989,7 @@ private fun ZipPackStage() {
                     val pulse = if (reduceMotion) 0f else sin(((phase + offset) % 1f) * 2f * PI.toFloat())
                     Surface(
                         modifier = Modifier.graphicsLayer {
-                            translationX = with(density) { (6.dp.toPx() * (0.5f + 0.5f * pulse)) }
+                            translationX = with(density) { (7.dp.toPx() * (0.5f + 0.5f * pulse)) }
                         },
                         shape = RoundedCornerShape(7.dp),
                         color = col,
@@ -1818,7 +2021,6 @@ private fun ZipPackStage() {
                 border = BorderStroke(1.8.dp, MeldColors.InkBlack)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // Alternating zipper teeth clasping vertically down the center
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val teeth = 6
                         val step = size.height / (teeth + 1)
