@@ -1,5 +1,6 @@
 package app.meld.android.ui
 
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -37,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import app.meld.android.model.MeldCategory
 import app.meld.android.model.MeldMode
 import app.meld.android.model.MeldToolId
@@ -85,14 +87,33 @@ fun MeldAppRoot(
     onUpdateRedactionZones: (List<app.meld.android.model.RedactionRect>) -> Unit = {},
     onToggleAutoDownloads: (Boolean) -> Unit
 ) {
-    val openingDriver = remember { MeldOpeningDriver() }
+    val context = LocalContext.current
     val reduceMotion = rememberReduceMotion()
+    // Play opening choreography automatically on first launch only; subsequent launches go straight to Studio.
+    val hasSeenOpening = remember(context) {
+        context.getSharedPreferences("meld_prefs", Context.MODE_PRIVATE)
+            .getBoolean("has_seen_opening_choreography", false)
+    }
+    val openingDriver = remember(hasSeenOpening, reduceMotion) {
+        MeldOpeningDriver(initiallyVisible = !hasSeenOpening && !reduceMotion)
+    }
     var replaySeed by remember { mutableIntStateOf(0) }
+    var coldPlayedInSession by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(replaySeed, reduceMotion) {
+        val isReplay = replaySeed > 0
+        val alreadySeen = hasSeenOpening || coldPlayedInSession > 0
+        if (!isReplay && !alreadySeen) {
+            coldPlayedInSession++
+            context.getSharedPreferences("meld_prefs", Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean("has_seen_opening_choreography", true)
+                .apply()
+        }
         openingDriver.playSequence(
-            isColdStart = (replaySeed == 0),
-            reduceMotion = reduceMotion
+            isColdStart = !isReplay,
+            reduceMotion = reduceMotion,
+            skipToRest = !isReplay && alreadySeen
         )
     }
 
