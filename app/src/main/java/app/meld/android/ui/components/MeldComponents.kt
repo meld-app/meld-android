@@ -5,7 +5,12 @@ import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -74,7 +79,9 @@ import app.meld.android.ui.theme.rememberReduceMotion
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
+import kotlin.math.PI
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 @Composable
 fun TactileCard(
@@ -595,17 +602,34 @@ fun ResultShowcaseCard(
     val fanProgress = remember { Animatable(if (reduceMotion) 1f else 0f) }
     val badgeReveal = remember { Animatable(if (reduceMotion) 1f else 0f) }
     val checkDraw = remember { Animatable(if (reduceMotion) 1f else 0f) }
+    val ringPulse = remember { Animatable(0f) }
+
+    val idleBob = if (reduceMotion) 0f else run {
+        val infinite = rememberInfiniteTransition(label = "resultIdleFloat")
+        val p by infinite.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = 3200, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "idlePhase"
+        )
+        sin(p * 2f * PI.toFloat())
+    }
 
     LaunchedEffect(result.outputFile.absolutePath, result.durationMs) {
         if (reduceMotion) {
             fanProgress.snapTo(1f)
             badgeReveal.snapTo(1f)
             checkDraw.snapTo(1f)
+            ringPulse.snapTo(1f)
             return@LaunchedEffect
         }
         fanProgress.snapTo(0f)
         badgeReveal.snapTo(0f)
         checkDraw.snapTo(0f)
+        ringPulse.snapTo(0f)
 
         launch {
             fanProgress.animateTo(
@@ -619,6 +643,13 @@ fun ResultShowcaseCard(
             badgeReveal.animateTo(
                 1f,
                 animationSpec = tween(durationMillis = 220, easing = MeldMotion.EaseOvershoot)
+            )
+        }
+        launch {
+            delay(130)
+            ringPulse.animateTo(
+                1f,
+                animationSpec = tween(durationMillis = 480, easing = MeldMotion.EaseOut)
             )
         }
         launch {
@@ -691,7 +722,8 @@ fun ResultShowcaseCard(
                             .width(155.dp)
                             .graphicsLayer {
                                 translationX = rightOffPx
-                                rotationZ = 3.5f * fanProgress.value
+                                translationY = 2.5.dp.toPx() * idleBob
+                                rotationZ = 3.5f * fanProgress.value + 1.0f * idleBob
                                 val s = 0.94f + 0.06f * fanProgress.value
                                 scaleX = s
                                 scaleY = s
@@ -754,6 +786,24 @@ fun ResultShowcaseCard(
                     }
                 }
             }
+        }
+
+        // Expanding Sonar Ring on completion (`ToolMotion.dc.html .rg`)
+        if (!reduceMotion && ringPulse.value in 0.02f..0.98f) {
+            val ringScale = 0.85f + 0.85f * ringPulse.value
+            val ringAlpha = (1f - ringPulse.value) * 0.72f
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-10).dp, y = (-10).dp)
+                    .size(52.dp)
+                    .graphicsLayer {
+                        scaleX = ringScale
+                        scaleY = ringScale
+                        alpha = ringAlpha
+                    }
+                    .border(2.5.dp, MeldColors.CoralOrange, CircleShape)
+            )
         }
 
         // Signature Coral Checkmark Badge — starts from 0.90f (never scale(0)) + animates checkmark stroke
