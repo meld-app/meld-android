@@ -146,6 +146,7 @@ fun TactileCard(
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
+                    role = androidx.compose.ui.semantics.Role.Button,
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onClick()
@@ -189,33 +190,42 @@ fun TactileCircleIconButton(
         label = "circlePressScale"
     )
 
-    Surface(
+    // Visual circle can be small, but the touch target is always at least 48dp (WCAG 2.5.8 / Material).
+    val touchSize = if (size < 48.dp) 48.dp else size
+    Box(
         modifier = modifier
-            .size(size)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
+            .size(touchSize)
             .clip(CircleShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
+                role = androidx.compose.ui.semantics.Role.Button,
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onClick()
                 }
             ),
-        shape = CircleShape,
-        color = backgroundColor,
-        border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+        contentAlignment = Alignment.Center
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = iconTint,
-                modifier = Modifier.size(20.dp)
-            )
+        Surface(
+            modifier = Modifier
+                .size(size)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                },
+            shape = CircleShape,
+            color = backgroundColor,
+            border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    tint = iconTint,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }
