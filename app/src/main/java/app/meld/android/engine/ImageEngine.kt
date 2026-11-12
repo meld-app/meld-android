@@ -4,11 +4,13 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.ImageDecoder
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
+import android.os.Build
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -23,22 +25,69 @@ import kotlin.math.sqrt
 object ImageEngine {
 
     /**
+     * Decodes an image respecting EXIF orientation on API 28+ and safely bounding
+     * largest dimension to avoid OOM on multi-megapixel phone camera photos.
+     */
+    fun decodeNormalizedBitmap(inputFile: File, maxDimension: Int = 2400): Bitmap {
+        if (!inputFile.exists()) {
+            throw IllegalArgumentException("File does not exist: ${inputFile.name}")
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = ImageDecoder.createSource(inputFile)
+            return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                val w = info.size.width
+                val h = info.size.height
+                val largest = max(w, h)
+                if (largest > maxDimension && maxDimension > 0) {
+                    val ratio = maxDimension.toFloat() / largest.toFloat()
+                    decoder.setTargetSize(
+                        max(1, (w * ratio).toInt()),
+                        max(1, (h * ratio).toInt())
+                    )
+                }
+            }
+        }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(inputFile.absolutePath, bounds)
+        var sample = 1
+        val largest = max(bounds.outWidth, bounds.outHeight)
+        while (largest / sample > maxDimension && maxDimension > 0) {
+            sample *= 2
+        }
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        return BitmapFactory.decodeFile(inputFile.absolutePath, opts)
+            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+    }
+
+    /** Composites transparent images onto white so JPEG outputs never turn alpha black. */
+    private fun flattenOnWhiteIfNeeded(bmp: Bitmap): Bitmap {
+        if (!bmp.hasAlpha()) return bmp
+        val opaque = Bitmap.createBitmap(bmp.width, bmp.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(opaque)
+        canvas.drawColor(Color.WHITE)
+        canvas.drawBitmap(bmp, 0f, 0f, null)
+        return opaque
+    }
+
+    /**
      * Converts image between formats (JPG, PNG, WEBP, BMP, TIFF).
      */
     fun convertFormat(inputFile: File, outputFile: File, targetFormat: String): String {
-        val bmp = BitmapFactory.decodeFile(inputFile.absolutePath)
-            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+        val bmp = decodeNormalizedBitmap(inputFile)
 
         val fmt = targetFormat.lowercase().trimStart('.')
         when (fmt) {
             "jpg", "jpeg" -> {
-                FileOutputStream(outputFile).use { bmp.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+                val flat = flattenOnWhiteIfNeeded(bmp)
+                FileOutputStream(outputFile).use { flat.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+                if (flat !== bmp) flat.recycle()
             }
             "png" -> {
                 FileOutputStream(outputFile).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
             }
             "webp" -> {
-                val webpFormat = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                val webpFormat = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     Bitmap.CompressFormat.WEBP_LOSSY
                 } else {
                     @Suppress("DEPRECATION")
@@ -47,10 +96,14 @@ object ImageEngine {
                 FileOutputStream(outputFile).use { bmp.compress(webpFormat, 90, it) }
             }
             "bmp" -> {
-                writeBmp(bmp, outputFile)
+                val flat = flattenOnWhiteIfNeeded(bmp)
+                writeBmp(flat, outputFile)
+                if (flat !== bmp) flat.recycle()
             }
             "tiff", "tif" -> {
-                writeTiff(bmp, outputFile)
+                val flat = flattenOnWhiteIfNeeded(bmp)
+                writeTiff(flat, outputFile)
+                if (flat !== bmp) flat.recycle()
             }
             else -> {
                 FileOutputStream(outputFile).use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
@@ -67,8 +120,7 @@ object ImageEngine {
      * Centers image into a print-ready A4 vector PDF page.
      */
     fun convertImageToPdf(inputFile: File, outputFile: File): String {
-        val bmp = BitmapFactory.decodeFile(inputFile.absolutePath)
-            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+        val bmp = decodeNormalizedBitmap(inputFile)
 
         val a4W = 595
         val a4H = 842
@@ -115,8 +167,7 @@ object ImageEngine {
         scalePercent: Int,
         addFrame: Boolean
     ): String {
-        val original = BitmapFactory.decodeFile(inputFile.absolutePath)
-            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+        val original = decodeNormalizedBitmap(inputFile)
 
         val factor = (scalePercent.coerceIn(10, 300)) / 100.0f
         val newW = max(32, (original.width * factor).toInt())
@@ -166,8 +217,7 @@ object ImageEngine {
      * Creates a 2x2 photo collage sheet from the staged image.
      */
     fun createPhotoCollage(inputFile: File, outputFile: File): String {
-        val original = BitmapFactory.decodeFile(inputFile.absolutePath)
-            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+        val original = decodeNormalizedBitmap(inputFile)
 
         val cellW = 540
         val cellH = 540
@@ -215,8 +265,7 @@ object ImageEngine {
      * Wipes all EXIF/GPS metadata by decoding pure pixel raster and re-encoding.
      */
     fun stripImageExif(inputFile: File, outputFile: File): String {
-        val original = BitmapFactory.decodeFile(inputFile.absolutePath)
-            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+        val original = decodeNormalizedBitmap(inputFile)
 
         FileOutputStream(outputFile).use { original.compress(Bitmap.CompressFormat.PNG, 100, it) }
         val w = original.width
@@ -231,8 +280,7 @@ object ImageEngine {
      * and applying smooth alpha feathering into a 32-bit ARGB_8888 PNG.
      */
     fun removeBackground(inputFile: File, outputFile: File, tolerance: Int = 42): String {
-        val source = BitmapFactory.decodeFile(inputFile.absolutePath)
-            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+        val source = decodeNormalizedBitmap(inputFile, maxDimension = 1600)
 
         val width = source.width
         val height = source.height
@@ -292,9 +340,10 @@ object ImageEngine {
      * Binary-searches JPEG quality and resolution downscaling to fit within targetKb.
      */
     fun compressToTargetKb(inputFile: File, outputFile: File, targetKb: Int): String {
-        val targetBytes = max(15, targetKb) * 1024
-        val original = BitmapFactory.decodeFile(inputFile.absolutePath)
-            ?: throw IllegalArgumentException("Could not decode image: ${inputFile.name}")
+        val targetBytes = max(10, targetKb) * 1024
+        val decoded = decodeNormalizedBitmap(inputFile)
+        val original = flattenOnWhiteIfNeeded(decoded)
+        if (original !== decoded) decoded.recycle()
 
         var working = original
         var bestBytes: ByteArray? = null

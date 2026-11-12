@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.FileProvider
+import androidx.core.content.IntentCompat
 import app.meld.android.ui.MeldAppRoot
 import app.meld.android.ui.MeldViewModel
 import app.meld.android.ui.theme.MeldTheme
@@ -32,13 +33,7 @@ class MainActivity : ComponentActivity() {
         )
 
         // Handle incoming "Share to MELD" intent from other Android apps
-        if (intent?.action == Intent.ACTION_SEND) {
-            @Suppress("DEPRECATION")
-            val sharedUri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
-            if (sharedUri != null) {
-                viewModel.importExternalUri(this, sharedUri)
-            }
-        }
+        handleIncomingIntent(intent)
 
         setContent {
             MeldTheme {
@@ -63,6 +58,7 @@ class MainActivity : ComponentActivity() {
                     onOpenResult = viewModel::openResult,
                     onNavigateHome = viewModel::navigateHome,
                     onSetFileSheetVisible = viewModel::setFileSheetVisible,
+                    onClearBanner = viewModel::clearBanner,
                     onPickExternalFile = {
                         viewModel.setFileSheetVisible(false)
                         filePickerLauncher.launch(arrayOf("*/*"))
@@ -113,33 +109,50 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(incoming: Intent?) {
+        if (incoming?.action == Intent.ACTION_SEND) {
+            val sharedUri = IntentCompat.getParcelableExtra(incoming, Intent.EXTRA_STREAM, Uri::class.java)
+            if (sharedUri != null) {
+                viewModel.importExternalUri(this, sharedUri)
+            }
+        }
+    }
+
     private fun shareOutputFile(file: File) {
         if (!file.exists()) return
-        val uri = FileProvider.getUriForFile(
-            this,
-            "${applicationContext.packageName}.fileprovider",
-            file
-        )
-        val mimeType = when (file.extension.lowercase()) {
-            "pdf" -> "application/pdf"
-            "png" -> "image/png"
-            "jpg", "jpeg" -> "image/jpeg"
-            "webp" -> "image/webp"
-            "bmp" -> "image/bmp"
-            "tiff", "tif" -> "image/tiff"
-            "json" -> "application/json"
-            "md", "txt" -> "text/plain"
-            "html" -> "text/html"
-            "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            "wav" -> "audio/wav"
-            "zip" -> "application/zip"
-            else -> "*/*"
+        runCatching {
+            val uri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.fileprovider",
+                file
+            )
+            val mimeType = when (file.extension.lowercase()) {
+                "pdf" -> "application/pdf"
+                "png" -> "image/png"
+                "jpg", "jpeg" -> "image/jpeg"
+                "webp" -> "image/webp"
+                "bmp" -> "image/bmp"
+                "tiff", "tif" -> "image/tiff"
+                "json" -> "application/json"
+                "md", "txt" -> "text/plain"
+                "html" -> "text/html"
+                "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                "wav" -> "audio/wav"
+                "zip" -> "application/zip"
+                else -> "*/*"
+            }
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(shareIntent, "Share MELD Output"))
         }
-        val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = mimeType
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        }
-        startActivity(Intent.createChooser(shareIntent, "Share MELD Output"))
     }
 }

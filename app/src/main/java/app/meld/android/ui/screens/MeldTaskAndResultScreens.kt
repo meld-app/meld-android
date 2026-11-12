@@ -94,6 +94,7 @@ fun MeldTaskScreen(
     uiState: MeldUiState,
     onBack: () -> Unit,
     onRunTool: () -> Unit,
+    onOpenChangeFile: () -> Unit = {},
     onUpdateTargetKb: (Int) -> Unit,
     onUpdateResizePercent: (Int) -> Unit,
     onToggleStudioFrame: (Boolean) -> Unit,
@@ -105,6 +106,7 @@ fun MeldTaskScreen(
 ) {
     val file = uiState.selectedFile
     val options = uiState.options
+    val usesSampleFallback = file != null && tool != MeldToolId.SCAN_QR && !tool.acceptsExtension(file.extension)
     val fileSubtitle = if (file != null) {
         "${file.cleanTitle} · ${file.formattedMetaLine}"
     } else {
@@ -219,6 +221,39 @@ fun MeldTaskScreen(
                 }
             }
 
+            if (usesSampleFallback) {
+                item {
+                    TactileCard(
+                        backgroundColor = MeldColors.WarmSurface,
+                        cornerRadius = MeldColors.SubCardCorner,
+                        onClick = onOpenChangeFile,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Selected .${file.extension.uppercase()} isn't compatible — runs on studio sample or tap to pick another file.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MeldColors.InkBlack,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Change",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MeldColors.CoralOrange
+                            )
+                        }
+                    }
+                }
+            }
+
             // Privacy Guarantee Line
             item {
                 Row(
@@ -291,9 +326,10 @@ private fun CompressTaskControls(
     targetKb: Int,
     onUpdateTargetKb: (Int) -> Unit
 ) {
-    val sourceKb = max(72, (sourceBytes / 1024.0).toInt())
-    val maxSliderKb = max(120, sourceKb.coerceAtMost(800))
+    val sourceKb = max(40, (sourceBytes / 1024.0).toInt())
+    val maxSliderKb = max(30, minOf(sourceKb, 2000))
     var showCustomInput by remember { mutableStateOf(false) }
+    var customText by remember(targetKb) { mutableStateOf(targetKb.toString()) }
     val displayKb by animateIntAsState(
         targetValue = targetKb,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
@@ -379,7 +415,7 @@ private fun CompressTaskControls(
                         color = MeldColors.InkBlack
                     )
                     Text(
-                        text = SelectedFileInfo.formatByteCount(sourceBytes),
+                        text = "$maxSliderKb KB",
                         style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                         color = MeldColors.InkBlack
                     )
@@ -397,7 +433,9 @@ private fun CompressTaskControls(
         // Presets Row matching Reference Page 2
         val presets = listOf(25, 40, 60)
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             presets.forEach { preset ->
@@ -406,6 +444,7 @@ private fun CompressTaskControls(
                     selected = !showCustomInput && targetKb == preset,
                     onClick = {
                         showCustomInput = false
+                        customText = preset.toString()
                         onUpdateTargetKb(preset)
                     }
                 )
@@ -413,15 +452,22 @@ private fun CompressTaskControls(
             TactileChipPill(
                 label = "Custom",
                 selected = showCustomInput || !presets.contains(targetKb),
-                onClick = { showCustomInput = !showCustomInput }
+                onClick = {
+                    showCustomInput = !showCustomInput
+                    if (showCustomInput) customText = targetKb.toString()
+                }
             )
         }
 
         AnimatedVisibility(visible = showCustomInput) {
             OutlinedTextField(
-                value = targetKb.toString(),
+                value = customText,
                 onValueChange = { txt ->
-                    txt.toIntOrNull()?.let { v -> onUpdateTargetKb(v.coerceIn(10, 2000)) }
+                    val digitsOnly = txt.filter { it.isDigit() }.take(4)
+                    customText = digitsOnly
+                    digitsOnly.toIntOrNull()?.let { v ->
+                        onUpdateTargetKb(v.coerceIn(10, 2000))
+                    }
                 },
                 label = { Text("Custom size limit (KB)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -447,7 +493,7 @@ private fun HandoutTaskControls(
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         TactileCard(
             backgroundColor = MeldColors.MintSage,
-            cornerRadius = 26.dp,
+            cornerRadius = MeldColors.CardCorner,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(22.dp)) {
@@ -497,7 +543,7 @@ private fun SplitPdfTaskControls(
     endPage: Int,
     onUpdateRange: (Int, Int) -> Unit
 ) {
-    val safeTotal = max(2, totalPages)
+    val safeTotal = max(1, totalPages)
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SplitPageSpreadStage(
             totalPages = safeTotal,
