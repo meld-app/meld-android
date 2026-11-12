@@ -1,10 +1,16 @@
 package app.meld.android.ui.theme
 
+import android.provider.Settings
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -12,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 object MeldColors {
-    // Tactile Warm Stationery Canvas
+    // Tactile Warm Stationery Canvas (Warm Grey Family Only — Zero Cool Greys)
     val CreamCanvas = Color(0xFFFAF4EC)
     val WarmSurface = Color(0xFFF3ECE1)
     val PureWhite = Color(0xFFFFFFFF)
@@ -31,7 +37,45 @@ object MeldColors {
     val SoftLavender = Color(0xFFCBBEEB)
     val PeachCream = Color(0xFFFFE0CC)
 
+    // Locked Shape Scale
+    val CardCorner = 24.dp
+    val SubCardCorner = 18.dp
     val StrokeWidth = 2.dp
+}
+
+object MeldMotion {
+    // Exact curves from Emil Kowalski & Appllama motion standards
+    val EaseOut = CubicBezierEasing(0.23f, 1f, 0.32f, 1f)
+    val EaseInOut = CubicBezierEasing(0.77f, 0f, 0.175f, 1f)
+    val EaseOvershoot = CubicBezierEasing(0.34f, 1.56f, 0.64f, 1f)
+
+    const val PRESS_MS = 140
+    const val UI_MS = 220
+    const val EXIT_MS = 160
+
+    fun <T> snapSpring() = spring<T>(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMedium
+    )
+
+    fun <T> popSpring() = spring<T>(
+        dampingRatio = 0.72f,
+        stiffness = 380f
+    )
+}
+
+@Composable
+fun rememberReduceMotion(): Boolean {
+    val context = LocalContext.current
+    return remember(context) {
+        runCatching {
+            Settings.Global.getFloat(
+                context.contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f
+            ) == 0f
+        }.getOrDefault(false)
+    }
 }
 
 private val MeldWarmLightScheme = lightColorScheme(

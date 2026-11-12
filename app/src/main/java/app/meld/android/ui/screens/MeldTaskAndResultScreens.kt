@@ -4,8 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -28,7 +26,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
@@ -51,24 +48,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.meld.android.engine.ImageEngine
 import app.meld.android.model.ConversionResult
 import app.meld.android.model.MeldToolId
 import app.meld.android.model.SelectedFileInfo
 import app.meld.android.ui.MeldUiState
+import app.meld.android.ui.components.AnimatedHandoutDiagram
 import app.meld.android.ui.components.BeforeAfterComparisonCard
+import app.meld.android.ui.components.CompressionRatioPill
+import app.meld.android.ui.components.QrMatrixStage
+import app.meld.android.ui.components.RemoveBgCurtainStage
+import app.meld.android.ui.components.ResizeFrameStage
 import app.meld.android.ui.components.ResultShowcaseCard
+import app.meld.android.ui.components.SpecializedToolShowcaseCard
+import app.meld.android.ui.components.SplitPageSpreadStage
+import app.meld.android.ui.components.StampSlamPreview
 import app.meld.android.ui.components.TactileCard
 import app.meld.android.ui.components.TactileChipPill
 import app.meld.android.ui.components.TactileCircleIconButton
@@ -201,6 +200,23 @@ fun MeldTaskScreen(
                 }
             }
 
+            uiState.bannerMessage?.let { msg ->
+                item {
+                    TactileCard(
+                        backgroundColor = MeldColors.PeachCream,
+                        cornerRadius = MeldColors.SubCardCorner,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = msg,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MeldColors.InkBlack,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                        )
+                    }
+                }
+            }
+
             // Privacy Guarantee Line
             item {
                 Row(
@@ -286,7 +302,7 @@ private fun CompressTaskControls(
         // Signature Butter Yellow Card with Tick Ruler
         TactileCard(
             backgroundColor = MeldColors.ButterYellow,
-            cornerRadius = 26.dp,
+            cornerRadius = MeldColors.CardCorner,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
@@ -294,28 +310,41 @@ private fun CompressTaskControls(
                     .fillMaxWidth()
                     .padding(horizontal = 22.dp, vertical = 22.dp)
             ) {
-                Text(
-                    text = "AIM FOR",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MeldColors.InkBlack.copy(alpha = 0.72f)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        text = "$displayKb",
-                        fontSize = 54.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MeldColors.InkBlack,
-                        lineHeight = 56.sp
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "KB",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MeldColors.InkBlack,
-                        modifier = Modifier.padding(bottom = 6.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column {
+                        Text(
+                            text = "AIM FOR",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MeldColors.InkBlack.copy(alpha = 0.72f)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text(
+                                text = "$displayKb",
+                                style = TextStyle(fontFeatureSettings = "tnum"),
+                                fontSize = 54.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MeldColors.InkBlack,
+                                lineHeight = 56.sp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "KB",
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MeldColors.InkBlack,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+                        }
+                    }
+
+                    CompressionRatioPill(
+                        ratio = targetKb.toFloat() / max(1, sourceKb).toFloat()
                     )
                 }
 
@@ -339,12 +368,12 @@ private fun CompressTaskControls(
                 ) {
                     Text(
                         text = "10 KB",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                         color = MeldColors.InkBlack
                     )
                     Text(
                         text = SelectedFileInfo.formatByteCount(sourceBytes),
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                         color = MeldColors.InkBlack
                     )
                 }
@@ -432,73 +461,8 @@ private fun HandoutTaskControls(
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Mini Sheet Paper Visual Diagram
-                TactileCard(
-                    backgroundColor = MeldColors.PureWhite,
-                    cornerRadius = 18.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(175.dp)
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                        val w = size.width
-                        val h = size.height
-                        if (pagesPerSheet <= 3) {
-                            val rows = pagesPerSheet
-                            val boxH = (h - (rows - 1) * 8.dp.toPx()) / rows
-                            val boxW = w * 0.42f
-                            for (r in 0 until rows) {
-                                val y = r * (boxH + 8.dp.toPx())
-                                drawRoundRect(
-                                    color = MeldColors.WarmSurface,
-                                    topLeft = Offset(0f, y),
-                                    size = Size(boxW, boxH),
-                                    cornerRadius = CornerRadius(6.dp.toPx())
-                                )
-                                drawRoundRect(
-                                    color = MeldColors.InkBlack,
-                                    topLeft = Offset(0f, y),
-                                    size = Size(boxW, boxH),
-                                    cornerRadius = CornerRadius(6.dp.toPx()),
-                                    style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx())
-                                )
-                                // Ruled note lines
-                                val lineStart = boxW + 14.dp.toPx()
-                                for (l in 1..3) {
-                                    val ly = y + (boxH * l / 4f)
-                                    drawLine(
-                                        color = MeldColors.TrackGray,
-                                        start = Offset(lineStart, ly),
-                                        end = Offset(w, ly),
-                                        strokeWidth = 1.5.dp.toPx()
-                                    )
-                                }
-                            }
-                        } else {
-                            val cellW = (w - 10.dp.toPx()) / 2f
-                            val cellH = (h - 10.dp.toPx()) / 2f
-                            for (r in 0..1) {
-                                for (c in 0..1) {
-                                    val x = c * (cellW + 10.dp.toPx())
-                                    val y = r * (cellH + 10.dp.toPx())
-                                    drawRoundRect(
-                                        color = MeldColors.WarmSurface,
-                                        topLeft = Offset(x, y),
-                                        size = Size(cellW, cellH),
-                                        cornerRadius = CornerRadius(6.dp.toPx())
-                                    )
-                                    drawRoundRect(
-                                        color = MeldColors.InkBlack,
-                                        topLeft = Offset(x, y),
-                                        size = Size(cellW, cellH),
-                                        cornerRadius = CornerRadius(6.dp.toPx()),
-                                        style = androidx.compose.ui.graphics.drawscope.Stroke(1.5.dp.toPx())
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                // Morphing Mini Sheet Paper Visual Diagram
+                AnimatedHandoutDiagram(pagesPerSheet = pagesPerSheet)
             }
         }
 
@@ -528,31 +492,20 @@ private fun SplitPdfTaskControls(
 ) {
     val safeTotal = max(2, totalPages)
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        TactileCard(
-            backgroundColor = MeldColors.PeriwinkleBlue,
-            cornerRadius = 26.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(22.dp)) {
-                Text(
-                    text = "EXTRACT RANGE",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MeldColors.InkBlack.copy(alpha = 0.72f)
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Pages $startPage to $endPage",
-                    style = MaterialTheme.typography.displayMedium,
-                    color = MeldColors.InkBlack
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Out of $safeTotal pages in this document",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MeldColors.InkBlack.copy(alpha = 0.8f)
-                )
+        SplitPageSpreadStage(
+            totalPages = safeTotal,
+            startPage = startPage,
+            endPage = endPage,
+            onSelectPage = { tapped ->
+                when {
+                    tapped < startPage -> onUpdateRange(tapped, endPage)
+                    tapped > endPage -> onUpdateRange(startPage, tapped)
+                    tapped == startPage && startPage < endPage -> onUpdateRange(tapped + 1, endPage)
+                    tapped == endPage && endPage > startPage -> onUpdateRange(startPage, tapped - 1)
+                    else -> onUpdateRange(tapped, tapped)
+                }
             }
-        }
+        )
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -611,7 +564,7 @@ private fun PageStepperCard(
                 )
                 Text(
                     text = "$value",
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MaterialTheme.typography.headlineSmall.copy(fontFeatureSettings = "tnum"),
                     color = MeldColors.InkBlack
                 )
                 TactileCircleIconButton(
@@ -631,39 +584,7 @@ private fun StampTaskControls(
     onUpdateStampText: (String) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        TactileCard(
-            backgroundColor = MeldColors.PeachCream,
-            cornerRadius = 26.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(170.dp)
-                    .padding(20.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                TactileCard(
-                    backgroundColor = MeldColors.PureWhite,
-                    cornerRadius = 14.dp,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stampText.ifBlank { "WATERMARK" }.uppercase(),
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MeldColors.CoralOrange.copy(alpha = 0.72f),
-                            modifier = Modifier.rotate(-14f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-        }
+        StampSlamPreview(stampText = stampText)
 
         OutlinedTextField(
             value = stampText,
@@ -707,10 +628,12 @@ private fun ResizeTaskControls(
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         TactileCard(
             backgroundColor = MeldColors.ButterYellow,
-            cornerRadius = 26.dp,
+            cornerRadius = MeldColors.CardCorner,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(22.dp)) {
+                ResizeFrameStage(percent = percent, addFrame = addFrame)
+                Spacer(modifier = Modifier.height(14.dp))
                 Text(
                     text = "SCALE OUTPUT TO",
                     style = MaterialTheme.typography.labelSmall,
@@ -719,6 +642,7 @@ private fun ResizeTaskControls(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "$percent%",
+                    style = TextStyle(fontFeatureSettings = "tnum"),
                     fontSize = 54.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = MeldColors.InkBlack
@@ -734,8 +658,16 @@ private fun ResizeTaskControls(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("25%", style = MaterialTheme.typography.labelMedium, color = MeldColors.InkBlack)
-                    Text("200%", style = MaterialTheme.typography.labelMedium, color = MeldColors.InkBlack)
+                    Text(
+                        "25%",
+                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                        color = MeldColors.InkBlack
+                    )
+                    Text(
+                        "200%",
+                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                        color = MeldColors.InkBlack
+                    )
                 }
             }
         }
@@ -784,10 +716,12 @@ private fun RemoveBgTaskControls(
 ) {
     TactileCard(
         backgroundColor = MeldColors.ButterYellow,
-        cornerRadius = 26.dp,
+        cornerRadius = MeldColors.CardCorner,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(22.dp)) {
+            RemoveBgCurtainStage(tolerance = tolerance)
+            Spacer(modifier = Modifier.height(14.dp))
             Text(
                 text = "EDGE FEATHERING",
                 style = MaterialTheme.typography.labelSmall,
@@ -796,6 +730,7 @@ private fun RemoveBgTaskControls(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = "$tolerance",
+                style = TextStyle(fontFeatureSettings = "tnum"),
                 fontSize = 52.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = MeldColors.InkBlack
@@ -821,45 +756,8 @@ private fun QrTaskControls(
     payload: String,
     onUpdatePayload: (String) -> Unit
 ) {
-    val matrix = remember(payload) { ImageEngine.buildQrMatrix21(payload.ifEmpty { "meld.app" }) }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        TactileCard(
-            backgroundColor = MeldColors.SoftLavender,
-            cornerRadius = 26.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                TactileCard(
-                    backgroundColor = MeldColors.PureWhite,
-                    cornerRadius = 18.dp,
-                    modifier = Modifier.size(165.dp)
-                ) {
-                    Canvas(modifier = Modifier.fillMaxSize().padding(14.dp)) {
-                        val cell = size.width / 21f
-                        for (r in 0 until 21) {
-                            for (c in 0 until 21) {
-                                if (matrix[r][c]) {
-                                    val isFinderCenter =
-                                        (r in 2..4 && c in 2..4) ||
-                                            (r in 2..4 && c in 16..18) ||
-                                            (r in 16..18 && c in 2..4)
-                                    drawRect(
-                                        color = if (isFinderCenter) MeldColors.CoralOrange else MeldColors.InkBlack,
-                                        topLeft = Offset(c * cell, r * cell),
-                                        size = Size(cell * 0.92f, cell * 0.92f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        QrMatrixStage(payload = payload)
 
         OutlinedTextField(
             value = payload,
@@ -883,73 +781,7 @@ private fun GenericConversionTaskCard(
     tool: MeldToolId,
     file: SelectedFileInfo?
 ) {
-    val sourceExt = (file?.extension?.takeIf { it.isNotBlank() } ?: "FILE").uppercase()
-    val cardColor = when (tool.outputExtension) {
-        "pdf" -> MeldColors.PeriwinkleBlue
-        "png", "jpg", "webp" -> MeldColors.ButterYellow
-        "docx", "md", "html", "txt" -> MeldColors.MintSage
-        else -> MeldColors.SoftLavender
-    }
-
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        TactileCard(
-            backgroundColor = cardColor,
-            cornerRadius = 26.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MeldColors.PureWhite,
-                        border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
-                    ) {
-                        Text(
-                            text = sourceExt,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MeldColors.InkBlack,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                        )
-                    }
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                        contentDescription = null,
-                        tint = MeldColors.InkBlack
-                    )
-                    Surface(
-                        shape = RoundedCornerShape(14.dp),
-                        color = MeldColors.InkBlack,
-                        border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
-                    ) {
-                        Text(
-                            text = tool.outputExtension.uppercase(),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MeldColors.PureWhite,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
-                        )
-                    }
-                }
-
-                Text(
-                    text = tool.subtitle,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MeldColors.InkBlack
-                )
-                Text(
-                    text = "Everything runs offline right here on your device with crisp print & studio fidelity.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MeldColors.InkBlack.copy(alpha = 0.8f)
-                )
-            }
-        }
-    }
+    SpecializedToolShowcaseCard(tool = tool, file = file)
 }
 
 @Composable

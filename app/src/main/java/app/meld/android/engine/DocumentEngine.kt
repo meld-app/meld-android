@@ -406,12 +406,19 @@ object DocumentEngine {
                 val w = (page.width * scaleFactor).toInt()
                 val h = (page.height * scaleFactor).toInt()
 
-                val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.RGB_565)
+                val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                bmp.eraseColor(android.graphics.Color.WHITE)
                 page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                 page.close()
 
                 val stream = ByteArrayOutputStream()
-                bmp.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+                var q = quality
+                bmp.compress(Bitmap.CompressFormat.JPEG, q, stream)
+                while (stream.size() > targetBytesPerPage && q > 18) {
+                    stream.reset()
+                    q = (q - 12).coerceAtLeast(18)
+                    bmp.compress(Bitmap.CompressFormat.JPEG, q, stream)
+                }
                 val compressedBytes = stream.toByteArray()
                 bmp.recycle()
 

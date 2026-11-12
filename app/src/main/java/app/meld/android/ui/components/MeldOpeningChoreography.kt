@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import app.meld.android.R
 import app.meld.android.ui.theme.MeldColors
+import app.meld.android.ui.theme.MeldMotion
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -80,7 +81,32 @@ class MeldOpeningDriver {
 
     var showOverlay by mutableStateOf(true)
 
-    suspend fun playSequence(isColdStart: Boolean = false) {
+    suspend fun playSequence(isColdStart: Boolean = false, reduceMotion: Boolean = false) {
+        if (reduceMotion) {
+            ghostFan.snapTo(0f)
+            taglineAlpha.snapTo(0f)
+            sheetPop.snapTo(1f)
+            line0.snapTo(1f)
+            line1.snapTo(1f)
+            line2.snapTo(1f)
+            line3.snapTo(1f)
+            line4.snapTo(1f)
+            brandPop.snapTo(1f)
+            dockToHome.snapTo(1f)
+            heroClip.snapTo(1f)
+            pillAlpha.snapTo(1f)
+            rhAnim.snapTo(1f)
+            rpAnim.snapTo(1f)
+            qtAnim.snapTo(1f)
+            t1Anim.snapTo(1f)
+            t2Anim.snapTo(1f)
+            t3Anim.snapTo(1f)
+            recAnim.snapTo(1f)
+            navDockAnim.snapTo(1f)
+            showOverlay = false
+            return
+        }
+
         showOverlay = true
         // Reset all
         sheetPop.snapTo(0f)
@@ -110,41 +136,41 @@ class MeldOpeningDriver {
         coroutineScope {
             // 1. Center Sheet pops up (-30deg -> -5deg, scale 1.1 -> 2.1)
             launch {
-                sheetPop.animateTo(1f, tween(340, easing = MeldOvershootEasing))
+                sheetPop.animateTo(1f, tween(340, easing = MeldMotion.EaseOvershoot))
             }
 
             // 2. Staggered document lines draw left-to-right (l0..l4)
             launch {
                 delay(180)
-                line0.animateTo(1f, tween(170, easing = MeldSmoothEasing))
+                line0.animateTo(1f, tween(170, easing = MeldMotion.EaseInOut))
             }
             launch {
                 delay(250)
-                line1.animateTo(1f, tween(160, easing = MeldSmoothEasing))
+                line1.animateTo(1f, tween(160, easing = MeldMotion.EaseInOut))
             }
             launch {
                 delay(305)
-                line2.animateTo(1f, tween(160, easing = MeldSmoothEasing))
+                line2.animateTo(1f, tween(160, easing = MeldMotion.EaseInOut))
             }
             launch {
                 delay(360)
-                line3.animateTo(1f, tween(160, easing = MeldSmoothEasing))
+                line3.animateTo(1f, tween(160, easing = MeldMotion.EaseInOut))
             }
             launch {
                 delay(415)
-                line4.animateTo(1f, tween(160, easing = MeldSmoothEasing))
+                line4.animateTo(1f, tween(160, easing = MeldMotion.EaseInOut))
             }
 
             // 3. Ghost pages g1/g2 fan outward + MELD brand + tagline appear
             launch {
                 delay(440)
-                ghostFan.animateTo(1f, tween(300, easing = MeldOvershootEasing))
+                ghostFan.animateTo(1f, tween(300, easing = MeldMotion.EaseOvershoot))
                 delay(280)
-                ghostFan.animateTo(0f, tween(220, easing = MeldSmoothEasing))
+                ghostFan.animateTo(0f, tween(220, easing = MeldMotion.EaseInOut))
             }
             launch {
                 delay(460)
-                brandPop.animateTo(1f, tween(280, easing = MeldOvershootEasing))
+                brandPop.animateTo(1f, tween(280, easing = MeldMotion.EaseOvershoot))
             }
             launch {
                 delay(620)
@@ -156,7 +182,7 @@ class MeldOpeningDriver {
             // 4. Sheet & Brand dock smoothly into live Home positions + Coral hero circular clip
             launch {
                 delay(1140)
-                dockToHome.animateTo(1f, tween(420, easing = MeldSmoothEasing))
+                dockToHome.animateTo(1f, tween(420, easing = MeldMotion.EaseInOut))
             }
             launch {
                 delay(1160)
@@ -166,36 +192,36 @@ class MeldOpeningDriver {
             // 5. Staggered studio elements spring into place
             launch {
                 delay(1220)
-                rhAnim.animateTo(1f, tween(300, easing = MeldOvershootEasing))
+                rhAnim.animateTo(1f, tween(300, easing = MeldMotion.EaseOvershoot))
             }
             launch {
                 delay(1270)
-                rpAnim.animateTo(1f, tween(300, easing = MeldOvershootEasing))
+                rpAnim.animateTo(1f, tween(300, easing = MeldMotion.EaseOvershoot))
             }
             launch {
                 delay(1340)
-                qtAnim.animateTo(1f, tween(280, easing = MeldOvershootEasing))
+                qtAnim.animateTo(1f, tween(280, easing = MeldMotion.EaseOvershoot))
             }
             launch {
                 delay(1380)
-                t1Anim.animateTo(1f, tween(320, easing = MeldOvershootEasing))
+                t1Anim.animateTo(1f, tween(320, easing = MeldMotion.EaseOvershoot))
             }
             launch {
                 delay(1430)
-                t2Anim.animateTo(1f, tween(320, easing = MeldOvershootEasing))
+                t2Anim.animateTo(1f, tween(320, easing = MeldMotion.EaseOvershoot))
             }
             launch {
                 delay(1480)
-                t3Anim.animateTo(1f, tween(320, easing = MeldOvershootEasing))
+                t3Anim.animateTo(1f, tween(320, easing = MeldMotion.EaseOvershoot))
             }
             launch {
                 delay(1460)
-                navDockAnim.animateTo(1f, tween(340, easing = MeldOvershootEasing))
+                navDockAnim.animateTo(1f, tween(340, easing = MeldMotion.EaseOvershoot))
             }
             launch {
                 delay(1520)
                 pillAlpha.animateTo(1f, tween(240))
-                recAnim.animateTo(1f, tween(280, easing = MeldOvershootEasing))
+                recAnim.animateTo(1f, tween(280, easing = MeldMotion.EaseOvershoot))
             }
         }
 

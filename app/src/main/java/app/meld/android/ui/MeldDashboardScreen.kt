@@ -2,8 +2,6 @@ package app.meld.android.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -11,7 +9,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,6 +38,8 @@ import app.meld.android.ui.screens.MeldSettingsScreen
 import app.meld.android.ui.screens.MeldStudioHomeScreen
 import app.meld.android.ui.screens.MeldTaskScreen
 import app.meld.android.ui.theme.MeldColors
+import app.meld.android.ui.theme.MeldMotion
+import app.meld.android.ui.theme.rememberReduceMotion
 import java.io.File
 
 @Composable
@@ -71,10 +70,14 @@ fun MeldAppRoot(
     onToggleAutoDownloads: (Boolean) -> Unit
 ) {
     val openingDriver = remember { MeldOpeningDriver() }
+    val reduceMotion = rememberReduceMotion()
     var replaySeed by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(replaySeed) {
-        openingDriver.playSequence(isColdStart = (replaySeed == 0))
+    LaunchedEffect(replaySeed, reduceMotion) {
+        openingDriver.playSequence(
+            isColdStart = (replaySeed == 0),
+            reduceMotion = reduceMotion
+        )
     }
 
     val replayOpening: () -> Unit = {
@@ -104,25 +107,33 @@ fun MeldAppRoot(
             AnimatedContent(
                 targetState = uiState.route,
                 transitionSpec = {
-                    when {
-                        targetState is MeldScreenRoute.Task && initialState is MeldScreenRoute.Home -> {
-                            (slideInHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { it / 3 } +
-                                fadeIn(tween(220))) togetherWith
-                                (slideOutHorizontally(tween(220)) { -it / 6 } + fadeOut(tween(180)))
-                        }
-                        targetState is MeldScreenRoute.Result -> {
-                            (slideInVertically(spring(dampingRatio = 0.82f, stiffness = Spring.StiffnessMediumLow)) { it / 5 } +
-                                scaleIn(initialScale = 0.94f, animationSpec = tween(260)) +
-                                fadeIn(tween(240))) togetherWith fadeOut(tween(180))
-                        }
-                        targetState is MeldScreenRoute.Home -> {
-                            (slideInHorizontally(spring(stiffness = Spring.StiffnessMediumLow)) { -it / 5 } +
-                                fadeIn(tween(220))) togetherWith
-                                (slideOutHorizontally(tween(200)) { it / 4 } + fadeOut(tween(180)))
-                        }
-                        else -> {
-                            (slideInHorizontally(tween(240)) { it / 4 } + fadeIn(tween(220))) togetherWith
-                                (slideOutHorizontally(tween(200)) { -it / 5 } + fadeOut(tween(180)))
+                    if (reduceMotion) {
+                        fadeIn(tween(110)) togetherWith fadeOut(tween(90))
+                    } else {
+                        when {
+                            targetState is MeldScreenRoute.Task && initialState is MeldScreenRoute.Home -> {
+                                (slideInHorizontally(MeldMotion.snapSpring()) { it / 4 } +
+                                    fadeIn(tween(MeldMotion.UI_MS, easing = MeldMotion.EaseOut))) togetherWith
+                                    (slideOutHorizontally(tween(MeldMotion.EXIT_MS, easing = MeldMotion.EaseOut)) { -it / 6 } +
+                                        fadeOut(tween(MeldMotion.EXIT_MS)))
+                            }
+                            targetState is MeldScreenRoute.Result -> {
+                                (slideInVertically(MeldMotion.popSpring()) { it / 6 } +
+                                    scaleIn(initialScale = 0.94f, animationSpec = tween(MeldMotion.UI_MS, easing = MeldMotion.EaseOut)) +
+                                    fadeIn(tween(MeldMotion.UI_MS))) togetherWith fadeOut(tween(MeldMotion.EXIT_MS))
+                            }
+                            targetState is MeldScreenRoute.Home -> {
+                                (slideInHorizontally(MeldMotion.snapSpring()) { -it / 5 } +
+                                    fadeIn(tween(MeldMotion.UI_MS, easing = MeldMotion.EaseOut))) togetherWith
+                                    (slideOutHorizontally(tween(MeldMotion.EXIT_MS, easing = MeldMotion.EaseOut)) { it / 4 } +
+                                        fadeOut(tween(MeldMotion.EXIT_MS)))
+                            }
+                            else -> {
+                                (slideInHorizontally(tween(MeldMotion.UI_MS, easing = MeldMotion.EaseOut)) { it / 4 } +
+                                    fadeIn(tween(MeldMotion.UI_MS))) togetherWith
+                                    (slideOutHorizontally(tween(MeldMotion.EXIT_MS)) { -it / 5 } +
+                                        fadeOut(tween(MeldMotion.EXIT_MS)))
+                            }
                         }
                     }
                 },
@@ -134,8 +145,13 @@ fun MeldAppRoot(
                             AnimatedContent(
                                 targetState = uiState.activeTab,
                                 transitionSpec = {
-                                    (fadeIn(tween(200)) + slideInVertically(tween(220)) { 18 }) togetherWith
-                                        fadeOut(tween(140))
+                                    // Peer navigation: cross-fade only, no directional slide between tabs
+                                    if (reduceMotion) {
+                                        fadeIn(tween(80)) togetherWith fadeOut(tween(60))
+                                    } else {
+                                        fadeIn(tween(150, easing = MeldMotion.EaseOut)) togetherWith
+                                            fadeOut(tween(110, easing = MeldMotion.EaseOut))
+                                    }
                                 },
                                 label = "MeldDockTabTransition"
                             ) { tab ->
