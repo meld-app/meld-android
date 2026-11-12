@@ -12,8 +12,8 @@ android {
         applicationId = "app.meld.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 210
-        versionName = "2.1.0-beta.1"
+        versionCode = 211
+        versionName = "2.1.0-beta.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
