@@ -13,10 +13,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
-import androidx.compose.material.icons.filled.Build
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -955,6 +957,8 @@ fun MeldSettingsScreen(
             }
         }
 
+        item { PrefsSectionLabel("PRIVACY") }
+
         item {
             TactileCard(
                 backgroundColor = MeldColors.MintSage,
@@ -996,6 +1000,8 @@ fun MeldSettingsScreen(
             }
         }
 
+        item { PrefsSectionLabel("OUTPUT") }
+
         item {
             TactileCard(
                 backgroundColor = MeldColors.PureWhite,
@@ -1005,6 +1011,11 @@ fun MeldSettingsScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .toggleable(
+                            value = uiState.defaultSaveToDownloads,
+                            role = androidx.compose.ui.semantics.Role.Switch,
+                            onValueChange = onToggleAutoDownloads
+                        )
                         .padding(18.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -1016,14 +1027,18 @@ fun MeldSettingsScreen(
                             color = MeldColors.InkBlack
                         )
                         Text(
-                            text = "Keep converted files easy to find in Android Files",
+                            text = if (uiState.defaultSaveToDownloads) {
+                                "On: every result is also copied to Downloads/MELD."
+                            } else {
+                                "Off: files stay private inside MELD until you tap Save."
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MeldColors.TextSecondary
                         )
                     }
                     Switch(
                         checked = uiState.defaultSaveToDownloads,
-                        onCheckedChange = onToggleAutoDownloads,
+                        onCheckedChange = null,
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = MeldColors.PureWhite,
                             checkedTrackColor = MeldColors.CoralOrange
@@ -1065,6 +1080,8 @@ fun MeldSettingsScreen(
                 }
             }
         }
+
+        item { PrefsSectionLabel("EXPERIENCE") }
 
         item {
             TactileCard(
@@ -1110,6 +1127,8 @@ fun MeldSettingsScreen(
             }
         }
 
+        item { PrefsSectionLabel("ABOUT") }
+
         item {
             TactileCard(
                 backgroundColor = MeldColors.WarmSurface,
@@ -1124,7 +1143,7 @@ fun MeldSettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "31 local utility engines • Open source under github.com/meld-app",
+                        text = "${MeldToolId.entries.size} local utility engines • Open source under github.com/meld-app",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MeldColors.TextSecondary
                     )
@@ -1132,6 +1151,18 @@ fun MeldSettingsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun PrefsSectionLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = MeldColors.TextSecondary,
+        modifier = Modifier
+            .padding(top = 6.dp, start = 4.dp)
+            .semantics { heading() }
+    )
 }
 
 @Composable
