@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @Stable
-class MeldOpeningDriver {
+class MeldOpeningDriver(initiallyVisible: Boolean = true) {
     // Targets captured in Root coordinates via onGloballyPositioned
     var rootOrigin by mutableStateOf(Offset.Zero)
     var brandTarget by mutableStateOf<Rect?>(null)
@@ -81,10 +81,14 @@ class MeldOpeningDriver {
     val recAnim = Animatable(0f)
     val navDockAnim = Animatable(0f)
 
-    var showOverlay by mutableStateOf(true)
+    var showOverlay by mutableStateOf(initiallyVisible)
 
-    suspend fun playSequence(isColdStart: Boolean = false, reduceMotion: Boolean = false) {
-        if (reduceMotion) {
+    suspend fun playSequence(
+        isColdStart: Boolean = false,
+        reduceMotion: Boolean = false,
+        skipToRest: Boolean = false
+    ) {
+        if (reduceMotion || skipToRest) {
             ghostFan.snapTo(0f)
             taglineAlpha.snapTo(0f)
             sheetPop.snapTo(1f)
