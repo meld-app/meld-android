@@ -140,9 +140,9 @@ fun MeldStudioHomeScreen(
     val ext = uiState.selectedFile?.extension?.lowercase() ?: "pdf"
     val quickTriple: Triple<MeldToolId, MeldToolId, MeldToolId> = remember(ext) {
         when (ext) {
-            in setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff") ->
+            in setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif") ->
                 Triple(MeldToolId.COMPRESS, MeldToolId.REMOVE_BG, MeldToolId.IMG_TO_PDF)
-            in setOf("wav", "mp3", "m4a", "aac", "mp4", "ogg") ->
+            in setOf("wav", "pcm", "mp3", "m4a", "aac", "mp4", "ogg") ->
                 Triple(MeldToolId.VISUALIZE, MeldToolId.SPEED_2X, MeldToolId.PACK_ZIP)
             in setOf("csv", "tsv", "txt") ->
                 Triple(MeldToolId.SHEET_TO_PDF, MeldToolId.SHEET_TO_MD, MeldToolId.TABLE_CONVERT)

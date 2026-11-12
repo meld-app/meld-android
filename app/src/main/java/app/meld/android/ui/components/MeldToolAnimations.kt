@@ -656,7 +656,7 @@ fun SplitPageSpreadStage(
     onSelectPage: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val visiblePages = minOf(totalPages.coerceAtLeast(2), 6)
+    val visiblePages = minOf(totalPages.coerceAtLeast(1), 6)
     var replay by remember { mutableIntStateOf(0) }
     val reduceMotion = rememberReduceMotion()
     val phase = rememberLoopPhase(3200, replay)
@@ -809,10 +809,6 @@ fun StampSlamPreview(
     val reduceMotion = rememberReduceMotion()
     val phase = rememberLoopPhase(3200, replay)
     val density = LocalDensity.current
-
-    LaunchedEffect(stampText) {
-        if (stampText.isNotEmpty()) replay++
-    }
 
     val fadeOutEnd = if (reduceMotion) 0f else easeOutSeg(phase, 0.90f, 0.98f)
     val slamT = if (reduceMotion) 1f else easePop(phase, 0.16f, 0.34f)
@@ -1192,7 +1188,7 @@ fun SpecializedToolShowcaseCard(
 
 /** 8. REDACT (`ToolMotion.dc.html` Redact): Keeps top context visible while ink marker strokes whip over middle lines. */
 @Composable
-private fun RedactSweepStage() {
+internal fun RedactSweepStage() {
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()

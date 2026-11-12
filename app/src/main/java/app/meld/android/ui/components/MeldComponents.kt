@@ -43,9 +43,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,13 +78,17 @@ import app.meld.android.model.ConversionResult
 import app.meld.android.ui.theme.MeldColors
 import app.meld.android.ui.theme.MeldMotion
 import app.meld.android.ui.theme.rememberReduceMotion
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.zip.ZipFile
 import kotlin.math.PI
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -589,15 +595,31 @@ fun ResultShowcaseCard(
     val reduceMotion = rememberReduceMotion()
     val haptic = LocalHapticFeedback.current
 
-    val previewBitmap = remember(result.outputFile.absolutePath, result.outputSizeBytes) {
-        val ext = result.outputFile.extension.lowercase()
-        when {
-            !result.outputFile.exists() -> null
-            ext in setOf("png", "jpg", "jpeg", "webp") ->
-                decodeBoundedBitmap(result.outputFile, maxDim = 1080)
-            ext == "pdf" ->
-                renderFirstPdfPage(result.outputFile)
-            else -> null
+    val previewBitmap by produceState<Bitmap?>(
+        initialValue = null,
+        result.outputFile.absolutePath,
+        result.outputSizeBytes,
+        result.durationMs
+    ) {
+        value = withContext(Dispatchers.IO) {
+            val ext = result.outputFile.extension.lowercase()
+            when {
+                !result.outputFile.exists() -> null
+                ext in setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif") ->
+                    decodeBoundedBitmap(result.outputFile, maxDim = 1080)
+                ext == "pdf" ->
+                    renderPdfPagePreview(result.outputFile, maxDim = 1080)
+                else -> null
+            }
+        }
+    }
+
+    DisposableEffect(previewBitmap) {
+        val bmp = previewBitmap
+        onDispose {
+            if (bmp != null && !bmp.isRecycled) {
+                bmp.recycle()
+            }
         }
     }
 
@@ -665,6 +687,7 @@ fun ResultShowcaseCard(
     }
 
     val density = LocalDensity.current
+    val renderedPreview = previewBitmap
 
     Box(modifier = modifier.fillMaxWidth()) {
         TactileCard(
@@ -674,7 +697,7 @@ fun ResultShowcaseCard(
                 .fillMaxWidth()
                 .height(225.dp)
         ) {
-            if (previewBitmap != null) {
+            if (renderedPreview != null) {
                 val leftOffPx = with(density) { (-46f * fanProgress.value).dp.toPx() }
                 val rightOffPx = with(density) { (32f * fanProgress.value).dp.toPx() }
 
@@ -736,7 +759,7 @@ fun ResultShowcaseCard(
                         border = BorderStroke(2.dp, MeldColors.InkBlack)
                     ) {
                         Image(
-                            bitmap = previewBitmap.asImageBitmap(),
+                            bitmap = renderedPreview.asImageBitmap(),
                             contentDescription = "Result preview",
                             contentScale = ContentScale.Fit,
                             modifier = Modifier
@@ -746,8 +769,15 @@ fun ResultShowcaseCard(
                     }
                 }
             } else {
-                val previewText = remember(result.outputFile.absolutePath, result.outputSizeBytes) {
-                    buildRichOutputPreview(result)
+                val previewText by produceState(
+                    initialValue = result.summary,
+                    result.outputFile.absolutePath,
+                    result.outputSizeBytes,
+                    result.durationMs
+                ) {
+                    value = withContext(Dispatchers.IO) {
+                        buildRichOutputPreview(result)
+                    }
                 }
                 Box(
                     modifier = Modifier
@@ -846,16 +876,19 @@ fun ResultShowcaseCard(
 
 private fun decodeBoundedBitmap(file: File, maxDim: Int = 1080): Bitmap? {
     return runCatching {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.absolutePath, bounds)
-        val largest = maxOf(bounds.outWidth, bounds.outHeight)
-        var sample = 1
-        while (largest / sample > maxDim && maxDim > 0) {
-            sample *= 2
-        }
-        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-        BitmapFactory.decodeFile(file.absolutePath, opts)
+        app.meld.android.engine.ImageEngine.decodeNormalizedBitmap(file, maxDimension = maxDim)
     }.getOrNull()
+}
+
+private fun readBoundedText(reader: java.io.Reader, maxChars: Int): String {
+    val buf = CharArray(maxChars)
+    var total = 0
+    while (total < maxChars) {
+        val n = reader.read(buf, total, maxChars - total)
+        if (n <= 0) break
+        total += n
+    }
+    return String(buf, 0, total)
 }
 
 private fun buildRichOutputPreview(result: ConversionResult): String {
@@ -865,9 +898,9 @@ private fun buildRichOutputPreview(result: ConversionResult): String {
         when {
             !file.exists() -> result.summary
             ext in setOf("json", "md", "txt", "html") ->
-                file.readText().take(240)
+                file.bufferedReader().use { readBoundedText(it, 240) }
             ext == "zip" -> ZipFile(file).use { zf ->
-                val entries = zf.entries().toList().take(4).joinToString("\n") { "• ${it.name}" }
+                val entries = zf.entries().asSequence().take(4).joinToString("\n") { "• ${it.name}" }
                 "ZIP Archive (${zf.size()} item${if (zf.size() == 1) "" else "s"})\n$entries"
             }
             ext == "wav" && file.length() >= 44 -> {
@@ -883,7 +916,7 @@ private fun buildRichOutputPreview(result: ConversionResult): String {
             ext == "docx" -> ZipFile(file).use { zf ->
                 val docEntry = zf.getEntry("word/document.xml")
                 val plain = if (docEntry != null) {
-                    zf.getInputStream(docEntry).bufferedReader().readText()
+                    zf.getInputStream(docEntry).bufferedReader().use { readBoundedText(it, 4096) }
                         .replace(Regex("<[^>]+>"), " ")
                         .replace(Regex("\\s+"), " ")
                         .trim()
@@ -895,18 +928,24 @@ private fun buildRichOutputPreview(result: ConversionResult): String {
     }.getOrElse { result.summary }
 }
 
-private fun renderFirstPdfPage(pdfFile: File): Bitmap? {
+internal fun renderPdfPagePreview(pdfFile: File, maxDim: Int = 1080): Bitmap? {
     return runCatching {
         ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
             PdfRenderer(pfd).use { renderer ->
                 if (renderer.pageCount > 0) {
-                    val page = renderer.openPage(0)
-                    val bmp = Bitmap.createBitmap(page.width, page.height, Bitmap.Config.ARGB_8888)
-                    val canvas = android.graphics.Canvas(bmp)
-                    canvas.drawColor(android.graphics.Color.WHITE)
-                    page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    page.close()
-                    bmp
+                    renderer.openPage(0).use { page ->
+                        val rawW = max(1, page.width)
+                        val rawH = max(1, page.height)
+                        val largest = max(rawW, rawH)
+                        val scale = if (largest > maxDim && maxDim > 0) maxDim.toFloat() / largest else 1f
+                        val w = max(1, (rawW * scale).toInt())
+                        val h = max(1, (rawH * scale).toInt())
+                        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                        val canvas = android.graphics.Canvas(bmp)
+                        canvas.drawColor(android.graphics.Color.WHITE)
+                        page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        bmp
+                    }
                 } else null
             }
         }

@@ -7,6 +7,8 @@ import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -30,6 +33,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.IosShare
@@ -45,15 +49,22 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -63,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.meld.android.model.ConversionResult
 import app.meld.android.model.MeldToolId
+import app.meld.android.model.RedactionRect
 import app.meld.android.model.SelectedFileInfo
 import app.meld.android.ui.MeldUiState
 import app.meld.android.ui.components.AnimatedHandoutDiagram
@@ -70,6 +82,7 @@ import app.meld.android.ui.components.BeforeAfterComparisonCard
 import app.meld.android.ui.components.CompressPlatesStage
 import app.meld.android.ui.components.CompressionRatioPill
 import app.meld.android.ui.components.QrMatrixStage
+import app.meld.android.ui.components.RedactSweepStage
 import app.meld.android.ui.components.RemoveBgCurtainStage
 import app.meld.android.ui.components.ResizeFrameStage
 import app.meld.android.ui.components.ResultShowcaseCard
@@ -81,10 +94,13 @@ import app.meld.android.ui.components.TactileChipPill
 import app.meld.android.ui.components.TactileCircleIconButton
 import app.meld.android.ui.components.TactilePillButton
 import app.meld.android.ui.components.TactileRulerSlider
+import app.meld.android.ui.components.renderPdfPagePreview
 import app.meld.android.ui.theme.MeldColors
 import app.meld.android.ui.theme.MeldMotion
 import app.meld.android.ui.theme.meldSharedToolBounds
 import app.meld.android.ui.theme.rememberReduceMotion
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.max
 
@@ -102,15 +118,16 @@ fun MeldTaskScreen(
     onUpdateHandoutMode: (Int) -> Unit,
     onUpdateQrPayload: (String) -> Unit,
     onUpdatePageRange: (Int, Int) -> Unit,
-    onUpdateChromaTolerance: (Int) -> Unit
+    onUpdateChromaTolerance: (Int) -> Unit,
+    onUpdateRedactionZones: (List<RedactionRect>) -> Unit = {}
 ) {
     val file = uiState.selectedFile
     val options = uiState.options
     val usesSampleFallback = file != null && tool != MeldToolId.SCAN_QR && !tool.acceptsExtension(file.extension)
-    val fileSubtitle = if (file != null) {
-        "${file.cleanTitle} · ${file.formattedMetaLine}"
-    } else {
-        "Built-in studio sample ready"
+    val fileSubtitle = when {
+        tool == MeldToolId.SCAN_QR -> "Encodes text or URLs offline into an ISO QR card"
+        file != null -> "${file.cleanTitle} · ${file.formattedMetaLine}"
+        else -> "Built-in studio sample ready"
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -205,6 +222,14 @@ fun MeldTaskScreen(
                             )
                         }
 
+                        MeldToolId.REDACT -> {
+                            RedactTaskControls(
+                                file = file,
+                                selectedZones = options.redactionZones,
+                                onUpdateZones = onUpdateRedactionZones
+                            )
+                        }
+
                         else -> {
                             GenericConversionTaskCard(
                                 tool = tool,
@@ -217,7 +242,11 @@ fun MeldTaskScreen(
 
             uiState.bannerMessage?.let { msg ->
                 item {
-                    ErrorShakeBanner(message = msg)
+                    if (uiState.isBannerError) {
+                        ErrorShakeBanner(message = msg)
+                    } else {
+                        InfoStatusBanner(message = msg)
+                    }
                 }
             }
 
@@ -226,7 +255,7 @@ fun MeldTaskScreen(
                     TactileCard(
                         backgroundColor = MeldColors.WarmSurface,
                         cornerRadius = MeldColors.SubCardCorner,
-                        onClick = onOpenChangeFile,
+                        onClick = if (uiState.isProcessing) null else onOpenChangeFile,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -290,7 +319,7 @@ fun MeldTaskScreen(
                 text = tool.ctaLabel,
                 icon = iconForTool(tool),
                 backgroundColor = MeldColors.CoralOrange,
-                enabled = !uiState.isProcessing,
+                enabled = !uiState.isProcessing && (tool != MeldToolId.REDACT || options.redactionZones.isNotEmpty()),
                 onClick = onRunTool,
                 height = 56.dp,
                 modifier = Modifier.fillMaxWidth(),
@@ -329,7 +358,7 @@ private fun CompressTaskControls(
     val sourceKb = max(40, (sourceBytes / 1024.0).toInt())
     val maxSliderKb = max(30, minOf(sourceKb, 2000))
     var showCustomInput by remember { mutableStateOf(false) }
-    var customText by remember(targetKb) { mutableStateOf(targetKb.toString()) }
+    var customText by remember(showCustomInput) { mutableStateOf(targetKb.toString()) }
     val displayKb by animateIntAsState(
         targetValue = targetKb,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
@@ -466,10 +495,12 @@ private fun CompressTaskControls(
                     val digitsOnly = txt.filter { it.isDigit() }.take(4)
                     customText = digitsOnly
                     digitsOnly.toIntOrNull()?.let { v ->
-                        onUpdateTargetKb(v.coerceIn(10, 2000))
+                        if (v >= 10) {
+                            onUpdateTargetKb(v.coerceIn(10, maxSliderKb))
+                        }
                     }
                 },
-                label = { Text("Custom size limit (KB)") },
+                label = { Text("Custom size limit (10–$maxSliderKb KB)") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
@@ -830,11 +861,164 @@ private fun QrTaskControls(
 }
 
 @Composable
+private fun RedactTaskControls(
+    file: SelectedFileInfo?,
+    selectedZones: List<RedactionRect>,
+    onUpdateZones: (List<RedactionRect>) -> Unit
+) {
+    val presetZones = remember {
+        listOf(
+            RedactionRect(0.08f, 0.08f, 0.92f, 0.17f, "Header / ID"),
+            RedactionRect(0.10f, 0.24f, 0.90f, 0.34f, "Upper strip"),
+            RedactionRect(0.10f, 0.42f, 0.90f, 0.56f, "Mid block"),
+            RedactionRect(0.10f, 0.76f, 0.90f, 0.88f, "Footer / Sig"),
+            RedactionRect(0.04f, 0.04f, 0.96f, 0.96f, "Full page scrub")
+        )
+    }
+
+    val pdfPreview by produceState<android.graphics.Bitmap?>(
+        initialValue = null,
+        file?.file?.absolutePath,
+        file?.sizeBytes
+    ) {
+        value = withContext(Dispatchers.IO) {
+            if (file != null && file.extension.equals("pdf", ignoreCase = true) && file.file.isFile) {
+                renderPdfPagePreview(file.file, maxDim = 640)
+            } else null
+        }
+    }
+
+    DisposableEffect(pdfPreview) {
+        val bmp = pdfPreview
+        onDispose {
+            if (bmp != null && !bmp.isRecycled) bmp.recycle()
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        RedactSweepStage()
+
+        if (pdfPreview != null) {
+            TactileCard(
+                backgroundColor = MeldColors.PureWhite,
+                cornerRadius = MeldColors.CardCorner,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = "PAGE 1 REDACTION TARGETS (${selectedZones.size} ACTIVE)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MeldColors.TextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .aspectRatio(595f / 842f)
+                            .background(MeldColors.PureWhite)
+                    ) {
+                        pdfPreview?.let { bmp ->
+                            Image(
+                                bitmap = bmp.asImageBitmap(),
+                                contentDescription = "PDF Page 1 Redaction Preview",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            for (zone in selectedZones) {
+                                val l = size.width * zone.left
+                                val t = size.height * zone.top
+                                val w = size.width * (zone.right - zone.left)
+                                val h = size.height * (zone.bottom - zone.top)
+                                drawRect(
+                                    color = MeldColors.InkBlack.copy(alpha = 0.85f),
+                                    topLeft = Offset(l, t),
+                                    size = Size(w, h)
+                                )
+                                drawRect(
+                                    color = MeldColors.CoralOrange,
+                                    topLeft = Offset(l, t),
+                                    size = Size(w, h),
+                                    style = Stroke(width = 2.dp.toPx())
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            presetZones.forEach { zone ->
+                val isSelected = selectedZones.any { it.label == zone.label }
+                TactileChipPill(
+                    label = zone.label,
+                    selected = isSelected,
+                    onClick = {
+                        val updated = if (isSelected) {
+                            selectedZones.filterNot { it.label == zone.label }
+                        } else {
+                            selectedZones + zone
+                        }
+                        onUpdateZones(updated)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun GenericConversionTaskCard(
     tool: MeldToolId,
     file: SelectedFileInfo?
 ) {
     SpecializedToolShowcaseCard(tool = tool, file = file)
+}
+
+@Composable
+private fun InfoStatusBanner(message: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(MeldColors.SubCardCorner),
+        color = MeldColors.MintSage,
+        border = BorderStroke(2.dp, MeldColors.InkBlack)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(26.dp),
+                shape = CircleShape,
+                color = MeldColors.InkBlack
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = MeldColors.PureWhite,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MeldColors.InkBlack,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
 }
 
 @Composable

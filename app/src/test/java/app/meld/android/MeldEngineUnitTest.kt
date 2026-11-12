@@ -1,5 +1,6 @@
 package app.meld.android
 
+import app.meld.android.engine.DocumentEngine
 import app.meld.android.engine.ImageEngine
 import app.meld.android.engine.MediaEngine
 import app.meld.android.model.MeldCategory
@@ -13,6 +14,7 @@ import org.junit.Test
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.util.zip.ZipFile
 
@@ -116,15 +118,22 @@ class MeldEngineUnitTest {
 
     @Test
     fun qrMatrix21_preservesFinderCorners() {
-        val matrix = ImageEngine.buildQrMatrix21("https://github.com/meld-app")
-        assertEquals(21, matrix.size)
-        assertEquals(21, matrix[0].size)
-        assertTrue(matrix[0][0])
-        assertTrue(matrix[3][3])
-        assertTrue(matrix[0][20])
-        assertTrue(matrix[3][17])
-        assertTrue(matrix[20][0])
-        assertTrue(matrix[17][3])
+        val v1Matrix = ImageEngine.buildQrMatrix21("https://meld.app")
+        assertEquals(21, v1Matrix.size)
+        assertEquals(21, v1Matrix[0].size)
+        assertTrue(v1Matrix[0][0])
+        assertTrue(v1Matrix[3][3])
+        assertTrue(v1Matrix[0][20])
+        assertTrue(v1Matrix[3][17])
+        assertTrue(v1Matrix[20][0])
+        assertTrue(v1Matrix[17][3])
+
+        val v2Matrix = ImageEngine.buildQrMatrix21("https://github.com/meld-app")
+        assertEquals(25, v2Matrix.size)
+        assertEquals(25, v2Matrix[0].size)
+        assertTrue(v2Matrix[0][0])
+        assertTrue(v2Matrix[0][24])
+        assertTrue(v2Matrix[24][0])
     }
 
     @Test
@@ -186,5 +195,151 @@ class MeldEngineUnitTest {
         MeldToolId.entries.forEach { tool ->
             assertFalse("${tool.name} should not suggest itself", tool.followUpTools().contains(tool))
         }
+    }
+
+    @Test
+    fun speed2xAudio_handlesLargeMalformedRiffChunkSizeWithoutOverflow() {
+        val tempDir = Files.createTempDirectory("meld_test_riff_overflow").toFile()
+        val badWav = File(tempDir, "overflow.wav")
+        val bb = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN)
+        bb.put("RIFF".toByteArray())
+        bb.putInt(36)
+        bb.put("WAVE".toByteArray())
+        bb.put("fmt ".toByteArray())
+        bb.putInt(0x7FFFFFF8)
+        bb.putShort(1)
+        bb.putShort(1)
+        bb.putInt(22050)
+        bb.putInt(44100)
+        bb.putShort(2)
+        bb.putShort(16)
+        bb.put("data".toByteArray())
+        bb.putInt(0)
+        badWav.writeBytes(bb.array())
+
+        val outWav = File(tempDir, "overflow_out.wav")
+        val summary = MediaEngine.speed2xAudio(badWav, outWav)
+        assertTrue(summary.contains("2.0x speed"))
+        assertTrue(outWav.exists())
+        tempDir.deleteRecursively()
+    }
+
+    @Test
+    fun csvStringToJson_escapesBackslashesControlCharsAndNonFiniteNumbers() {
+        val csv = "k,path,f1,f2,zero\n1,C:\\\\dir\\a,NaN,Infinity,0"
+        val (json, count) = MediaEngine.csvStringToJson(csv)
+        assertEquals(1, count)
+        assertTrue(json.contains("\"NaN\""))
+        assertTrue(json.contains("\"Infinity\""))
+        assertTrue(json.contains("\"zero\": 0"))
+        assertTrue(json.contains("C:\\\\"))
+    }
+
+    @Test
+    fun parseTabularRows_preservesRfc4180QuotesMultilineAndTsv() {
+        val rfc = MediaEngine.parseTabularRows("\"He said \"\"hi\"\"\",next\n\"line1\nline2\",ok")
+        assertEquals(2, rfc.size)
+        assertEquals("He said \"hi\"", rfc[0][0])
+        assertEquals("line1\nline2", rfc[1][0])
+
+        val tsv = MediaEngine.parseTabularRows("c1\tc2\nv1\tv2", '\t')
+        assertEquals(2, tsv.size)
+        assertEquals(listOf("v1", "v2"), tsv[1])
+    }
+
+    @Test
+    fun csvToMarkdownTable_escapesPipesAndLinks() {
+        val tempDir = Files.createTempDirectory("meld_test_md_inj").toFile()
+        val csvFile = File(tempDir, "notes.csv").apply {
+            writeText("User,Note\nAlice,\"a | b | [link](https://example.invalid)\"")
+        }
+        val mdFile = File(tempDir, "notes.md")
+        MediaEngine.convertCsvToMarkdownTable(csvFile, mdFile)
+        val mdText = mdFile.readText()
+        assertTrue(mdText.contains("a \\| b \\| \\[link\\](https://example.invalid)"))
+        tempDir.deleteRecursively()
+    }
+
+    @Test
+    fun waveformEnvelope_evenStepPreventsByteSwappedAmplitudeSpike() {
+        val wavOdd = ByteArray(44 + 288)
+        wavOdd[0] = 'R'.code.toByte()
+        wavOdd[1] = 'I'.code.toByte()
+        for (i in 44 until wavOdd.size step 2) {
+            wavOdd[i] = 1
+            wavOdd[i + 1] = 0
+        }
+        val bars = MediaEngine.extractAmplitudeEnvelope(wavOdd, 96)
+        assertEquals(bars[0], bars[1], 0.001f)
+        assertEquals(bars[1], bars[2], 0.001f)
+    }
+
+    @Test
+    fun qrMatrix_preservesWhiteFinderSeparatorsAndEncodesDistinctInputs() {
+        val qr1 = ImageEngine.buildQrMatrix21("https://github.com/meld-app")
+        val qr2 = ImageEngine.buildQrMatrix21("https://example.com/other")
+        val n = qr1.size
+        assertTrue(n >= 21)
+        // Top-left 1-module white separator row (row 7 cols 0..7) and col (col 7 rows 0..7)
+        for (i in 0..7) {
+            assertFalse("Separator cell (7,$i) must be white", qr1[7][i])
+            assertFalse("Separator cell ($i,7) must be white", qr1[i][7])
+        }
+        var diff = 0
+        for (r in 0 until minOf(qr1.size, qr2.size)) {
+            for (c in 0 until minOf(qr1.size, qr2.size)) {
+                if (qr1[r][c] != qr2[r][c]) diff++
+            }
+        }
+        assertTrue("QR payload variation should change matrix bits", diff > 20)
+    }
+
+    @Test
+    fun packToZip_rejectsMissingInputWithoutCreatingEmptyZip() {
+        val tempDir = Files.createTempDirectory("meld_test_missing_zip").toFile()
+        val missing = File(tempDir, "does_not_exist.txt")
+        val outZip = File(tempDir, "out.zip")
+        var threw = false
+        try {
+            MediaEngine.packToZip(missing, outZip)
+        } catch (_: IllegalArgumentException) {
+            threw = true
+        }
+        assertTrue(threw)
+        assertFalse(outZip.exists())
+        tempDir.deleteRecursively()
+    }
+
+    @Test
+    fun scrubPdfInfoValues_erasesProducerWhilePreservingByteLength() {
+        val fakePdf = "%PDF-1.4\n1 0 obj\n<< /Producer (Skia/PDF m120) /CreationDate (D:20261112) >>\nendobj\n"
+            .toByteArray(StandardCharsets.ISO_8859_1)
+        val scrubbed = DocumentEngine.scrubPdfInfoValues(fakePdf)
+        assertEquals(fakePdf.size, scrubbed.size)
+        val asText = String(scrubbed, StandardCharsets.ISO_8859_1)
+        assertFalse(asText.contains("Skia/PDF"))
+        assertFalse(asText.contains("20261112"))
+    }
+
+    @Test
+    fun escapeXml_stripsIllegalXml10ControlChars() {
+        val raw = "A\u0001\u0008B&C<D>\t\n"
+        val escaped = DocumentEngine.escapeXml(raw)
+        assertEquals("AB&amp;C&lt;D&gt;\t\n", escaped)
+    }
+
+    @Test
+    fun extensionParity_allImageAndAudioToolsAligned() {
+        listOf(
+            MeldToolId.IMG_TO_JPG,
+            MeldToolId.IMG_TO_PNG,
+            MeldToolId.IMG_TO_WEBP,
+            MeldToolId.IMG_TO_BMP,
+            MeldToolId.IMG_TO_TIFF,
+            MeldToolId.IMG_TO_PDF
+        ).forEach { tool ->
+            assertTrue("${tool.name} should accept .tif", tool.acceptsExtension("tif"))
+        }
+        assertEquals(MeldToolId.VISUALIZE.supportedExtensions, MeldToolId.SPEED_2X.supportedExtensions)
     }
 }

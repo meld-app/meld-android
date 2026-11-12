@@ -93,7 +93,7 @@ enum class MeldToolId(
         resultHeadline = "PDF ready.",
         mode = MeldMode.CONVERT,
         category = MeldCategory.IMAGE_STUDIO,
-        supportedExtensions = setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff"),
+        supportedExtensions = setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif"),
         outputExtension = "pdf"
     ),
 
@@ -329,7 +329,7 @@ enum class MeldToolId(
         resultHeadline = "Waveform ready.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.AUDIO_VIDEO,
-        supportedExtensions = setOf("wav", "mp3", "m4a", "aac", "mp4", "ogg"),
+        supportedExtensions = setOf("wav", "pcm", "mp3", "m4a", "aac", "mp4", "ogg"),
         outputExtension = "png"
     ),
     SPEED_2X(
@@ -340,7 +340,7 @@ enum class MeldToolId(
         resultHeadline = "2x audio ready.",
         mode = MeldMode.TOOLS,
         category = MeldCategory.AUDIO_VIDEO,
-        supportedExtensions = setOf("wav", "mp3", "m4a", "mp4"),
+        supportedExtensions = setOf("wav", "pcm", "mp3", "m4a", "aac", "mp4", "ogg"),
         outputExtension = "wav"
     ),
     SHEET_TO_PDF(
@@ -400,6 +400,14 @@ enum class MeldToolId(
     }
 }
 
+data class RedactionRect(
+    val left: Float,
+    val top: Float,
+    val right: Float,
+    val bottom: Float,
+    val label: String = ""
+)
+
 data class ToolOptions(
     val targetKb: Int = 40,
     val resizePercent: Int = 75,
@@ -409,7 +417,10 @@ data class ToolOptions(
     val qrPayloadText: String = "https://github.com/meld-app",
     val pageRangeStart: Int = 1,
     val pageRangeEnd: Int = 2,
-    val chromaTolerance: Int = 42
+    val chromaTolerance: Int = 42,
+    val redactionZones: List<RedactionRect> = listOf(
+        RedactionRect(0.10f, 0.24f, 0.90f, 0.34f, "Upper strip")
+    )
 )
 
 data class SelectedFileInfo(
@@ -425,6 +436,7 @@ data class SelectedFileInfo(
             .removePrefix("MELD_")
             .removeSuffix("_4Pages")
             .replace('_', ' ')
+            .ifBlank { displayName }
 
     val formattedSize: String
         get() = formatByteCount(sizeBytes)
