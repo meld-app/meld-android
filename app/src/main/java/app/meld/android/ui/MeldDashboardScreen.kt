@@ -2,6 +2,8 @@ package app.meld.android.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -37,6 +40,8 @@ import app.meld.android.ui.screens.MeldResultScreen
 import app.meld.android.ui.screens.MeldSettingsScreen
 import app.meld.android.ui.screens.MeldStudioHomeScreen
 import app.meld.android.ui.screens.MeldTaskScreen
+import app.meld.android.ui.theme.LocalMeldRouteAnimScope
+import app.meld.android.ui.theme.LocalMeldSharedScope
 import app.meld.android.ui.theme.MeldColors
 import app.meld.android.ui.theme.MeldMotion
 import app.meld.android.ui.theme.rememberReduceMotion
@@ -104,126 +109,134 @@ fun MeldAppRoot(
                     openingDriver.rootOrigin = coords.positionInRoot()
                 }
         ) {
-            AnimatedContent(
-                targetState = uiState.route,
-                transitionSpec = {
-                    if (reduceMotion) {
-                        fadeIn(tween(110)) togetherWith fadeOut(tween(90))
-                    } else {
-                        when {
-                            targetState is MeldScreenRoute.Task && initialState is MeldScreenRoute.Home -> {
-                                (slideInHorizontally(MeldMotion.snapSpring()) { it / 4 } +
-                                    fadeIn(tween(MeldMotion.UI_MS, easing = MeldMotion.EaseOut))) togetherWith
-                                    (slideOutHorizontally(tween(MeldMotion.EXIT_MS, easing = MeldMotion.EaseOut)) { -it / 6 } +
-                                        fadeOut(tween(MeldMotion.EXIT_MS)))
-                            }
-                            targetState is MeldScreenRoute.Result -> {
-                                (slideInVertically(MeldMotion.popSpring()) { it / 6 } +
-                                    scaleIn(initialScale = 0.94f, animationSpec = tween(MeldMotion.UI_MS, easing = MeldMotion.EaseOut)) +
-                                    fadeIn(tween(MeldMotion.UI_MS))) togetherWith fadeOut(tween(MeldMotion.EXIT_MS))
-                            }
-                            targetState is MeldScreenRoute.Home -> {
-                                (slideInHorizontally(MeldMotion.snapSpring()) { -it / 5 } +
-                                    fadeIn(tween(MeldMotion.UI_MS, easing = MeldMotion.EaseOut))) togetherWith
-                                    (slideOutHorizontally(tween(MeldMotion.EXIT_MS, easing = MeldMotion.EaseOut)) { it / 4 } +
-                                        fadeOut(tween(MeldMotion.EXIT_MS)))
-                            }
-                            else -> {
-                                (slideInHorizontally(tween(MeldMotion.UI_MS, easing = MeldMotion.EaseOut)) { it / 4 } +
-                                    fadeIn(tween(MeldMotion.UI_MS))) togetherWith
-                                    (slideOutHorizontally(tween(MeldMotion.EXIT_MS)) { -it / 5 } +
-                                        fadeOut(tween(MeldMotion.EXIT_MS)))
-                            }
-                        }
-                    }
-                },
-                label = "MeldScreenTransition"
-            ) { route ->
-                when (route) {
-                    MeldScreenRoute.Home -> {
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            AnimatedContent(
-                                targetState = uiState.activeTab,
-                                transitionSpec = {
-                                    // Peer navigation: cross-fade only, no directional slide between tabs
-                                    if (reduceMotion) {
-                                        fadeIn(tween(80)) togetherWith fadeOut(tween(60))
-                                    } else {
-                                        fadeIn(tween(150, easing = MeldMotion.EaseOut)) togetherWith
-                                            fadeOut(tween(110, easing = MeldMotion.EaseOut))
+            @OptIn(ExperimentalSharedTransitionApi::class)
+            SharedTransitionLayout {
+                CompositionLocalProvider(LocalMeldSharedScope provides this) {
+                    AnimatedContent(
+                        targetState = uiState.route,
+                        transitionSpec = {
+                            if (reduceMotion) {
+                                fadeIn(tween(110)) togetherWith fadeOut(tween(90))
+                            } else {
+                                when {
+                                    targetState is MeldScreenRoute.Task && initialState is MeldScreenRoute.Home -> {
+                                        fadeIn(tween(MeldMotion.UI_MS, easing = MeldMotion.EaseOut)) togetherWith
+                                            fadeOut(tween(MeldMotion.EXIT_MS, easing = MeldMotion.EaseOut))
                                     }
-                                },
-                                label = "MeldDockTabTransition"
-                            ) { tab ->
-                                when (tab) {
-                                    DockTab.STUDIO -> {
-                                        MeldStudioHomeScreen(
-                                            uiState = uiState,
-                                            openingDriver = openingDriver,
-                                            onReplayIntro = replayOpening,
-                                            onOpenChangeFile = { onSetFileSheetVisible(true) },
-                                            onOpenTask = onOpenTask,
-                                            onSeeAllTools = { onSelectTab(DockTab.ALL_TOOLS) },
-                                            onOpenResult = onOpenResult,
-                                            onShareFile = onShareResult
-                                        )
+                                    targetState is MeldScreenRoute.Result -> {
+                                        (slideInVertically(MeldMotion.popSpring()) { it / 6 } +
+                                            scaleIn(initialScale = 0.94f, animationSpec = tween(MeldMotion.UI_MS, easing = MeldMotion.EaseOut)) +
+                                            fadeIn(tween(MeldMotion.UI_MS))) togetherWith fadeOut(tween(MeldMotion.EXIT_MS))
                                     }
-                                    DockTab.ALL_TOOLS -> {
-                                        MeldAllToolsScreen(
-                                            uiState = uiState,
-                                            onSelectMode = onSelectMode,
-                                            onSelectCategory = onSelectCategory,
-                                            onSearchChange = onSearchChange,
-                                            onOpenTask = onOpenTask,
-                                            onOpenChangeFile = { onSetFileSheetVisible(true) }
-                                        )
+                                    targetState is MeldScreenRoute.Home -> {
+                                        fadeIn(tween(MeldMotion.UI_MS, easing = MeldMotion.EaseOut)) togetherWith
+                                            fadeOut(tween(MeldMotion.EXIT_MS, easing = MeldMotion.EaseOut))
                                     }
-                                    DockTab.SETTINGS -> {
-                                        MeldSettingsScreen(
-                                            uiState = uiState,
-                                            onToggleAutoDownloads = onToggleAutoDownloads,
-                                            onUpdateDefaultHandout = onUpdateHandoutMode,
-                                            onReplayIntro = replayOpening
-                                        )
+                                    else -> {
+                                        (slideInHorizontally(tween(MeldMotion.UI_MS, easing = MeldMotion.EaseOut)) { it / 4 } +
+                                            fadeIn(tween(MeldMotion.UI_MS))) togetherWith
+                                            (slideOutHorizontally(tween(MeldMotion.EXIT_MS)) { -it / 5 } +
+                                                fadeOut(tween(MeldMotion.EXIT_MS)))
                                     }
                                 }
                             }
+                        },
+                        label = "MeldScreenTransition"
+                    ) { route ->
+                        val routeAnimScope = this
+                        when (route) {
+                            MeldScreenRoute.Home -> {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    AnimatedContent(
+                                        targetState = uiState.activeTab,
+                                        transitionSpec = {
+                                            // Peer navigation: cross-fade only, no directional slide between tabs
+                                            if (reduceMotion) {
+                                                fadeIn(tween(80)) togetherWith fadeOut(tween(60))
+                                            } else {
+                                                fadeIn(tween(150, easing = MeldMotion.EaseOut)) togetherWith
+                                                    fadeOut(tween(110, easing = MeldMotion.EaseOut))
+                                            }
+                                        },
+                                        label = "MeldDockTabTransition"
+                                    ) { tab ->
+                                        CompositionLocalProvider(
+                                            LocalMeldRouteAnimScope provides if (tab == uiState.activeTab) routeAnimScope else null
+                                        ) {
+                                            when (tab) {
+                                                DockTab.STUDIO -> {
+                                                    MeldStudioHomeScreen(
+                                                        uiState = uiState,
+                                                        openingDriver = openingDriver,
+                                                        onReplayIntro = replayOpening,
+                                                        onOpenChangeFile = { onSetFileSheetVisible(true) },
+                                                        onOpenTask = onOpenTask,
+                                                        onSeeAllTools = { onSelectTab(DockTab.ALL_TOOLS) },
+                                                        onOpenResult = onOpenResult,
+                                                        onShareFile = onShareResult
+                                                    )
+                                                }
+                                                DockTab.ALL_TOOLS -> {
+                                                    MeldAllToolsScreen(
+                                                        uiState = uiState,
+                                                        onSelectMode = onSelectMode,
+                                                        onSelectCategory = onSelectCategory,
+                                                        onSearchChange = onSearchChange,
+                                                        onOpenTask = onOpenTask,
+                                                        onOpenChangeFile = { onSetFileSheetVisible(true) }
+                                                    )
+                                                }
+                                                DockTab.SETTINGS -> {
+                                                    MeldSettingsScreen(
+                                                        uiState = uiState,
+                                                        onToggleAutoDownloads = onToggleAutoDownloads,
+                                                        onUpdateDefaultHandout = onUpdateHandoutMode,
+                                                        onReplayIntro = replayOpening
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
 
-                            MeldFloatingBottomDock(
-                                activeTab = uiState.activeTab,
-                                openingDriver = openingDriver,
-                                onSelectTab = onSelectTab,
-                                modifier = Modifier.align(Alignment.BottomCenter)
-                            )
+                                    MeldFloatingBottomDock(
+                                        activeTab = uiState.activeTab,
+                                        openingDriver = openingDriver,
+                                        onSelectTab = onSelectTab,
+                                        modifier = Modifier.align(Alignment.BottomCenter)
+                                    )
+                                }
+                            }
+
+                            is MeldScreenRoute.Task -> {
+                                CompositionLocalProvider(LocalMeldRouteAnimScope provides routeAnimScope) {
+                                    MeldTaskScreen(
+                                        tool = route.tool,
+                                        uiState = uiState,
+                                        onBack = onNavigateHome,
+                                        onRunTool = { onRunTool(route.tool) },
+                                        onUpdateTargetKb = onUpdateTargetKb,
+                                        onUpdateResizePercent = onUpdateResizePercent,
+                                        onToggleStudioFrame = onToggleStudioFrame,
+                                        onUpdateStampText = onUpdateStampText,
+                                        onUpdateHandoutMode = onUpdateHandoutMode,
+                                        onUpdateQrPayload = onUpdateQrPayload,
+                                        onUpdatePageRange = onUpdatePageRange,
+                                        onUpdateChromaTolerance = onUpdateChromaTolerance
+                                    )
+                                }
+                            }
+
+                            is MeldScreenRoute.Result -> {
+                                MeldResultScreen(
+                                    result = route.conversion,
+                                    bannerMessage = uiState.bannerMessage,
+                                    onClose = onNavigateHome,
+                                    onContinueTool = { nextTool -> onContinueTool(route.conversion, nextTool) },
+                                    onSaveToDownloads = onSaveToDownloads,
+                                    onShare = onShareResult
+                                )
+                            }
                         }
-                    }
-
-                    is MeldScreenRoute.Task -> {
-                        MeldTaskScreen(
-                            tool = route.tool,
-                            uiState = uiState,
-                            onBack = onNavigateHome,
-                            onRunTool = { onRunTool(route.tool) },
-                            onUpdateTargetKb = onUpdateTargetKb,
-                            onUpdateResizePercent = onUpdateResizePercent,
-                            onToggleStudioFrame = onToggleStudioFrame,
-                            onUpdateStampText = onUpdateStampText,
-                            onUpdateHandoutMode = onUpdateHandoutMode,
-                            onUpdateQrPayload = onUpdateQrPayload,
-                            onUpdatePageRange = onUpdatePageRange,
-                            onUpdateChromaTolerance = onUpdateChromaTolerance
-                        )
-                    }
-
-                    is MeldScreenRoute.Result -> {
-                        MeldResultScreen(
-                            result = route.conversion,
-                            bannerMessage = uiState.bannerMessage,
-                            onClose = onNavigateHome,
-                            onContinueTool = { nextTool -> onContinueTool(route.conversion, nextTool) },
-                            onSaveToDownloads = onSaveToDownloads,
-                            onShare = onShareResult
-                        )
                     }
                 }
             }

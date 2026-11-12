@@ -107,6 +107,7 @@ import app.meld.android.ui.components.TactileCircleIconButton
 import app.meld.android.ui.components.WorkingDocumentIllustration
 import app.meld.android.ui.theme.MeldColors
 import app.meld.android.ui.theme.MeldMotion
+import app.meld.android.ui.theme.meldSharedToolBounds
 import app.meld.android.ui.theme.rememberReduceMotion
 import java.io.File
 import java.util.Calendar
@@ -394,6 +395,7 @@ fun MeldStudioHomeScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
+                            .meldSharedToolBounds("tool-${primaryTool.name}")
                             .graphicsLayer {
                                 alpha = t1T.coerceIn(0f, 1f)
                                 translationY = (1f - t1T) * slide26Px
@@ -457,6 +459,7 @@ fun MeldStudioHomeScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
+                                .meldSharedToolBounds("tool-${topRight.name}")
                                 .graphicsLayer {
                                     alpha = t2T.coerceIn(0f, 1f)
                                     translationY = (1f - t2T) * slide26Px
@@ -502,6 +505,7 @@ fun MeldStudioHomeScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .weight(1f)
+                                .meldSharedToolBounds("tool-${bottomRight.name}")
                                 .graphicsLayer {
                                     alpha = t3T.coerceIn(0f, 1f)
                                     translationY = (1f - t3T) * slide26Px
@@ -775,7 +779,9 @@ fun MeldAllToolsScreen(
                                 backgroundColor = bg,
                                 cornerRadius = 22.dp,
                                 onClick = { onOpenTask(tool) },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .meldSharedToolBounds("tool-${tool.name}")
                             ) {
                                 Column(
                                     modifier = Modifier.padding(14.dp),

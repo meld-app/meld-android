@@ -1,9 +1,12 @@
 package app.meld.android.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -42,12 +45,16 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -60,6 +67,7 @@ import app.meld.android.model.SelectedFileInfo
 import app.meld.android.ui.MeldUiState
 import app.meld.android.ui.components.AnimatedHandoutDiagram
 import app.meld.android.ui.components.BeforeAfterComparisonCard
+import app.meld.android.ui.components.CompressPlatesStage
 import app.meld.android.ui.components.CompressionRatioPill
 import app.meld.android.ui.components.QrMatrixStage
 import app.meld.android.ui.components.RemoveBgCurtainStage
@@ -74,6 +82,9 @@ import app.meld.android.ui.components.TactileCircleIconButton
 import app.meld.android.ui.components.TactilePillButton
 import app.meld.android.ui.components.TactileRulerSlider
 import app.meld.android.ui.theme.MeldColors
+import app.meld.android.ui.theme.MeldMotion
+import app.meld.android.ui.theme.meldSharedToolBounds
+import app.meld.android.ui.theme.rememberReduceMotion
 import java.io.File
 import kotlin.math.max
 
@@ -134,86 +145,77 @@ fun MeldTaskScreen(
                 }
             }
 
-            // Contextual Tactile Card per Tool
+            // Contextual Tactile Card per Tool (shared-bounds morph target from Home/Tools grid tile)
             item {
-                when (tool) {
-                    MeldToolId.COMPRESS, MeldToolId.COMPRESS_PDF -> {
-                        CompressTaskControls(
-                            sourceBytes = file?.sizeBytes ?: (72L * 1024L),
-                            targetKb = options.targetKb,
-                            onUpdateTargetKb = onUpdateTargetKb
-                        )
-                    }
+                Box(modifier = Modifier.meldSharedToolBounds("tool-${tool.name}")) {
+                    when (tool) {
+                        MeldToolId.COMPRESS, MeldToolId.COMPRESS_PDF -> {
+                            CompressTaskControls(
+                                sourceBytes = file?.sizeBytes ?: (72L * 1024L),
+                                targetKb = options.targetKb,
+                                onUpdateTargetKb = onUpdateTargetKb
+                            )
+                        }
 
-                    MeldToolId.HANDOUT -> {
-                        HandoutTaskControls(
-                            pagesPerSheet = options.handoutPagesPerSheet,
-                            onUpdateHandoutMode = onUpdateHandoutMode
-                        )
-                    }
+                        MeldToolId.HANDOUT -> {
+                            HandoutTaskControls(
+                                pagesPerSheet = options.handoutPagesPerSheet,
+                                onUpdateHandoutMode = onUpdateHandoutMode
+                            )
+                        }
 
-                    MeldToolId.PDF_EXTRACT -> {
-                        SplitPdfTaskControls(
-                            totalPages = file?.pageCount ?: 4,
-                            startPage = options.pageRangeStart,
-                            endPage = options.pageRangeEnd,
-                            onUpdateRange = onUpdatePageRange
-                        )
-                    }
+                        MeldToolId.PDF_EXTRACT -> {
+                            SplitPdfTaskControls(
+                                totalPages = file?.pageCount ?: 4,
+                                startPage = options.pageRangeStart,
+                                endPage = options.pageRangeEnd,
+                                onUpdateRange = onUpdatePageRange
+                            )
+                        }
 
-                    MeldToolId.LOCK_STAMP -> {
-                        StampTaskControls(
-                            stampText = options.stampText,
-                            onUpdateStampText = onUpdateStampText
-                        )
-                    }
+                        MeldToolId.LOCK_STAMP -> {
+                            StampTaskControls(
+                                stampText = options.stampText,
+                                onUpdateStampText = onUpdateStampText
+                            )
+                        }
 
-                    MeldToolId.RESIZE_IMAGE -> {
-                        ResizeTaskControls(
-                            percent = options.resizePercent,
-                            addFrame = options.addStudioFrame,
-                            onUpdatePercent = onUpdateResizePercent,
-                            onToggleFrame = onToggleStudioFrame
-                        )
-                    }
+                        MeldToolId.RESIZE_IMAGE -> {
+                            ResizeTaskControls(
+                                percent = options.resizePercent,
+                                addFrame = options.addStudioFrame,
+                                onUpdatePercent = onUpdateResizePercent,
+                                onToggleFrame = onToggleStudioFrame
+                            )
+                        }
 
-                    MeldToolId.REMOVE_BG -> {
-                        RemoveBgTaskControls(
-                            tolerance = options.chromaTolerance,
-                            onUpdateTolerance = onUpdateChromaTolerance
-                        )
-                    }
+                        MeldToolId.REMOVE_BG -> {
+                            RemoveBgTaskControls(
+                                tolerance = options.chromaTolerance,
+                                onUpdateTolerance = onUpdateChromaTolerance
+                            )
+                        }
 
-                    MeldToolId.SCAN_QR -> {
-                        QrTaskControls(
-                            payload = options.qrPayloadText,
-                            onUpdatePayload = onUpdateQrPayload
-                        )
-                    }
+                        MeldToolId.SCAN_QR -> {
+                            QrTaskControls(
+                                payload = options.qrPayloadText,
+                                onUpdatePayload = onUpdateQrPayload
+                            )
+                        }
 
-                    else -> {
-                        GenericConversionTaskCard(
-                            tool = tool,
-                            file = file
-                        )
+                        else -> {
+                            GenericConversionTaskCard(
+                                tool = tool,
+                                file = file
+                            )
+                        }
                     }
                 }
             }
 
             uiState.bannerMessage?.let { msg ->
                 item {
-                    TactileCard(
-                        backgroundColor = MeldColors.PeachCream,
-                        cornerRadius = MeldColors.SubCardCorner,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = msg,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MeldColors.InkBlack,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
-                        )
-                    }
+                    ErrorShakeBanner(message = msg)
                 }
             }
 
@@ -308,8 +310,13 @@ private fun CompressTaskControls(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 22.dp, vertical = 22.dp)
+                    .padding(horizontal = 22.dp, vertical = 20.dp)
             ) {
+                CompressPlatesStage(
+                    sourceBytes = sourceBytes,
+                    targetKb = targetKb
+                )
+                Spacer(modifier = Modifier.height(14.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -782,6 +789,72 @@ private fun GenericConversionTaskCard(
     file: SelectedFileInfo?
 ) {
     SpecializedToolShowcaseCard(tool = tool, file = file)
+}
+
+@Composable
+private fun ErrorShakeBanner(message: String) {
+    val reduceMotion = rememberReduceMotion()
+    val density = LocalDensity.current
+    val shakeOffset = remember(message) { Animatable(0f) }
+    val badgePop = remember(message) { Animatable(if (reduceMotion) 1f else 0.90f) }
+
+    LaunchedEffect(message, reduceMotion) {
+        if (reduceMotion) {
+            shakeOffset.snapTo(0f)
+            badgePop.snapTo(1f)
+            return@LaunchedEffect
+        }
+        badgePop.animateTo(1f, tween(durationMillis = MeldMotion.UI_MS, easing = MeldMotion.EaseOvershoot))
+        val peaks = listOf(-7f, 7f, -5f, 5f, -3f, 0f)
+        for (p in peaks) {
+            shakeOffset.animateTo(p, tween(durationMillis = 40, easing = MeldMotion.EaseOut))
+        }
+    }
+
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                translationX = with(density) { shakeOffset.value.dp.toPx() }
+            },
+        shape = RoundedCornerShape(MeldColors.SubCardCorner),
+        color = MeldColors.PureWhite,
+        border = BorderStroke(2.dp, Color(0xFFC62828))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                modifier = Modifier
+                    .size(26.dp)
+                    .graphicsLayer {
+                        scaleX = badgePop.value
+                        scaleY = badgePop.value
+                    },
+                shape = CircleShape,
+                color = Color(0xFFC62828)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "!",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MeldColors.PureWhite
+                    )
+                }
+            }
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MeldColors.InkBlack,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
 }
 
 @Composable

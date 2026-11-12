@@ -1,6 +1,9 @@
 package app.meld.android.ui.theme
 
 import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -9,6 +12,8 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -149,4 +154,25 @@ fun MeldTheme(content: @Composable () -> Unit) {
         typography = MeldTypography,
         content = content
     )
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+val LocalMeldSharedScope = staticCompositionLocalOf<SharedTransitionScope?> { null }
+val LocalMeldRouteAnimScope = staticCompositionLocalOf<AnimatedVisibilityScope?> { null }
+
+/** Connects a home/catalog tool tile cleanly to its Task hero card via shared bounds. */
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.meldSharedToolBounds(key: String): Modifier {
+    val reduceMotion = rememberReduceMotion()
+    val sharedScope = LocalMeldSharedScope.current
+    val animScope = LocalMeldRouteAnimScope.current
+    if (reduceMotion || sharedScope == null || animScope == null) return this
+    return with(sharedScope) {
+        this@meldSharedToolBounds.sharedBounds(
+            sharedContentState = rememberSharedContentState(key = key),
+            animatedVisibilityScope = animScope,
+            resizeMode = SharedTransitionScope.ResizeMode.ScaleToBounds()
+        )
+    }
 }
