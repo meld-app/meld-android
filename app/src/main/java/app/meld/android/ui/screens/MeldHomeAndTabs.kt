@@ -138,9 +138,9 @@ fun MeldStudioHomeScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         modifier = Modifier.size(38.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        color = MeldColors.InkBlack,
-                        border = BorderStroke(1.5.dp, MeldColors.InkBlack)
+                        shape = RoundedCornerShape(11.dp),
+                        color = MeldColors.CoralOrange,
+                        border = BorderStroke(2.dp, MeldColors.InkBlack)
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.meld_logo),
