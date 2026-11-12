@@ -12,6 +12,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -156,7 +161,7 @@ fun MeldStudioHomeScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 112.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 136.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         // Top Brand Row: M meld (tap to replay opening!) + Works offline pill
@@ -634,7 +639,7 @@ fun MeldAllToolsScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 112.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 136.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
@@ -872,7 +877,7 @@ fun MeldSettingsScreen(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 112.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 136.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
@@ -1104,7 +1109,7 @@ fun MeldFloatingBottomDock(
         ) {
             val items = listOf(
                 Triple(DockTab.STUDIO, "Studio", Icons.Default.GridView),
-                Triple(DockTab.ALL_TOOLS, "Tools", Icons.Default.FolderOpen),
+                Triple(DockTab.ALL_TOOLS, "Tools", Icons.Default.Build),
                 Triple(DockTab.SETTINGS, "Prefs", Icons.Default.Tune)
             )
             items.forEach { (tab, label, icon) ->
@@ -1123,6 +1128,10 @@ fun MeldFloatingBottomDock(
                 Surface(
                     modifier = Modifier
                         .clip(CircleShape)
+                        .semantics {
+                            role = androidx.compose.ui.semantics.Role.Tab
+                            this.selected = selected
+                        }
                         .clickable {
                             if (tab != activeTab) {
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -1132,35 +1141,31 @@ fun MeldFloatingBottomDock(
                     shape = CircleShape,
                     color = pillBg
                 ) {
-                    Row(
-                        modifier = Modifier.padding(
-                            horizontal = if (selected) 20.dp else 18.dp,
-                            vertical = 10.dp
-                        ),
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        modifier = Modifier
+                            .defaultMinSize(minWidth = 76.dp, minHeight = 52.dp)
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
                         Icon(
                             imageVector = icon,
-                            contentDescription = label,
+                            contentDescription = null,
                             tint = if (selected) MeldColors.InkBlack else MeldColors.PureWhite.copy(alpha = 0.85f),
                             modifier = Modifier
-                                .size(20.dp)
+                                .size(22.dp)
                                 .graphicsLayer {
                                     scaleX = iconScale
                                     scaleY = iconScale
                                 }
                         )
-                        AnimatedVisibility(visible = selected) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = label,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MeldColors.InkBlack
-                                )
-                            }
-                        }
+                        Text(
+                            text = label,
+                            fontSize = 12.sp,
+                            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                            color = if (selected) MeldColors.InkBlack else MeldColors.PureWhite.copy(alpha = 0.85f),
+                            maxLines = 1
+                        )
                     }
                 }
             }
