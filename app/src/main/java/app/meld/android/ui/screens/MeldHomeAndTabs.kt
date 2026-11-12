@@ -1,0 +1,1039 @@
+package app.meld.android.ui.screens
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Compress
+import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.HideImage
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material.icons.filled.Transform
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import app.meld.android.R
+import app.meld.android.model.ConversionResult
+import app.meld.android.model.MeldCategory
+import app.meld.android.model.MeldMode
+import app.meld.android.model.MeldToolId
+import app.meld.android.model.SelectedFileInfo
+import app.meld.android.ui.DockTab
+import app.meld.android.ui.MeldUiState
+import app.meld.android.ui.SamplePreset
+import app.meld.android.ui.components.TactileCard
+import app.meld.android.ui.components.TactileChipPill
+import app.meld.android.ui.components.TactileCircleIconButton
+import app.meld.android.ui.components.WorkingDocumentIllustration
+import app.meld.android.ui.theme.MeldColors
+import java.io.File
+import java.util.Calendar
+
+@Composable
+fun MeldStudioHomeScreen(
+    uiState: MeldUiState,
+    onOpenChangeFile: () -> Unit,
+    onOpenTask: (MeldToolId) -> Unit,
+    onSeeAllTools: () -> Unit,
+    onOpenResult: (ConversionResult) -> Unit,
+    onShareFile: (File) -> Unit
+) {
+    val greeting = remember {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        when {
+            hour < 12 -> "Good morning."
+            hour < 17 -> "Good afternoon."
+            else -> "Good evening."
+        }
+    }
+
+    val ext = uiState.selectedFile?.extension?.lowercase() ?: "pdf"
+    val quickTriple: Triple<MeldToolId, MeldToolId, MeldToolId> = remember(ext) {
+        when (ext) {
+            in setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff") ->
+                Triple(MeldToolId.COMPRESS, MeldToolId.REMOVE_BG, MeldToolId.IMG_TO_PDF)
+            in setOf("wav", "mp3", "m4a", "aac", "mp4", "ogg") ->
+                Triple(MeldToolId.VISUALIZE, MeldToolId.SPEED_2X, MeldToolId.PACK_ZIP)
+            in setOf("csv", "tsv", "txt") ->
+                Triple(MeldToolId.SHEET_TO_PDF, MeldToolId.SHEET_TO_MD, MeldToolId.TABLE_CONVERT)
+            else ->
+                Triple(MeldToolId.COMPRESS_PDF, MeldToolId.HANDOUT, MeldToolId.PDF_EXTRACT)
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 112.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        // Top Brand Row: M meld + Works offline badge
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        modifier = Modifier.size(38.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        color = MeldColors.InkBlack,
+                        border = BorderStroke(1.5.dp, MeldColors.InkBlack)
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.meld_logo),
+                            contentDescription = "meld",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "meld",
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MeldColors.InkBlack
+                    )
+                }
+
+                Surface(
+                    shape = CircleShape,
+                    color = MeldColors.PureWhite,
+                    border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = MeldColors.InkBlack,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Works offline",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MeldColors.InkBlack
+                        )
+                    }
+                }
+            }
+        }
+
+        // Human Greeting Header
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = greeting,
+                    style = MaterialTheme.typography.displayMedium,
+                    color = MeldColors.InkBlack
+                )
+                Text(
+                    text = "What needs sorting today?",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
+                    color = MeldColors.TextSecondary
+                )
+            }
+        }
+
+        // Hero Coral WORKING ON Card
+        item {
+            val file = uiState.selectedFile
+            TactileCard(
+                backgroundColor = MeldColors.CoralOrange,
+                cornerRadius = 26.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    WorkingDocumentIllustration(extension = file?.extension ?: "pdf")
+                    Spacer(modifier = Modifier.width(20.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "WORKING ON",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MeldColors.InkBlack.copy(alpha = 0.72f)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = file?.cleanTitle ?: "Lecture Deck",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MeldColors.InkBlack,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = file?.formattedMetaLine ?: "Tap Change file to pick one",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MeldColors.InkBlack.copy(alpha = 0.85f)
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Surface(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .clickable { onOpenChangeFile() },
+                            shape = CircleShape,
+                            color = MeldColors.PureWhite,
+                            border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+                        ) {
+                            Text(
+                                text = "Change file",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MeldColors.InkBlack,
+                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Quick Tools Section + All 31 Link
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Quick tools",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MeldColors.InkBlack
+                    )
+                    Text(
+                        text = "All ${MeldToolId.entries.size}",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            textDecoration = TextDecoration.Underline
+                        ),
+                        color = MeldColors.InkBlack,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onSeeAllTools() }
+                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+
+                // Asymmetric Bento Grid matching Reference Page 1
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(236.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Left Tall Yellow Card
+                    val primaryTool = quickTriple.first
+                    TactileCard(
+                        backgroundColor = MeldColors.ButterYellow,
+                        cornerRadius = 24.dp,
+                        onClick = { onOpenTask(primaryTool) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Surface(
+                                modifier = Modifier.size(44.dp),
+                                shape = CircleShape,
+                                color = MeldColors.PureWhite,
+                                border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = iconForTool(primaryTool),
+                                        contentDescription = null,
+                                        tint = MeldColors.InkBlack,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+
+                            Column {
+                                Text(
+                                    text = primaryTool.title,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    color = MeldColors.InkBlack
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = primaryTool.subtitle,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MeldColors.InkBlack.copy(alpha = 0.8f),
+                                    maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    // Right Column: 2 Stacked Pastel Cards
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        val topRight = quickTriple.second
+                        TactileCard(
+                            backgroundColor = MeldColors.MintSage,
+                            cornerRadius = 22.dp,
+                            onClick = { onOpenTask(topRight) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Surface(
+                                    modifier = Modifier.size(36.dp),
+                                    shape = CircleShape,
+                                    color = MeldColors.PureWhite,
+                                    border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = iconForTool(topRight),
+                                            contentDescription = null,
+                                            tint = MeldColors.InkBlack,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = topRight.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MeldColors.InkBlack
+                                )
+                            }
+                        }
+
+                        val bottomRight = quickTriple.third
+                        TactileCard(
+                            backgroundColor = MeldColors.PeriwinkleBlue,
+                            cornerRadius = 22.dp,
+                            onClick = { onOpenTask(bottomRight) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(14.dp),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Surface(
+                                    modifier = Modifier.size(36.dp),
+                                    shape = CircleShape,
+                                    color = MeldColors.PureWhite,
+                                    border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = iconForTool(bottomRight),
+                                            contentDescription = null,
+                                            tint = MeldColors.InkBlack,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = bottomRight.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MeldColors.InkBlack
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Most Recent Result Strip (matching Reference Page 1 bottom white card)
+        uiState.recentResults.firstOrNull()?.let { latest ->
+            item {
+                TactileCard(
+                    backgroundColor = MeldColors.PureWhite,
+                    cornerRadius = 22.dp,
+                    onClick = { onOpenResult(latest) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = iconForTool(latest.tool),
+                            contentDescription = null,
+                            tint = MeldColors.InkBlack,
+                            modifier = Modifier.size(26.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = latest.tool.title + " · " + latest.outputFile.extension.uppercase(),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MeldColors.InkBlack,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "${SelectedFileInfo.formatByteCount(latest.outputSizeBytes)} · just now",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MeldColors.TextSecondary
+                            )
+                        }
+                        TactileCircleIconButton(
+                            icon = Icons.Default.IosShare,
+                            contentDescription = "Share result",
+                            onClick = { onShareFile(latest.outputFile) },
+                            backgroundColor = MeldColors.PureWhite,
+                            size = 40.dp
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MeldAllToolsScreen(
+    uiState: MeldUiState,
+    onSelectMode: (MeldMode) -> Unit,
+    onSelectCategory: (MeldCategory) -> Unit,
+    onSearchChange: (String) -> Unit,
+    onOpenTask: (MeldToolId) -> Unit,
+    onOpenChangeFile: () -> Unit
+) {
+    val filtered = remember(uiState.selectedMode, uiState.selectedCategory, uiState.searchQuery) {
+        val q = uiState.searchQuery.trim().lowercase()
+        MeldToolId.entries.filter { tool ->
+            (uiState.selectedMode == MeldMode.ALL || tool.mode == uiState.selectedMode) &&
+                (uiState.selectedCategory == MeldCategory.ALL || tool.category == uiState.selectedCategory) &&
+                (q.isEmpty() || tool.title.lowercase().contains(q) || tool.subtitle.lowercase().contains(q) || tool.badge.lowercase().contains(q))
+        }
+    }
+
+    val pastelCycle = listOf(
+        MeldColors.PureWhite,
+        MeldColors.MintSage,
+        MeldColors.ButterYellow,
+        MeldColors.PeriwinkleBlue,
+        MeldColors.SoftLavender
+    )
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 112.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "All tools.",
+                        style = MaterialTheme.typography.displayMedium,
+                        color = MeldColors.InkBlack
+                    )
+                    Text(
+                        text = "Working on ${uiState.selectedFile?.cleanTitle ?: "sample file"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MeldColors.TextSecondary
+                    )
+                }
+                Surface(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable { onOpenChangeFile() },
+                    shape = CircleShape,
+                    color = MeldColors.CoralOrange,
+                    border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+                ) {
+                    Text(
+                        text = "Change file",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MeldColors.InkBlack,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                    )
+                }
+            }
+        }
+
+        // Tactile Search Input
+        item {
+            OutlinedTextField(
+                value = uiState.searchQuery,
+                onValueChange = onSearchChange,
+                placeholder = { Text("Find PDF, PNG, Word, Markdown, Remove BG...") },
+                leadingIcon = {
+                    Icon(
+                        imageVector = Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MeldColors.InkBlack
+                    )
+                },
+                singleLine = true,
+                shape = CircleShape,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = MeldColors.PureWhite,
+                    unfocusedContainerColor = MeldColors.PureWhite,
+                    focusedBorderColor = MeldColors.InkBlack,
+                    unfocusedBorderColor = MeldColors.InkBlack
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        // Mode Pills
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MeldMode.entries.forEach { mode ->
+                    TactileChipPill(
+                        label = mode.label,
+                        selected = uiState.selectedMode == mode,
+                        onClick = { onSelectMode(mode) }
+                    )
+                }
+            }
+        }
+
+        // Category Filter Strip
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MeldCategory.entries.forEach { cat ->
+                    TactileChipPill(
+                        label = cat.label,
+                        selected = uiState.selectedCategory == cat,
+                        onClick = { onSelectCategory(cat) }
+                    )
+                }
+            }
+        }
+
+        // 2-Column Tactile Action Grid
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                filtered.chunked(2).forEachIndexed { rowIdx, pair ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        pair.forEachIndexed { colIdx, tool ->
+                            val bg = pastelCycle[(rowIdx * 2 + colIdx) % pastelCycle.size]
+                            TactileCard(
+                                backgroundColor = bg,
+                                cornerRadius = 22.dp,
+                                onClick = { onOpenTask(tool) },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Surface(
+                                            modifier = Modifier.size(34.dp),
+                                            shape = CircleShape,
+                                            color = MeldColors.PureWhite,
+                                            border = BorderStroke(1.5.dp, MeldColors.InkBlack)
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Icon(
+                                                    imageVector = iconForTool(tool),
+                                                    contentDescription = null,
+                                                    tint = MeldColors.InkBlack,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                        Surface(
+                                            shape = CircleShape,
+                                            color = MeldColors.PureWhite.copy(alpha = 0.85f),
+                                            border = BorderStroke(1.2.dp, MeldColors.InkBlack)
+                                        ) {
+                                            Text(
+                                                text = tool.badge,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontSize = 10.sp,
+                                                color = MeldColors.InkBlack,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = tool.title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MeldColors.InkBlack,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = tool.subtitle,
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 16.sp),
+                                        color = MeldColors.InkBlack.copy(alpha = 0.78f),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                        if (pair.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MeldSettingsScreen(
+    uiState: MeldUiState,
+    onToggleAutoDownloads: (Boolean) -> Unit,
+    onUpdateDefaultHandout: (Int) -> Unit
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 112.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item {
+            Column {
+                Text(
+                    text = "Preferences.",
+                    style = MaterialTheme.typography.displayMedium,
+                    color = MeldColors.InkBlack
+                )
+                Text(
+                    text = "Local rules and how MELD handles your files",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MeldColors.TextSecondary
+                )
+            }
+        }
+
+        item {
+            TactileCard(
+                backgroundColor = MeldColors.MintSage,
+                cornerRadius = 24.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.size(42.dp),
+                        shape = CircleShape,
+                        color = MeldColors.PureWhite,
+                        border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = MeldColors.InkBlack
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = "100% On-device promise",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MeldColors.InkBlack
+                        )
+                        Text(
+                            text = "MELD requests zero internet permission. Your documents never touch a server.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MeldColors.InkBlack.copy(alpha = 0.85f)
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            TactileCard(
+                backgroundColor = MeldColors.PureWhite,
+                cornerRadius = 22.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Save directly to Downloads/MELD",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MeldColors.InkBlack
+                        )
+                        Text(
+                            text = "Keep converted files easy to find in Android Files",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MeldColors.TextSecondary
+                        )
+                    }
+                    Switch(
+                        checked = uiState.defaultSaveToDownloads,
+                        onCheckedChange = onToggleAutoDownloads,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MeldColors.PureWhite,
+                            checkedTrackColor = MeldColors.CoralOrange
+                        )
+                    )
+                }
+            }
+        }
+
+        item {
+            TactileCard(
+                backgroundColor = MeldColors.PureWhite,
+                cornerRadius = 22.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Default Study Handout Layout",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MeldColors.InkBlack
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(2 to "2-up + notes", 3 to "3-up notes", 4 to "4-up grid").forEach { (n, label) ->
+                            TactileChipPill(
+                                label = label,
+                                selected = uiState.options.handoutPagesPerSheet == n,
+                                onClick = { onUpdateDefaultHandout(n) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            TactileCard(
+                backgroundColor = MeldColors.WarmSurface,
+                cornerRadius = 22.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Text(
+                        text = "MELD for Android v2.1.0-beta.1",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MeldColors.InkBlack
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "31 local utility engines • Open source under github.com/meld-app",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MeldColors.TextSecondary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MeldFloatingBottomDock(
+    activeTab: DockTab,
+    onSelectTab: (DockTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 14.dp),
+        shape = CircleShape,
+        color = MeldColors.DockInk,
+        border = BorderStroke(2.dp, MeldColors.InkBlack),
+        shadowElevation = 8.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val items = listOf(
+                Triple(DockTab.STUDIO, "Studio", Icons.Default.GridView),
+                Triple(DockTab.ALL_TOOLS, "Tools", Icons.Default.FolderOpen),
+                Triple(DockTab.SETTINGS, "Prefs", Icons.Default.Tune)
+            )
+            items.forEach { (tab, label, icon) ->
+                val selected = tab == activeTab
+                Surface(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable { onSelectTab(tab) },
+                    shape = CircleShape,
+                    color = if (selected) MeldColors.CoralOrange else Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier.padding(
+                            horizontal = if (selected) 20.dp else 18.dp,
+                            vertical = 10.dp
+                        ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = label,
+                            tint = if (selected) MeldColors.InkBlack else MeldColors.PureWhite.copy(alpha = 0.85f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        if (selected) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MeldColors.InkBlack
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MeldChangeFileBottomSheet(
+    onDismiss: () -> Unit,
+    onBrowseStorage: () -> Unit,
+    onPickSample: (SamplePreset) -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MeldColors.CreamCanvas
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .padding(bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(
+                text = "Pick a file to work on",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MeldColors.InkBlack
+            )
+
+            TactileCard(
+                backgroundColor = MeldColors.CoralOrange,
+                cornerRadius = 20.dp,
+                onClick = onBrowseStorage,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = CircleShape,
+                        color = MeldColors.PureWhite,
+                        border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.FolderOpen,
+                                contentDescription = null,
+                                tint = MeldColors.InkBlack
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = "Browse phone storage",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MeldColors.InkBlack
+                        )
+                        Text(
+                            text = "Pick any PDF, image, audio, or CSV",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MeldColors.InkBlack.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = "Or try a built-in studio sample:",
+                style = MaterialTheme.typography.labelMedium,
+                color = MeldColors.TextSecondary
+            )
+
+            SamplePreset.entries.chunked(2).forEach { pair ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    pair.forEach { preset ->
+                        TactileCard(
+                            backgroundColor = MeldColors.PureWhite,
+                            cornerRadius = 18.dp,
+                            onClick = { onPickSample(preset) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = preset.label,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontSize = 14.sp,
+                                    color = MeldColors.InkBlack
+                                )
+                                Text(
+                                    text = preset.badge,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MeldColors.CoralOrange
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun iconForTool(tool: MeldToolId): ImageVector = when (tool) {
+    MeldToolId.IMG_TO_JPG,
+    MeldToolId.IMG_TO_PNG,
+    MeldToolId.IMG_TO_WEBP,
+    MeldToolId.IMG_TO_BMP,
+    MeldToolId.IMG_TO_TIFF -> Icons.Default.Transform
+    MeldToolId.IMG_TO_PDF -> Icons.Default.PictureAsPdf
+    MeldToolId.REMOVE_BG -> Icons.Default.AutoAwesome
+    MeldToolId.COMPRESS, MeldToolId.COMPRESS_PDF -> Icons.Default.Compress
+    MeldToolId.RESIZE_IMAGE -> Icons.Default.AspectRatio
+    MeldToolId.COLLAGE -> Icons.Default.Collections
+    MeldToolId.STRIP_EXIF -> Icons.Default.HideImage
+    MeldToolId.SCAN_QR -> Icons.Default.QrCode2
+    MeldToolId.PDF_TO_PNG, MeldToolId.PDF_TO_JPG -> Icons.Default.Image
+    MeldToolId.PDF_TO_MD -> Icons.Default.Code
+    MeldToolId.PDF_TO_HTML -> Icons.Default.Language
+    MeldToolId.PDF_TO_DOCX -> Icons.Default.Description
+    MeldToolId.PDF_TO_TXT -> Icons.Default.EditNote
+    MeldToolId.HANDOUT -> Icons.Default.GridView
+    MeldToolId.LOCK_STAMP -> Icons.Default.Lock
+    MeldToolId.REDACT, MeldToolId.STRIP_PDF_META -> Icons.Default.VisibilityOff
+    MeldToolId.PDF_EXTRACT -> Icons.Default.ContentCut
+    MeldToolId.PDF_MERGE -> Icons.Default.Layers
+    MeldToolId.VISUALIZE -> Icons.Default.GraphicEq
+    MeldToolId.SPEED_2X -> Icons.Default.FastForward
+    MeldToolId.SHEET_TO_PDF -> Icons.Default.PictureAsPdf
+    MeldToolId.SHEET_TO_MD, MeldToolId.TABLE_CONVERT -> Icons.Default.TableChart
+    MeldToolId.PACK_ZIP -> Icons.Default.Archive
+}

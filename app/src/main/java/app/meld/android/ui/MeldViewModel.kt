@@ -1,7 +1,13 @@
 package app.meld.android.ui
 
+import android.content.ContentValues
 import android.content.Context
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.os.ParcelFileDescriptor
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -26,22 +32,37 @@ import java.io.File
 import java.io.FileOutputStream
 
 enum class SamplePreset(val label: String, val badge: String) {
-    PDF_DECK("Lecture Deck.pdf", "4 PAGES"),
-    STUDIO_IMAGE("Studio Subject.png", "1080x1080"),
+    PDF_DECK("Lecture Deck.pdf", "4 pages"),
+    STUDIO_IMAGE("Studio Subject.png", "1080×1080"),
     SYNTH_AUDIO("Studio Synth.wav", "PCM WAV"),
-    BENCHMARK_CSV("Benchmark.csv", "5 ROWS")
+    BENCHMARK_CSV("Benchmark.csv", "5 rows")
+}
+
+enum class DockTab(val label: String) {
+    STUDIO("Studio"),
+    ALL_TOOLS("Files"),
+    SETTINGS("Settings")
+}
+
+sealed class MeldScreenRoute {
+    data object Home : MeldScreenRoute()
+    data class Task(val tool: MeldToolId) : MeldScreenRoute()
+    data class Result(val conversion: ConversionResult) : MeldScreenRoute()
 }
 
 data class MeldUiState(
+    val activeTab: DockTab = DockTab.STUDIO,
+    val route: MeldScreenRoute = MeldScreenRoute.Home,
     val selectedMode: MeldMode = MeldMode.ALL,
     val selectedCategory: MeldCategory = MeldCategory.ALL,
-    val selectedTool: MeldToolId = MeldToolId.IMG_TO_PDF,
+    val searchQuery: String = "",
     val selectedFile: SelectedFileInfo? = null,
     val options: ToolOptions = ToolOptions(),
     val isProcessing: Boolean = false,
-    val statusMessage: String = "Select a file or tap a built-in sample below to begin.",
-    val lastResult: ConversionResult? = null,
-    val history: List<ConversionResult> = emptyList()
+    val showFileSheet: Boolean = false,
+    val bannerMessage: String? = null,
+    val recentResults: List<ConversionResult> = emptyList(),
+    val defaultSaveToDownloads: Boolean = true
 )
 
 class MeldViewModel : ViewModel() {
@@ -49,76 +70,93 @@ class MeldViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(MeldUiState())
     val uiState: StateFlow<MeldUiState> = _uiState.asStateFlow()
 
-    fun selectMode(mode: MeldMode) {
-        _uiState.update { state ->
-            val matchingTools = filterTools(mode, state.selectedCategory)
-            val nextTool = if (matchingTools.contains(state.selectedTool)) {
-                state.selectedTool
-            } else {
-                matchingTools.firstOrNull() ?: state.selectedTool
+    fun ensureDefaultFileLoaded(context: Context) {
+        if (_uiState.value.selectedFile != null) return
+        viewModelScope.launch {
+            val info = withContext(Dispatchers.IO) {
+                val sampleDir = File(context.cacheDir, "samples").apply { mkdirs() }
+                val pdf = SampleFileFactory.createSamplePdf(sampleDir)
+                buildFileInfo(pdf)
             }
-            state.copy(selectedMode = mode, selectedTool = nextTool)
+            _uiState.update { it.copy(selectedFile = info) }
         }
+    }
+
+    fun selectDockTab(tab: DockTab) {
+        _uiState.update { it.copy(activeTab = tab, route = MeldScreenRoute.Home, bannerMessage = null) }
+    }
+
+    fun openTask(tool: MeldToolId) {
+        _uiState.update { it.copy(route = MeldScreenRoute.Task(tool), bannerMessage = null) }
+    }
+
+    fun openResult(conversion: ConversionResult) {
+        _uiState.update { it.copy(route = MeldScreenRoute.Result(conversion), bannerMessage = null) }
+    }
+
+    fun navigateHome() {
+        _uiState.update { it.copy(route = MeldScreenRoute.Home, bannerMessage = null) }
+    }
+
+    fun setFileSheetVisible(visible: Boolean) {
+        _uiState.update { it.copy(showFileSheet = visible) }
+    }
+
+    fun selectMode(mode: MeldMode) {
+        _uiState.update { it.copy(selectedMode = mode) }
     }
 
     fun selectCategory(category: MeldCategory) {
-        _uiState.update { state ->
-            val matchingTools = filterTools(state.selectedMode, category)
-            val nextTool = if (matchingTools.contains(state.selectedTool)) {
-                state.selectedTool
-            } else {
-                matchingTools.firstOrNull() ?: state.selectedTool
-            }
-            state.copy(selectedCategory = category, selectedTool = nextTool)
-        }
+        _uiState.update { it.copy(selectedCategory = category) }
     }
 
-    fun selectTool(tool: MeldToolId) {
-        _uiState.update { it.copy(selectedTool = tool) }
+    fun updateSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
     }
 
     fun updateOptions(transform: (ToolOptions) -> ToolOptions) {
         _uiState.update { it.copy(options = transform(it.options)) }
     }
 
-    private fun filterTools(mode: MeldMode, category: MeldCategory): List<MeldToolId> {
-        return MeldToolId.entries.filter { tool ->
-            (mode == MeldMode.ALL || tool.mode == mode) &&
-                (category == MeldCategory.ALL || tool.category == category)
+    fun toggleAutoDownloads(enabled: Boolean) {
+        _uiState.update { it.copy(defaultSaveToDownloads = enabled) }
+    }
+
+    fun clearBanner() {
+        _uiState.update { it.copy(bannerMessage = null) }
+    }
+
+    fun continueWithResult(conversion: ConversionResult, nextTool: MeldToolId) {
+        viewModelScope.launch {
+            val info = withContext(Dispatchers.IO) { buildFileInfo(conversion.outputFile) }
+            _uiState.update {
+                it.copy(
+                    selectedFile = info,
+                    route = MeldScreenRoute.Task(nextTool),
+                    bannerMessage = null
+                )
+            }
         }
     }
 
     fun loadSamplePreset(context: Context, preset: SamplePreset) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isProcessing = true, statusMessage = "Preparing ${preset.label}...") }
-            val resultPair = withContext(Dispatchers.IO) {
+            _uiState.update { it.copy(isProcessing = true, showFileSheet = false) }
+            val file = withContext(Dispatchers.IO) {
                 val sampleDir = File(context.cacheDir, "samples").apply { mkdirs() }
                 when (preset) {
-                    SamplePreset.PDF_DECK ->
-                        SampleFileFactory.createSamplePdf(sampleDir) to MeldToolId.HANDOUT
-                    SamplePreset.STUDIO_IMAGE ->
-                        SampleFileFactory.createSampleImage(sampleDir) to MeldToolId.REMOVE_BG
-                    SamplePreset.SYNTH_AUDIO ->
-                        SampleFileFactory.createSampleAudioWav(sampleDir) to MeldToolId.VISUALIZE
-                    SamplePreset.BENCHMARK_CSV ->
-                        SampleFileFactory.createSampleCsv(sampleDir) to MeldToolId.SHEET_TO_PDF
+                    SamplePreset.PDF_DECK -> SampleFileFactory.createSamplePdf(sampleDir)
+                    SamplePreset.STUDIO_IMAGE -> SampleFileFactory.createSampleImage(sampleDir)
+                    SamplePreset.SYNTH_AUDIO -> SampleFileFactory.createSampleAudioWav(sampleDir)
+                    SamplePreset.BENCHMARK_CSV -> SampleFileFactory.createSampleCsv(sampleDir)
                 }
             }
-            val file = resultPair.first
-            val recommendedTool = resultPair.second
-            val info = SelectedFileInfo(
-                file = file,
-                displayName = file.name,
-                extension = file.extension.lowercase(),
-                sizeBytes = file.length()
-            )
+            val info = withContext(Dispatchers.IO) { buildFileInfo(file) }
             _uiState.update {
                 it.copy(
                     isProcessing = false,
                     selectedFile = info,
-                    selectedCategory = recommendedTool.category,
-                    selectedTool = recommendedTool,
-                    statusMessage = "Loaded ${info.displayName} (${info.formattedSize}) • Ready for ${recommendedTool.title}"
+                    bannerMessage = "Loaded ${info.cleanTitle}"
                 )
             }
         }
@@ -126,10 +164,10 @@ class MeldViewModel : ViewModel() {
 
     fun importExternalUri(context: Context, uri: Uri) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isProcessing = true, statusMessage = "Importing file...") }
+            _uiState.update { it.copy(isProcessing = true, showFileSheet = false) }
             val imported = withContext(Dispatchers.IO) {
                 val resolver = context.contentResolver
-                var displayName = "imported_file"
+                var displayName = "document"
                 resolver.query(uri, null, null, null, null)?.use { cursor ->
                     val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                     if (nameIndex >= 0 && cursor.moveToFirst()) {
@@ -143,43 +181,24 @@ class MeldViewModel : ViewModel() {
                         input.copyTo(output)
                     }
                 }
-                destFile
+                buildFileInfo(destFile)
             }
-
-            val ext = imported.extension.lowercase()
-            val matchingTool = MeldToolId.entries.firstOrNull { it.acceptsExtension(ext) }
-                ?: _uiState.value.selectedTool
-
-            val info = SelectedFileInfo(
-                file = imported,
-                displayName = imported.name,
-                extension = ext,
-                sizeBytes = imported.length()
-            )
             _uiState.update {
                 it.copy(
                     isProcessing = false,
-                    selectedFile = info,
-                    selectedCategory = matchingTool.category,
-                    selectedTool = matchingTool,
-                    statusMessage = "Staged ${info.displayName} (${info.formattedSize}) • Ready for ${matchingTool.title}"
+                    selectedFile = imported,
+                    bannerMessage = "Ready: ${imported.cleanTitle}"
                 )
             }
         }
     }
 
-    fun executeSelectedTool(context: Context) {
+    fun executeTool(context: Context, tool: MeldToolId) {
         val current = _uiState.value
-        val tool = current.selectedTool
         val opts = current.options
 
         viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isProcessing = true,
-                    statusMessage = "Running ${tool.title} locally..."
-                )
-            }
+            _uiState.update { it.copy(isProcessing = true, bannerMessage = null) }
 
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -329,7 +348,7 @@ class MeldViewModel : ViewModel() {
                         outputFile = outFile,
                         inputSizeBytes = inputFile.length(),
                         outputSizeBytes = outFile.length(),
-                        summary = summary,
+                        summary = "$summary. Took $elapsed ms.",
                         durationMs = elapsed
                     )
                 }
@@ -337,20 +356,84 @@ class MeldViewModel : ViewModel() {
                 _uiState.update { state ->
                     state.copy(
                         isProcessing = false,
-                        lastResult = result,
-                        history = (listOf(result) + state.history).take(12),
-                        statusMessage = "✓ ${result.summary} (${result.durationMs} ms)"
+                        route = MeldScreenRoute.Result(result),
+                        recentResults = (listOf(result) + state.recentResults).take(12)
                     )
                 }
             }.onFailure { err ->
                 _uiState.update {
                     it.copy(
                         isProcessing = false,
-                        statusMessage = "⚠ Error: ${err.message ?: "Conversion failed"}"
+                        bannerMessage = err.message ?: "Something went wrong while running ${tool.title}."
                     )
                 }
             }
         }
+    }
+
+    fun saveToDownloads(context: Context, file: File) {
+        viewModelScope.launch {
+            val savedPath = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        val values = ContentValues().apply {
+                            put(MediaStore.Downloads.DISPLAY_NAME, file.name)
+                            put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/MELD")
+                            put(MediaStore.Downloads.IS_PENDING, 1)
+                        }
+                        val resolver = context.contentResolver
+                        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                        if (uri != null) {
+                            resolver.openOutputStream(uri)?.use { out ->
+                                file.inputStream().use { input -> input.copyTo(out) }
+                            }
+                            values.clear()
+                            values.put(MediaStore.Downloads.IS_PENDING, 0)
+                            resolver.update(uri, values, null, null)
+                            "Downloads/MELD/${file.name}"
+                        } else null
+                    } else {
+                        @Suppress("DEPRECATION")
+                        val dir = File(
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                            "MELD"
+                        ).apply { mkdirs() }
+                        val dest = File(dir, file.name)
+                        file.copyTo(dest, overwrite = true)
+                        "Downloads/MELD/${file.name}"
+                    }
+                }.getOrNull()
+            }
+            _uiState.update {
+                it.copy(
+                    bannerMessage = if (savedPath != null) {
+                        "Saved to $savedPath"
+                    } else {
+                        "Saved locally — tap Share to export"
+                    }
+                )
+            }
+        }
+    }
+
+    private fun buildFileInfo(file: File): SelectedFileInfo {
+        val ext = file.extension.lowercase()
+        val pages = if (ext == "pdf") countPdfPages(file) else null
+        return SelectedFileInfo(
+            file = file,
+            displayName = file.name,
+            extension = ext,
+            sizeBytes = file.length(),
+            pageCount = pages
+        )
+    }
+
+    private fun countPdfPages(file: File): Int? {
+        return runCatching {
+            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+                PdfRenderer(pfd).use { renderer -> renderer.pageCount }
+            }
+        }.getOrNull()
     }
 
     private fun autoProvideSampleForTool(context: Context, tool: MeldToolId): File {
