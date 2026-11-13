@@ -44,8 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import app.meld.android.R
-import app.meld.android.ui.theme.MeldColors
 import app.meld.android.ui.theme.MeldMotion
+import app.meld.android.ui.theme.meldColors
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -243,6 +243,7 @@ fun MeldOpeningOverlay(
     if (!driver.showOverlay) return
 
     val density = LocalDensity.current
+    val colors = meldColors
 
     BoxWithConstraints(
         modifier = modifier
@@ -259,13 +260,13 @@ fun MeldOpeningOverlay(
         val containerW = constraints.maxWidth.toFloat()
         val containerH = constraints.maxHeight.toFloat()
 
-        // Cover full screen in Cream only before dock begins, then expose real Home elements seamlessly!
+        // Cover full screen in canvas background only before dock begins, then expose real Home elements seamlessly!
         val bgAlpha = (1f - driver.dockToHome.value * 1.4f).coerceIn(0f, 1f)
         if (bgAlpha > 0f) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MeldColors.CreamCanvas.copy(alpha = bgAlpha))
+                    .background(colors.canvas.copy(alpha = bgAlpha))
             )
         }
 
@@ -388,8 +389,8 @@ fun MeldOpeningOverlay(
             Surface(
                 modifier = Modifier.size(38.dp),
                 shape = RoundedCornerShape(11.dp),
-                color = MeldColors.CoralOrange,
-                border = BorderStroke(2.dp, MeldColors.InkBlack)
+                color = colors.coral,
+                border = BorderStroke(2.dp, colors.border)
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.meld_logo),
@@ -403,7 +404,7 @@ fun MeldOpeningOverlay(
                 text = "meld",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.ExtraBold,
-                color = MeldColors.InkBlack
+                color = colors.textPrimary
             )
         }
 
@@ -421,7 +422,7 @@ fun MeldOpeningOverlay(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 2.sp,
-                    color = MeldColors.TextSecondary,
+                    color = colors.textSecondary,
                     modifier = Modifier.graphicsLayer { alpha = tagA }
                 )
             }

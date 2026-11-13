@@ -78,8 +78,9 @@ import androidx.compose.ui.util.lerp
 import app.meld.android.engine.ImageEngine
 import app.meld.android.model.MeldToolId
 import app.meld.android.model.SelectedFileInfo
-import app.meld.android.ui.theme.MeldColors
+import app.meld.android.ui.theme.MeldDimens
 import app.meld.android.ui.theme.MeldMotion
+import app.meld.android.ui.theme.meldColors
 import app.meld.android.ui.theme.rememberReduceMotion
 import kotlinx.coroutines.delay
 import kotlin.math.PI
@@ -87,13 +88,6 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
-
-private val StageSand = Color(0xFFEFE8DA)
-private val StageDarkLine = Color(0xFFD8D2C4)
-private val StageLaserRed = Color(0xFFC9400F)
-private val StageWordBlue = Color(0xFF5B8CFF)
-private val StageLimeCode = Color(0xFFC6F432)
-private val StagePinkCode = Color(0xFFFF5CA8)
 
 // Exact ToolMotion.dc.html S-curve & overshoot easing curves
 private val TravelCurve = CubicBezierEasing(0.65f, 0f, 0.35f, 1f)
@@ -148,10 +142,11 @@ private fun rememberLoopPhase(durationMs: Int = 3200, replayKey: Int = 0): Float
 fun MeldStageViewport(
     modifier: Modifier = Modifier,
     height: Dp = 156.dp,
-    backgroundColor: Color = StageSand,
+    backgroundColor: Color = meldColors.stageSand,
     onTapReplay: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
+    val colors = meldColors
     val reduceMotion = rememberReduceMotion()
     val haptic = LocalHapticFeedback.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -185,7 +180,7 @@ fun MeldStageViewport(
             ),
         shape = RoundedCornerShape(14.dp),
         color = backgroundColor,
-        border = BorderStroke(1.8.dp, MeldColors.InkBlack),
+        border = BorderStroke(1.8.dp, colors.inkOnAccent),
         content = { Box(modifier = Modifier.fillMaxSize(), content = content) }
     )
 }
@@ -196,16 +191,17 @@ private fun MiniSheetGlyph(
     modifier: Modifier = Modifier,
     width: Dp = 58.dp,
     height: Dp = 74.dp,
-    accentHeader: Color = MeldColors.InkBlack,
+    accentHeader: Color = meldColors.paperStroke,
     lineFractions: List<Float> = listOf(1f, 1f, 1f, 1f),
     badgeText: String? = null,
-    badgeColor: Color = MeldColors.CoralOrange
+    badgeColor: Color = meldColors.coral
 ) {
+    val colors = meldColors
     Surface(
         modifier = modifier.size(width = width, height = height),
         shape = RoundedCornerShape(7.dp),
-        color = MeldColors.PureWhite,
-        border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+        color = colors.paperFill,
+        border = BorderStroke(1.8.dp, colors.paperStroke)
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -226,7 +222,7 @@ private fun MiniSheetGlyph(
                         modifier = Modifier
                             .fillMaxWidth(frac.coerceIn(0.25f, 1f))
                             .height(3.dp)
-                            .background(StageDarkLine)
+                            .background(colors.paperLine)
                     )
                 }
             }
@@ -237,13 +233,13 @@ private fun MiniSheetGlyph(
                         .padding(4.dp),
                     shape = RoundedCornerShape(5.dp),
                     color = badgeColor,
-                    border = BorderStroke(1.2.dp, MeldColors.InkBlack)
+                    border = BorderStroke(1.2.dp, colors.paperStroke)
                 ) {
                     Text(
                         text = badgeText,
                         fontSize = 8.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = MeldColors.InkBlack,
+                        color = colors.inkOnAccent,
                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                     )
                 }
@@ -257,28 +253,29 @@ private fun MiniSheetGlyph(
 private fun MiniPolaroidGlyph(
     modifier: Modifier = Modifier,
     formatBadge: String? = null,
-    badgeColor: Color = MeldColors.CoralOrange
+    badgeColor: Color = meldColors.coral
 ) {
+    val colors = meldColors
     Box(modifier = modifier.size(width = 78.dp, height = 94.dp)) {
         Surface(
             modifier = Modifier
                 .align(Alignment.Center)
                 .size(width = 68.dp, height = 88.dp),
             shape = RoundedCornerShape(8.dp),
-            color = MeldColors.PureWhite,
-            border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+            color = colors.paperFill,
+            border = BorderStroke(1.8.dp, colors.paperStroke)
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(start = 6.dp, end = 6.dp, top = 6.dp, bottom = 20.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .border(1.2.dp, MeldColors.InkBlack, RoundedCornerShape(4.dp))
-                    .background(MeldColors.PeriwinkleBlue)
+                    .border(1.2.dp, colors.paperStroke, RoundedCornerShape(4.dp))
+                    .background(colors.periwinkle)
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     drawCircle(
-                        color = MeldColors.ButterYellow,
+                        color = colors.butter,
                         radius = size.minDimension * 0.16f,
                         center = Offset(size.width * 0.25f, size.height * 0.26f)
                     )
@@ -288,7 +285,7 @@ private fun MiniPolaroidGlyph(
                         lineTo(size.width, size.height)
                         close()
                     }
-                    drawPath(path = hill, color = MeldColors.MintSage)
+                    drawPath(path = hill, color = colors.mint)
                 }
             }
         }
@@ -299,13 +296,13 @@ private fun MiniPolaroidGlyph(
                     .graphicsLayer { rotationZ = 8f },
                 shape = RoundedCornerShape(7.dp),
                 color = badgeColor,
-                border = BorderStroke(1.5.dp, MeldColors.InkBlack)
+                border = BorderStroke(1.5.dp, colors.paperStroke)
             ) {
                 Text(
                     text = formatBadge,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = MeldColors.InkBlack,
+                    color = colors.inkOnAccent,
                     modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                 )
             }
@@ -319,6 +316,7 @@ fun CompressionRatioPill(
     ratio: Float,
     modifier: Modifier = Modifier
 ) {
+    val colors = meldColors
     val reduceMotion = rememberReduceMotion()
     val clamped = ratio.coerceIn(0.10f, 1.0f)
     val animatedGap by animateFloatAsState(
@@ -331,8 +329,8 @@ fun CompressionRatioPill(
     Surface(
         modifier = modifier,
         shape = CircleShape,
-        color = MeldColors.PureWhite,
-        border = BorderStroke(1.6.dp, MeldColors.InkBlack)
+        color = colors.surface,
+        border = BorderStroke(1.6.dp, colors.inkOnAccent)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -344,19 +342,19 @@ fun CompressionRatioPill(
                 val stroke = 2.dp.toPx()
                 val travel = 3.5.dp.toPx() * (1f - animatedGap)
                 drawLine(
-                    color = MeldColors.CoralOrange,
+                    color = colors.coral,
                     start = Offset(2.dp.toPx(), centerY),
                     end = Offset(size.width - 2.dp.toPx(), centerY),
                     strokeWidth = stroke
                 )
                 drawLine(
-                    color = MeldColors.InkBlack,
+                    color = colors.textPrimary,
                     start = Offset(size.width / 2f, 1.dp.toPx()),
                     end = Offset(size.width / 2f, centerY - 4.dp.toPx() + travel),
                     strokeWidth = stroke
                 )
                 drawLine(
-                    color = MeldColors.InkBlack,
+                    color = colors.textPrimary,
                     start = Offset(size.width / 2f, size.height - 1.dp.toPx()),
                     end = Offset(size.width / 2f, centerY + 4.dp.toPx() - travel),
                     strokeWidth = stroke
@@ -365,7 +363,7 @@ fun CompressionRatioPill(
             Text(
                 text = "-$pctSaved%",
                 style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                color = MeldColors.InkBlack,
+                color = colors.textPrimary,
                 fontWeight = FontWeight.ExtraBold
             )
         }
@@ -425,6 +423,7 @@ fun CompressPlatesStage(
         else -> 1f - easeOutSeg(phase, 0.88f, 0.96f)
     }
 
+    val colors = meldColors
     MeldStageViewport(modifier = modifier, height = 152.dp, onTapReplay = { replay++ }) {
         // Center-anchored plates track exact edge of the squeezed 58dp sheet
         val sheetHalfW = 29.dp * sheetScaleX
@@ -437,7 +436,7 @@ fun CompressPlatesStage(
                 .width(8.dp)
                 .height(84.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(MeldColors.InkBlack)
+                .background(colors.textPrimary)
         )
 
         Box(
@@ -447,7 +446,7 @@ fun CompressPlatesStage(
                 .width(8.dp)
                 .height(84.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(MeldColors.InkBlack)
+                .background(colors.textPrimary)
         )
 
         MiniSheetGlyph(
@@ -475,13 +474,13 @@ fun CompressPlatesStage(
                     scaleY = s
                 },
                 shape = CircleShape,
-                color = MeldColors.PureWhite,
-                border = BorderStroke(1.6.dp, MeldColors.InkBlack)
+                color = colors.surface,
+                border = BorderStroke(1.6.dp, colors.border)
             ) {
                 Text(
                     text = SelectedFileInfo.formatByteCount(sourceBytes),
                     style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum"),
-                    color = MeldColors.InkBlack,
+                    color = colors.textPrimary,
                     modifier = Modifier.padding(horizontal = 13.dp, vertical = 3.dp)
                 )
             }
@@ -493,13 +492,13 @@ fun CompressPlatesStage(
                     scaleY = s
                 },
                 shape = CircleShape,
-                color = MeldColors.MintSage,
-                border = BorderStroke(1.6.dp, MeldColors.InkBlack)
+                color = colors.mint,
+                border = BorderStroke(1.6.dp, colors.border)
             ) {
                 Text(
                     text = "$targetKb KB",
                     style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum"),
-                    color = MeldColors.InkBlack,
+                    color = colors.inkOnAccent,
                     modifier = Modifier.padding(horizontal = 13.dp, vertical = 3.dp)
                 )
             }
@@ -517,14 +516,15 @@ fun AnimatedHandoutDiagram(
     pagesPerSheet: Int,
     modifier: Modifier = Modifier
 ) {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val reduceMotion = rememberReduceMotion()
     val phase = rememberLoopPhase(3200, replay)
     val density = LocalDensity.current
 
     TactileCard(
-        backgroundColor = MeldColors.PureWhite,
-        cornerRadius = MeldColors.SubCardCorner,
+        backgroundColor = colors.surface,
+        cornerRadius = MeldDimens.SubCardCorner,
         onClick = { replay++ },
         modifier = modifier
             .fillMaxWidth()
@@ -562,14 +562,14 @@ fun AnimatedHandoutDiagram(
                                     translationY = dropY
                                 },
                             shape = RoundedCornerShape(6.dp),
-                            color = MeldColors.WarmSurface,
-                            border = BorderStroke(1.5.dp, MeldColors.InkBlack)
+                            color = colors.warmSurface,
+                            border = BorderStroke(1.5.dp, colors.border)
                         ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(4.dp)
-                                    .background(MeldColors.InkBlack)
+                                    .background(colors.textPrimary)
                             )
                         }
 
@@ -589,7 +589,7 @@ fun AnimatedHandoutDiagram(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(2.dp)
-                                        .background(StageDarkLine)
+                                        .background(colors.stageLine)
                                 )
                             }
                         }
@@ -624,14 +624,14 @@ fun AnimatedHandoutDiagram(
                                         translationY = with(density) { (-20.dp.toPx()) * (1f - dropPop) }
                                     },
                                 shape = RoundedCornerShape(6.dp),
-                                color = MeldColors.WarmSurface,
-                                border = BorderStroke(1.5.dp, MeldColors.InkBlack)
+                                color = colors.warmSurface,
+                                border = BorderStroke(1.5.dp, colors.border)
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(4.dp)
-                                        .background(MeldColors.InkBlack)
+                                        .background(colors.textPrimary)
                                 )
                             }
                         }
@@ -672,9 +672,10 @@ fun SplitPageSpreadStage(
         else -> 1f - easeTravel(phase, 0.84f, 0.98f)
     }
 
+    val colors = meldColors
     TactileCard(
-        backgroundColor = MeldColors.PeriwinkleBlue,
-        cornerRadius = MeldColors.CardCorner,
+        backgroundColor = colors.periwinkle,
+        cornerRadius = MeldDimens.CardCorner,
         modifier = modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
@@ -716,7 +717,7 @@ fun SplitPageSpreadStage(
                     val cutAlpha = (if (cutDraw > 0.02f) 1f - cutFade else 0f).coerceIn(0f, 1f)
                     if (cutAlpha > 0.01f) {
                         drawLine(
-                            color = StageLaserRed.copy(alpha = cutAlpha),
+                            color = colors.stageLaserRed.copy(alpha = cutAlpha),
                             start = Offset(x, topY),
                             end = Offset(x, topY + fullLen * cutDraw),
                             strokeWidth = 2.4.dp.toPx(),
@@ -730,13 +731,13 @@ fun SplitPageSpreadStage(
             Text(
                 text = "EXTRACT RANGE",
                 style = MaterialTheme.typography.labelSmall,
-                color = MeldColors.InkBlack.copy(alpha = 0.72f)
+                color = colors.inkOnAccent.copy(alpha = 0.85f)
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = "Pages $startPage to $endPage",
                 style = MaterialTheme.typography.headlineLarge.copy(fontFeatureSettings = "tnum"),
-                color = MeldColors.InkBlack
+                color = colors.inkOnAccent
             )
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -762,10 +763,10 @@ fun SplitPageSpreadStage(
                             .clip(RoundedCornerShape(12.dp))
                             .clickable { onSelectPage(page) },
                         shape = RoundedCornerShape(12.dp),
-                        color = if (selected) MeldColors.PureWhite else MeldColors.PureWhite.copy(alpha = 0.45f),
+                        color = if (selected) colors.surface else colors.inkOnAccent.copy(alpha = 0.14f),
                         border = BorderStroke(
                             width = if (selected) 2.2.dp else 1.2.dp,
-                            color = if (selected) MeldColors.InkBlack else MeldColors.InkBlack.copy(alpha = 0.4f)
+                            color = if (selected) colors.inkOnAccent else colors.inkOnAccent.copy(alpha = 0.55f)
                         )
                     ) {
                         Column(
@@ -779,13 +780,13 @@ fun SplitPageSpreadStage(
                                 modifier = Modifier
                                     .size(7.dp)
                                     .clip(CircleShape)
-                                    .background(if (selected) MeldColors.CoralOrange else MeldColors.InkBlack.copy(alpha = 0.2f))
+                                    .background(if (selected) colors.coral else colors.inkOnAccent.copy(alpha = 0.35f))
                             )
                             Text(
                                 text = "P$page",
                                 style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                                 fontWeight = FontWeight.ExtraBold,
-                                color = if (selected) MeldColors.InkBlack else MeldColors.InkBlack.copy(alpha = 0.55f)
+                                color = if (selected) colors.textPrimary else colors.inkOnAccent
                             )
                         }
                     }
@@ -830,9 +831,10 @@ fun StampSlamPreview(
     val lockPop = if (reduceMotion) 1f else easePop(phase, 0.48f, 0.62f)
     val lockAlpha = if (reduceMotion) 1f else (seg(phase, 0.48f, 0.54f) * (1f - fadeOutEnd))
 
+    val colors = meldColors
     TactileCard(
-        backgroundColor = MeldColors.PeachCream,
-        cornerRadius = MeldColors.CardCorner,
+        backgroundColor = colors.peach,
+        cornerRadius = MeldDimens.CardCorner,
         modifier = modifier.fillMaxWidth()
     ) {
         Box(
@@ -860,15 +862,15 @@ fun StampSlamPreview(
                             alpha = stampAlpha.coerceIn(0f, 1f)
                         },
                         shape = RoundedCornerShape(5.dp),
-                        color = MeldColors.PureWhite.copy(alpha = 0.85f),
-                        border = BorderStroke(2.2.dp, StageLaserRed)
+                        color = colors.surface.copy(alpha = 0.92f),
+                        border = BorderStroke(2.2.dp, colors.stageLaserRed)
                     ) {
                         Text(
                             text = stampText.ifBlank { "LOCKED" }.uppercase(),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = 1.2.sp,
-                            color = StageLaserRed,
+                            color = colors.stageLaserRed,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
@@ -887,14 +889,14 @@ fun StampSlamPreview(
                                 alpha = lockAlpha.coerceIn(0f, 1f)
                             },
                         shape = CircleShape,
-                        color = MeldColors.CoralOrange,
-                        border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                        color = colors.coral,
+                        border = BorderStroke(1.8.dp, colors.inkOnAccent)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = null,
-                                tint = MeldColors.InkBlack,
+                                tint = colors.inkOnAccent,
                                 modifier = Modifier.size(16.dp)
                             )
                         }
@@ -911,6 +913,7 @@ fun RemoveBgCurtainStage(
     tolerance: Int,
     modifier: Modifier = Modifier
 ) {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(2800, replay)
     val reduceMotion = rememberReduceMotion()
@@ -925,7 +928,7 @@ fun RemoveBgCurtainStage(
     MeldStageViewport(
         modifier = modifier,
         height = 120.dp,
-        backgroundColor = MeldColors.PureWhite,
+        backgroundColor = Color(0xFFF5EFE6),
         onTapReplay = { replay++ }
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -936,7 +939,7 @@ fun RemoveBgCurtainStage(
                 for (c in 0..cols) {
                     if ((r + c) % 2 == 0) {
                         drawRect(
-                            color = MeldColors.WarmSurface,
+                            color = Color(0xFFE6DDD0),
                             topLeft = Offset(c * sq, r * sq),
                             size = Size(sq, sq)
                         )
@@ -946,7 +949,7 @@ fun RemoveBgCurtainStage(
             val splitX = size.width * (1f - animatedSweep)
             if (splitX > 2f) {
                 drawRect(
-                    color = MeldColors.DockInk,
+                    color = Color(0xFF18181A),
                     topLeft = Offset.Zero,
                     size = Size(splitX, size.height)
                 )
@@ -961,15 +964,15 @@ fun RemoveBgCurtainStage(
                     scaleY = breathe
                 },
             shape = RoundedCornerShape(14.dp),
-            color = MeldColors.CoralOrange,
-            border = BorderStroke(2.2.dp, MeldColors.InkBlack)
+            color = colors.coral,
+            border = BorderStroke(2.2.dp, colors.inkOnAccent)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     text = "α",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = MeldColors.InkBlack
+                    color = colors.inkOnAccent
                 )
             }
         }
@@ -983,6 +986,7 @@ fun ResizeFrameStage(
     addFrame: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val reduceMotion = rememberReduceMotion()
     val norm = ((percent - 25) / 175f).coerceIn(0f, 1f)
@@ -1006,7 +1010,7 @@ fun ResizeFrameStage(
             val left = (size.width - boxW) / 2f
             val top = (size.height - boxH) / 2f
             drawRoundRect(
-                color = MeldColors.InkBlack.copy(alpha = 0.45f),
+                color = colors.textPrimary.copy(alpha = 0.55f),
                 topLeft = Offset(left, top),
                 size = Size(boxW, boxH),
                 cornerRadius = CornerRadius(10.dp.toPx()),
@@ -1027,14 +1031,14 @@ fun ResizeFrameStage(
                     scaleY = s
                 },
             shape = RoundedCornerShape(10.dp),
-            color = MeldColors.CoralOrange,
-            border = BorderStroke(borderWidth.dp, MeldColors.InkBlack)
+            color = colors.coral,
+            border = BorderStroke(borderWidth.dp, colors.inkOnAccent)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
                     text = "$percent%",
                     style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum"),
-                    color = MeldColors.InkBlack
+                    color = colors.inkOnAccent
                 )
             }
         }
@@ -1062,9 +1066,10 @@ fun QrMatrixStage(
         }
     }
 
+    val colors = meldColors
     TactileCard(
-        backgroundColor = MeldColors.SoftLavender,
-        cornerRadius = MeldColors.CardCorner,
+        backgroundColor = colors.lavender,
+        cornerRadius = MeldDimens.CardCorner,
         modifier = modifier.fillMaxWidth()
     ) {
         Box(
@@ -1074,8 +1079,10 @@ fun QrMatrixStage(
             contentAlignment = Alignment.Center
         ) {
             TactileCard(
-                backgroundColor = MeldColors.PureWhite,
-                cornerRadius = MeldColors.SubCardCorner,
+                backgroundColor = colors.paperFill,
+                cornerRadius = MeldDimens.SubCardCorner,
+                borderColor = colors.paperStroke,
+                shadowColor = colors.inkOnAccent,
                 onClick = { replay++ },
                 modifier = Modifier.size(168.dp)
             ) {
@@ -1094,7 +1101,7 @@ fun QrMatrixStage(
                                             (r in 16..18 && c in 2..4)
                                         val s = if (isFinder) cell * 0.92f * pulseScale else cell * 0.92f
                                         drawRect(
-                                            color = if (isFinder) MeldColors.CoralOrange else MeldColors.InkBlack,
+                                            color = if (isFinder) colors.coral else colors.paperStroke,
                                             topLeft = Offset(c * cell + (cell - s) / 2f, r * cell + (cell - s) / 2f),
                                             size = Size(s, s)
                                         )
@@ -1105,7 +1112,7 @@ fun QrMatrixStage(
                         if (!reduceMotion) {
                             val scanY = size.height * phase
                             drawLine(
-                                color = MeldColors.CoralOrange.copy(alpha = 0.72f),
+                                color = colors.coral.copy(alpha = 0.85f),
                                 start = Offset(0f, scanY),
                                 end = Offset(size.width, scanY),
                                 strokeWidth = 2.dp.toPx()
@@ -1125,18 +1132,19 @@ fun SpecializedToolShowcaseCard(
     file: SelectedFileInfo?,
     modifier: Modifier = Modifier
 ) {
+    val colors = meldColors
     val sourceExt = (file?.extension?.takeIf { it.isNotBlank() } ?: "FILE").uppercase()
     val cardColor = when (tool.outputExtension) {
-        "pdf" -> MeldColors.PeriwinkleBlue
-        "png", "jpg", "webp", "bmp", "tiff" -> MeldColors.ButterYellow
-        "docx" -> MeldColors.PeriwinkleBlue
-        "md", "html", "txt", "json" -> MeldColors.MintSage
-        else -> MeldColors.SoftLavender
+        "pdf" -> colors.periwinkle
+        "png", "jpg", "webp", "bmp", "tiff" -> colors.butter
+        "docx" -> colors.periwinkle
+        "md", "html", "txt", "json" -> colors.mint
+        else -> colors.lavender
     }
 
     TactileCard(
         backgroundColor = cardColor,
-        cornerRadius = MeldColors.CardCorner,
+        cornerRadius = MeldDimens.CardCorner,
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
@@ -1153,9 +1161,9 @@ fun SpecializedToolShowcaseCard(
                 MeldToolId.PDF_MERGE -> MergeBookletStage()
                 MeldToolId.PACK_ZIP -> ZipPackStage()
                 MeldToolId.PDF_TO_DOCX -> SheetFlipWordStage()
-                MeldToolId.PDF_TO_MD -> SheetToCodeTerminalStage(tag = "#", accentColor = StageLimeCode)
-                MeldToolId.PDF_TO_HTML -> SheetToCodeTerminalStage(tag = "</>", accentColor = MeldColors.PeriwinkleBlue)
-                MeldToolId.PDF_TO_TXT -> SheetToCodeTerminalStage(tag = "Aa", accentColor = MeldColors.MintSage)
+                MeldToolId.PDF_TO_MD -> SheetToCodeTerminalStage(tag = "#", accentColor = colors.stageLimeCode)
+                MeldToolId.PDF_TO_HTML -> SheetToCodeTerminalStage(tag = "</>", accentColor = colors.periwinkle)
+                MeldToolId.PDF_TO_TXT -> SheetToCodeTerminalStage(tag = "Aa", accentColor = colors.mint)
                 MeldToolId.PDF_TO_PNG, MeldToolId.PDF_TO_JPG,
                 MeldToolId.IMG_TO_JPG, MeldToolId.IMG_TO_PNG,
                 MeldToolId.IMG_TO_WEBP, MeldToolId.IMG_TO_BMP,
@@ -1164,9 +1172,9 @@ fun SpecializedToolShowcaseCard(
                     targetExt = tool.outputExtension.uppercase()
                 )
                 MeldToolId.IMG_TO_PDF -> PhotoToPdfStackStage(sourceExt = sourceExt)
-                MeldToolId.SHEET_TO_PDF -> TableTransformStage(targetExt = "PDF", badgeColor = MeldColors.CoralOrange)
-                MeldToolId.SHEET_TO_MD -> TableTransformStage(targetExt = "# MD", badgeColor = StageLimeCode)
-                MeldToolId.TABLE_CONVERT -> TableTransformStage(targetExt = "{JSON}", badgeColor = MeldColors.ButterYellow)
+                MeldToolId.SHEET_TO_PDF -> TableTransformStage(targetExt = "PDF", badgeColor = colors.coral)
+                MeldToolId.SHEET_TO_MD -> TableTransformStage(targetExt = "# MD", badgeColor = colors.stageLimeCode)
+                MeldToolId.TABLE_CONVERT -> TableTransformStage(targetExt = "{JSON}", badgeColor = colors.butter)
                 else -> PolaroidFormatMorphStage(sourceExt = sourceExt, targetExt = tool.outputExtension.uppercase())
             }
 
@@ -1174,12 +1182,12 @@ fun SpecializedToolShowcaseCard(
                 Text(
                     text = tool.subtitle,
                     style = MaterialTheme.typography.headlineSmall,
-                    color = MeldColors.InkBlack
+                    color = colors.inkOnAccent
                 )
                 Text(
                     text = "Runs completely offline on your phone · Tap stage to replay.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MeldColors.InkBlack.copy(alpha = 0.8f)
+                    color = colors.inkOnAccent.copy(alpha = 0.85f)
                 )
             }
         }
@@ -1189,6 +1197,7 @@ fun SpecializedToolShowcaseCard(
 /** 8. REDACT (`ToolMotion.dc.html` Redact): Keeps top context visible while ink marker strokes whip over middle lines. */
 @Composable
 internal fun RedactSweepStage() {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
@@ -1202,8 +1211,8 @@ internal fun RedactSweepStage() {
                 .align(Alignment.Center)
                 .size(width = 74.dp, height = 96.dp),
             shape = RoundedCornerShape(8.dp),
-            color = MeldColors.PureWhite,
-            border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+            color = colors.paperFill,
+            border = BorderStroke(1.8.dp, colors.paperStroke)
         ) {
             Column(
                 modifier = Modifier.padding(10.dp),
@@ -1215,14 +1224,14 @@ internal fun RedactSweepStage() {
                         .fillMaxWidth(0.56f)
                         .height(7.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(MeldColors.InkBlack)
+                        .background(colors.paperStroke)
                 )
                 // Context line 1 stays intact
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.92f)
                         .height(3.5.dp)
-                        .background(StageDarkLine)
+                        .background(colors.paperLine)
                 )
                 // Sensitive lines 2 & 3 get whipped black by blackout bars
                 listOf(b1, b2).forEach { sweep ->
@@ -1232,7 +1241,7 @@ internal fun RedactSweepStage() {
                                 .fillMaxWidth(0.94f)
                                 .height(3.5.dp)
                                 .align(Alignment.CenterStart)
-                                .background(StageDarkLine)
+                                .background(colors.paperLine)
                         )
                         Box(
                             modifier = Modifier
@@ -1243,7 +1252,7 @@ internal fun RedactSweepStage() {
                                     scaleX = sweep.coerceAtLeast(0.001f)
                                 }
                                 .clip(RoundedCornerShape(2.dp))
-                                .background(MeldColors.InkBlack)
+                                .background(colors.paperStroke)
                         )
                     }
                 }
@@ -1252,7 +1261,7 @@ internal fun RedactSweepStage() {
                     modifier = Modifier
                         .fillMaxWidth(0.75f)
                         .height(3.5.dp)
-                        .background(StageDarkLine)
+                        .background(colors.paperLine)
                 )
             }
         }
@@ -1266,6 +1275,7 @@ internal fun RedactSweepStage() {
  */
 @Composable
 private fun SanitizeScanStage(isExif: Boolean) {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
@@ -1301,7 +1311,7 @@ private fun SanitizeScanStage(isExif: Boolean) {
                         .height(10.dp)
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color.Transparent, MeldColors.CoralOrange.copy(alpha = 0.28f))
+                                listOf(Color.Transparent, colors.coral.copy(alpha = 0.28f))
                             )
                         )
                 )
@@ -1310,7 +1320,7 @@ private fun SanitizeScanStage(isExif: Boolean) {
                         .fillMaxWidth()
                         .height(3.dp)
                         .clip(CircleShape)
-                        .background(MeldColors.CoralOrange)
+                        .background(colors.coral)
                 )
             }
         }
@@ -1342,14 +1352,14 @@ private fun SanitizeScanStage(isExif: Boolean) {
                         alpha = visAlpha.coerceIn(0f, 1f)
                     },
                 shape = CircleShape,
-                color = MeldColors.PureWhite,
-                border = BorderStroke(1.5.dp, MeldColors.InkBlack)
+                color = colors.surface,
+                border = BorderStroke(1.5.dp, colors.border)
             ) {
                 Text(
                     text = label,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MeldColors.InkBlack,
+                    color = colors.textPrimary,
                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
                 )
             }
@@ -1365,6 +1375,7 @@ private fun SanitizeScanStage(isExif: Boolean) {
  */
 @Composable
 private fun MergeBookletStage() {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
@@ -1406,7 +1417,7 @@ private fun MergeBookletStage() {
                     translationX = with(density) { lerp(88f, 5f, join).dp.toPx() }
                     rotationZ = lerp(10f, 5f, join)
                 },
-                accentHeader = MeldColors.CoralOrange
+                accentHeader = colors.coral
             )
             MiniSheetGlyph(
                 modifier = Modifier.graphicsLayer {
@@ -1426,7 +1437,7 @@ private fun MergeBookletStage() {
                         alpha = spineDraw.coerceIn(0f, 1f)
                     }
                     .clip(RoundedCornerShape(2.dp))
-                    .background(MeldColors.InkBlack)
+                    .background(colors.paperStroke)
             )
         }
     }
@@ -1438,6 +1449,7 @@ private fun PolaroidFormatMorphStage(
     sourceExt: String,
     targetExt: String
 ) {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
@@ -1489,14 +1501,14 @@ private fun PolaroidFormatMorphStage(
                         alpha = stickerIn.coerceIn(0f, 1f)
                     },
                 shape = RoundedCornerShape(8.dp),
-                color = MeldColors.CoralOrange,
-                border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                color = colors.coral,
+                border = BorderStroke(1.8.dp, colors.inkOnAccent)
             ) {
                 Text(
                     text = targetExt,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color = MeldColors.InkBlack,
+                    color = colors.inkOnAccent,
                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
                 )
             }
@@ -1506,7 +1518,7 @@ private fun PolaroidFormatMorphStage(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White.copy(alpha = flashAlpha))
+                    .background(colors.paperFill.copy(alpha = flashAlpha))
             )
         }
     }
@@ -1515,6 +1527,7 @@ private fun PolaroidFormatMorphStage(
 /** 12. IMG_TO_PDF: Polaroid slides into a clean corner-folded PDF sheet with Coral sticker. */
 @Composable
 private fun PhotoToPdfStackStage(sourceExt: String) {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
@@ -1529,7 +1542,7 @@ private fun PhotoToPdfStackStage(sourceExt: String) {
         ) {
             MiniPolaroidGlyph(
                 formatBadge = sourceExt.take(4),
-                badgeColor = MeldColors.ButterYellow,
+                badgeColor = colors.butter,
                 modifier = Modifier.graphicsLayer {
                     translationX = with(density) { lerp(0f, -6.dp.toPx(), morph) }
                     rotationZ = -4f
@@ -1538,7 +1551,7 @@ private fun PhotoToPdfStackStage(sourceExt: String) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = null,
-                tint = MeldColors.InkBlack,
+                tint = colors.textPrimary,
                 modifier = Modifier
                     .padding(horizontal = 10.dp)
                     .graphicsLayer { scaleX = 0.88f + 0.12f * morph }
@@ -1552,7 +1565,7 @@ private fun PhotoToPdfStackStage(sourceExt: String) {
                     scaleY = sc
                 },
                 badgeText = "PDF",
-                badgeColor = MeldColors.CoralOrange
+                badgeColor = colors.coral
             )
         }
     }
@@ -1565,6 +1578,7 @@ private fun PhotoToPdfStackStage(sourceExt: String) {
  */
 @Composable
 private fun SheetFlipWordStage() {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(2600, replay)
     val reduceMotion = rememberReduceMotion()
@@ -1593,7 +1607,7 @@ private fun SheetFlipWordStage() {
                         rotationY = rotY
                     },
                 badgeText = "PDF",
-                badgeColor = MeldColors.CoralOrange
+                badgeColor = colors.coral
             )
         } else {
             Surface(
@@ -1605,15 +1619,15 @@ private fun SheetFlipWordStage() {
                         rotationY = rotY
                     },
                 shape = RoundedCornerShape(10.dp),
-                color = StageWordBlue,
-                border = BorderStroke(2.dp, MeldColors.InkBlack)
+                color = colors.stageWordBlue,
+                border = BorderStroke(2.dp, colors.inkOnAccent)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = "W",
                         fontSize = 38.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = MeldColors.InkBlack
+                        color = colors.inkOnAccent
                     )
                 }
             }
@@ -1627,12 +1641,13 @@ private fun SheetToCodeTerminalStage(
     tag: String,
     accentColor: Color
 ) {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
     val reset = if (reduceMotion) 0f else easeTravel(phase, 0.88f, 0.98f)
     val lineFracs = listOf(0.62f, 0.86f, 0.50f, 0.76f)
-    val lineColors = listOf(StageLimeCode, MeldColors.PeriwinkleBlue, StagePinkCode, MeldColors.MintSage)
+    val lineColors = listOf(colors.stageLimeCode, colors.periwinkle, colors.stagePinkCode, colors.mint)
 
     MeldStageViewport(height = 152.dp, onTapReplay = { replay++ }) {
         Row(
@@ -1646,7 +1661,7 @@ private fun SheetToCodeTerminalStage(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = null,
-                tint = MeldColors.InkBlack,
+                tint = colors.textPrimary,
                 modifier = Modifier.size(20.dp)
             )
             Surface(
@@ -1654,7 +1669,8 @@ private fun SheetToCodeTerminalStage(
                     .weight(1f)
                     .height(94.dp),
                 shape = RoundedCornerShape(10.dp),
-                color = MeldColors.InkBlack
+                color = colors.terminalBg,
+                border = BorderStroke(1.5.dp, colors.border)
             ) {
                 Box(modifier = Modifier.fillMaxSize().padding(12.dp)) {
                     Column(
@@ -1694,11 +1710,12 @@ private fun SheetToCodeTerminalStage(
 /** 15. COLLAGE: Four scattered tilted Polaroids spring-snap into a tight 2x2 contact grid. */
 @Composable
 private fun CollageGridAssembleStage() {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(3200, replay)
     val reduceMotion = rememberReduceMotion()
     val snap = if (reduceMotion) 1f else (easePop(phase, 0.12f, 0.40f) * (1f - easeTravel(phase, 0.86f, 0.98f)))
-    val colors = listOf(MeldColors.ButterYellow, MeldColors.MintSage, MeldColors.PeriwinkleBlue, MeldColors.PeachCream)
+    val tileColors = listOf(colors.butter, colors.mint, colors.periwinkle, colors.peach)
     val tilts = listOf(-12f, 10f, 11f, -9f)
     val spreadX = listOf(-16f, 16f, -16f, 16f)
     val spreadY = listOf(-12f, -12f, 12f, 12f)
@@ -1731,8 +1748,8 @@ private fun CollageGridAssembleStage() {
                                     scaleY = sc
                                 },
                             shape = RoundedCornerShape(7.dp),
-                            color = colors[idx],
-                            border = BorderStroke(1.6.dp, MeldColors.InkBlack)
+                            color = tileColors[idx],
+                            border = BorderStroke(1.6.dp, colors.inkOnAccent)
                         ) {
                             Box(modifier = Modifier.fillMaxSize()) {
                                 Box(
@@ -1740,7 +1757,7 @@ private fun CollageGridAssembleStage() {
                                         .align(Alignment.TopCenter)
                                         .padding(top = 3.dp)
                                         .size(width = 14.dp, height = 4.dp)
-                                        .background(MeldColors.CoralOrange)
+                                        .background(colors.coral)
                                 )
                             }
                         }
@@ -1754,11 +1771,12 @@ private fun CollageGridAssembleStage() {
 /** 16. VISUALIZE: 18 pulsing studio equalizer gradient bars inside dark studio viewport. */
 @Composable
 private fun AudioWaveformStage() {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(1800, replay)
     val reduceMotion = rememberReduceMotion()
 
-    MeldStageViewport(height = 152.dp, backgroundColor = MeldColors.InkBlack, onTapReplay = { replay++ }) {
+    MeldStageViewport(height = 152.dp, backgroundColor = colors.terminalBg, onTapReplay = { replay++ }) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -1768,7 +1786,7 @@ private fun AudioWaveformStage() {
             Text(
                 text = "LIVE STUDIO WAVEFORM",
                 style = MaterialTheme.typography.labelSmall,
-                color = MeldColors.ButterYellow
+                color = colors.butter
             )
             Canvas(
                 modifier = Modifier
@@ -1779,7 +1797,7 @@ private fun AudioWaveformStage() {
                 val gap = 4.dp.toPx()
                 val barW = (size.width - gap * (count - 1)) / count
                 val brush = Brush.verticalGradient(
-                    listOf(MeldColors.ButterYellow, MeldColors.CoralOrange, MeldColors.SoftLavender)
+                    listOf(colors.butter, colors.coral, colors.lavender)
                 )
                 for (i in 0 until count) {
                     val norm = if (reduceMotion) {
@@ -1801,7 +1819,7 @@ private fun AudioWaveformStage() {
             Text(
                 text = "1920×600 PNG waveform render",
                 style = MaterialTheme.typography.labelSmall,
-                color = MeldColors.PureWhite.copy(alpha = 0.75f)
+                color = colors.terminalText.copy(alpha = 0.8f)
             )
         }
     }
@@ -1810,6 +1828,7 @@ private fun AudioWaveformStage() {
 /** 17. SPEED_2X: Dual playhead tempo comparison streams (`1.0x` vs `2.0x`). */
 @Composable
 private fun SpeedRaceStage() {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(2400, replay)
     val reduceMotion = rememberReduceMotion()
@@ -1830,27 +1849,27 @@ private fun SpeedRaceStage() {
                 Icon(
                     imageVector = Icons.Default.FastForward,
                     contentDescription = null,
-                    tint = MeldColors.InkBlack,
+                    tint = colors.textPrimary,
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
                     text = "2.0x DOUBLE TEMPO STREAM",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.ExtraBold,
-                    color = MeldColors.InkBlack
+                    color = colors.textPrimary
                 )
             }
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = MeldColors.PureWhite,
-                border = BorderStroke(1.6.dp, MeldColors.InkBlack),
+                color = colors.surface,
+                border = BorderStroke(1.6.dp, colors.border),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(
                     modifier = Modifier.padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    listOf(Triple("1.0x", slow, MeldColors.WarmSurface), Triple("2.0x", fast, MeldColors.CoralOrange))
+                    listOf(Triple("1.0x", slow, colors.textSecondary), Triple("2.0x", fast, colors.coral))
                         .forEach { (label, frac, fill) ->
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -1859,7 +1878,7 @@ private fun SpeedRaceStage() {
                                 Text(
                                     text = label,
                                     style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
-                                    color = MeldColors.InkBlack,
+                                    color = colors.textPrimary,
                                     modifier = Modifier.width(34.dp)
                                 )
                                 Box(
@@ -1867,7 +1886,7 @@ private fun SpeedRaceStage() {
                                         .weight(1f)
                                         .height(10.dp)
                                         .clip(CircleShape)
-                                        .background(StageSand)
+                                        .background(colors.track)
                                 ) {
                                     Box(
                                         modifier = Modifier
@@ -1891,6 +1910,7 @@ private fun TableTransformStage(
     targetExt: String,
     badgeColor: Color
 ) {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(2800, replay)
     val reduceMotion = rememberReduceMotion()
@@ -1907,8 +1927,8 @@ private fun TableTransformStage(
             Surface(
                 modifier = Modifier.size(width = 112.dp, height = 84.dp),
                 shape = RoundedCornerShape(10.dp),
-                color = MeldColors.PureWhite,
-                border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                color = colors.surface,
+                border = BorderStroke(1.8.dp, colors.border)
             ) {
                 Column(
                     modifier = Modifier.padding(8.dp),
@@ -1926,8 +1946,8 @@ private fun TableTransformStage(
                                         .weight(1f)
                                         .fillMaxHeight()
                                         .clip(RoundedCornerShape(3.dp))
-                                        .background(if (lit) MeldColors.ButterYellow else StageSand)
-                                        .border(1.dp, MeldColors.InkBlack.copy(alpha = 0.25f), RoundedCornerShape(3.dp))
+                                        .background(if (lit) colors.butter else colors.warmSurface)
+                                        .border(1.dp, colors.border.copy(alpha = 0.45f), RoundedCornerShape(3.dp))
                                 )
                             }
                         }
@@ -1938,21 +1958,21 @@ private fun TableTransformStage(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = null,
-                tint = MeldColors.InkBlack
+                tint = colors.textPrimary
             )
 
             Surface(
                 modifier = Modifier.size(width = 76.dp, height = 64.dp),
                 shape = RoundedCornerShape(12.dp),
                 color = badgeColor,
-                border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                border = BorderStroke(1.8.dp, colors.inkOnAccent)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Text(
                         text = targetExt,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = MeldColors.InkBlack
+                        color = colors.inkOnAccent
                     )
                 }
             }
@@ -1963,6 +1983,7 @@ private fun TableTransformStage(
 /** 19. PACK_ZIP: File pills ease smoothly into Lavender archive as zipper teeth clasp top-to-bottom. */
 @Composable
 private fun ZipPackStage() {
+    val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(2800, replay)
     val reduceMotion = rememberReduceMotion()
@@ -1978,9 +1999,9 @@ private fun ZipPackStage() {
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(
-                    Triple("PDF", MeldColors.CoralOrange, 0f),
-                    Triple("PNG", MeldColors.ButterYellow, 0.14f),
-                    Triple("TXT", MeldColors.MintSage, 0.28f)
+                    Triple("PDF", colors.coral, 0f),
+                    Triple("PNG", colors.butter, 0.14f),
+                    Triple("TXT", colors.mint, 0.28f)
                 ).forEach { (ext, col, offset) ->
                     val pulse = if (reduceMotion) 0f else sin(((phase + offset) % 1f) * 2f * PI.toFloat())
                     Surface(
@@ -1989,13 +2010,13 @@ private fun ZipPackStage() {
                         },
                         shape = RoundedCornerShape(7.dp),
                         color = col,
-                        border = BorderStroke(1.5.dp, MeldColors.InkBlack)
+                        border = BorderStroke(1.5.dp, colors.inkOnAccent)
                     ) {
                         Text(
                             text = ext,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = MeldColors.InkBlack,
+                            color = colors.inkOnAccent,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
                         )
                     }
@@ -2005,7 +2026,7 @@ private fun ZipPackStage() {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                 contentDescription = null,
-                tint = MeldColors.InkBlack
+                tint = colors.textPrimary
             )
 
             Surface(
@@ -2013,8 +2034,8 @@ private fun ZipPackStage() {
                     .weight(1f)
                     .height(92.dp),
                 shape = RoundedCornerShape(14.dp),
-                color = MeldColors.SoftLavender,
-                border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                color = colors.lavender,
+                border = BorderStroke(1.8.dp, colors.inkOnAccent)
             ) {
                 Box(modifier = Modifier.fillMaxSize()) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
@@ -2024,7 +2045,7 @@ private fun ZipPackStage() {
                         for (i in 0 until teethDrawn) {
                             val side = if (i % 2 == 0) -6.dp.toPx() else 2.dp.toPx()
                             drawRoundRect(
-                                color = MeldColors.InkBlack,
+                                color = colors.inkOnAccent,
                                 topLeft = Offset(size.width * 0.24f + side, (i + 0.7f) * step),
                                 size = Size(6.dp.toPx(), 4.dp.toPx()),
                                 cornerRadius = CornerRadius(1.5.dp.toPx())
@@ -2036,14 +2057,14 @@ private fun ZipPackStage() {
                             .align(Alignment.CenterEnd)
                             .padding(end = 14.dp),
                         shape = RoundedCornerShape(8.dp),
-                        color = MeldColors.PureWhite,
-                        border = BorderStroke(1.6.dp, MeldColors.InkBlack)
+                        color = colors.surface,
+                        border = BorderStroke(1.6.dp, colors.inkOnAccent)
                     ) {
                         Text(
                             text = ".ZIP",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold,
-                            color = MeldColors.InkBlack,
+                            color = colors.textPrimary,
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                         )
                     }

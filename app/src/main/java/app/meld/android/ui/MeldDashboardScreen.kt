@@ -53,8 +53,8 @@ import app.meld.android.ui.screens.MeldStudioHomeScreen
 import app.meld.android.ui.screens.MeldTaskScreen
 import app.meld.android.ui.theme.LocalMeldRouteAnimScope
 import app.meld.android.ui.theme.LocalMeldSharedScope
-import app.meld.android.ui.theme.MeldColors
 import app.meld.android.ui.theme.MeldMotion
+import app.meld.android.ui.theme.meldColors
 import app.meld.android.ui.theme.rememberReduceMotion
 import java.io.File
 
@@ -128,9 +128,11 @@ fun MeldAppRoot(
         onNavigateHome()
     }
 
+    val colors = meldColors
+
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MeldColors.CreamCanvas
+        color = colors.canvas
     ) {
         Box(
             // Keep content readable on tablets / landscape: centered column, max 640dp wide.
@@ -303,13 +305,13 @@ fun MeldAppRoot(
                         .padding(top = 10.dp, start = 20.dp, end = 20.dp)
                         .clickable { onClearBanner() },
                     shape = CircleShape,
-                    color = if (uiState.isBannerError) androidx.compose.ui.graphics.Color(0xFFC62828) else MeldColors.InkBlack,
+                    color = if (uiState.isBannerError) colors.error else colors.bannerBg,
                     shadowElevation = 6.dp
                 ) {
                     Text(
                         text = uiState.bannerMessage,
                         style = MaterialTheme.typography.labelMedium,
-                        color = MeldColors.PureWhite,
+                        color = if (uiState.isBannerError) colors.onError else colors.bannerContent,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp)
                     )
                 }

@@ -115,8 +115,9 @@ import app.meld.android.ui.components.TactileCard
 import app.meld.android.ui.components.TactileChipPill
 import app.meld.android.ui.components.TactileCircleIconButton
 import app.meld.android.ui.components.WorkingDocumentIllustration
-import app.meld.android.ui.theme.MeldColors
+import app.meld.android.ui.theme.MeldDimens
 import app.meld.android.ui.theme.MeldMotion
+import app.meld.android.ui.theme.meldColors
 import app.meld.android.ui.theme.meldSharedToolBounds
 import app.meld.android.ui.theme.rememberReduceMotion
 import java.io.File
@@ -134,6 +135,7 @@ fun MeldStudioHomeScreen(
     onOpenResult: (ConversionResult) -> Unit,
     onShareFile: (File) -> Unit
 ) {
+    val colors = meldColors
     val density = LocalDensity.current
     val greeting = remember {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
@@ -189,8 +191,8 @@ fun MeldStudioHomeScreen(
                     Surface(
                         modifier = Modifier.size(38.dp),
                         shape = RoundedCornerShape(11.dp),
-                        color = MeldColors.CoralOrange,
-                        border = BorderStroke(2.dp, MeldColors.InkBlack)
+                        color = colors.coral,
+                        border = BorderStroke(2.dp, colors.border)
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.meld_logo),
@@ -204,7 +206,7 @@ fun MeldStudioHomeScreen(
                         text = "meld",
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.ExtraBold,
-                        color = MeldColors.InkBlack
+                        color = colors.textPrimary
                     )
                 }
 
@@ -213,8 +215,8 @@ fun MeldStudioHomeScreen(
                         alpha = if (!openingDriver.showOverlay) 1f else openingDriver.pillAlpha.value.coerceIn(0f, 1f)
                     },
                     shape = CircleShape,
-                    color = MeldColors.PureWhite,
-                    border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                    color = colors.surface,
+                    border = BorderStroke(1.8.dp, colors.border)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
@@ -223,14 +225,14 @@ fun MeldStudioHomeScreen(
                         Icon(
                             imageVector = Icons.Default.Lock,
                             contentDescription = null,
-                            tint = MeldColors.InkBlack,
+                            tint = colors.textPrimary,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "Works offline",
                             style = MaterialTheme.typography.labelMedium,
-                            color = MeldColors.InkBlack
+                            color = colors.textPrimary
                         )
                     }
                 }
@@ -245,7 +247,7 @@ fun MeldStudioHomeScreen(
                 Text(
                     text = greeting,
                     style = MaterialTheme.typography.displayMedium,
-                    color = MeldColors.InkBlack,
+                    color = colors.textPrimary,
                     modifier = Modifier.graphicsLayer {
                         alpha = rhT.coerceIn(0f, 1f)
                         translationY = (1f - rhT) * slide22Px
@@ -254,7 +256,7 @@ fun MeldStudioHomeScreen(
                 Text(
                     text = "What needs sorting today?",
                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
-                    color = MeldColors.TextSecondary,
+                    color = colors.textSecondary,
                     modifier = Modifier.graphicsLayer {
                         alpha = rpT.coerceIn(0f, 1f)
                         translationY = (1f - rpT) * slide22Px
@@ -286,7 +288,7 @@ fun MeldStudioHomeScreen(
                     .clip(heroRevealShape)
             ) {
                 TactileCard(
-                    backgroundColor = MeldColors.CoralOrange,
+                    backgroundColor = colors.coral,
                     cornerRadius = 26.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -314,13 +316,13 @@ fun MeldStudioHomeScreen(
                                 text = "WORKING ON",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = MeldColors.InkBlack.copy(alpha = 0.72f)
+                                color = colors.inkOnAccent.copy(alpha = 0.85f)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = file?.cleanTitle ?: "Lecture Deck",
                                 style = MaterialTheme.typography.headlineSmall,
-                                color = MeldColors.InkBlack,
+                                color = colors.inkOnAccent,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -328,7 +330,7 @@ fun MeldStudioHomeScreen(
                             Text(
                                 text = file?.formattedMetaLine ?: "Tap Change file to pick one",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-                                color = MeldColors.InkBlack.copy(alpha = 0.85f)
+                                color = colors.inkOnAccent.copy(alpha = 0.88f)
                             )
                             Spacer(modifier = Modifier.height(14.dp))
                             Surface(
@@ -336,14 +338,14 @@ fun MeldStudioHomeScreen(
                                     .clip(CircleShape)
                                     .clickable { onOpenChangeFile() },
                                 shape = CircleShape,
-                                color = MeldColors.PureWhite,
-                                border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+                                color = colors.surface,
+                                border = BorderStroke(MeldDimens.StrokeWidth, colors.inkOnAccent)
                             ) {
                                 Text(
                                     text = "Change file",
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = MeldColors.InkBlack,
+                                    color = colors.textPrimary,
                                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp)
                                 )
                             }
@@ -374,14 +376,14 @@ fun MeldStudioHomeScreen(
                     Text(
                         text = "Quick tools",
                         style = MaterialTheme.typography.headlineSmall,
-                        color = MeldColors.InkBlack
+                        color = colors.textPrimary
                     )
                     Text(
                         text = "All ${MeldToolId.entries.size}",
                         style = MaterialTheme.typography.labelMedium.copy(
                             textDecoration = TextDecoration.Underline
                         ),
-                        color = MeldColors.InkBlack,
+                        color = colors.textPrimary,
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { onSeeAllTools() }
@@ -399,7 +401,7 @@ fun MeldStudioHomeScreen(
                     // Left Tall Yellow Card (`t1`)
                     val primaryTool = quickTriple.first
                     TactileCard(
-                        backgroundColor = MeldColors.ButterYellow,
+                        backgroundColor = colors.butter,
                         cornerRadius = 24.dp,
                         onClick = { onOpenTask(primaryTool) },
                         modifier = Modifier
@@ -423,14 +425,14 @@ fun MeldStudioHomeScreen(
                             Surface(
                                 modifier = Modifier.size(44.dp),
                                 shape = CircleShape,
-                                color = MeldColors.PureWhite,
-                                border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                                color = colors.surface,
+                                border = BorderStroke(1.8.dp, colors.inkOnAccent)
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Icon(
                                         imageVector = iconForTool(primaryTool),
                                         contentDescription = null,
-                                        tint = MeldColors.InkBlack,
+                                        tint = colors.textPrimary,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }
@@ -440,13 +442,13 @@ fun MeldStudioHomeScreen(
                                 Text(
                                     text = primaryTool.title,
                                     style = MaterialTheme.typography.headlineSmall,
-                                    color = MeldColors.InkBlack
+                                    color = colors.inkOnAccent
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = primaryTool.subtitle,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MeldColors.InkBlack.copy(alpha = 0.8f),
+                                    color = colors.inkOnAccent.copy(alpha = 0.85f),
                                     maxLines = 3,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -463,7 +465,7 @@ fun MeldStudioHomeScreen(
                     ) {
                         val topRight = quickTriple.second
                         TactileCard(
-                            backgroundColor = MeldColors.MintSage,
+                            backgroundColor = colors.mint,
                             cornerRadius = 22.dp,
                             onClick = { onOpenTask(topRight) },
                             modifier = Modifier
@@ -487,14 +489,14 @@ fun MeldStudioHomeScreen(
                                 Surface(
                                     modifier = Modifier.size(36.dp),
                                     shape = CircleShape,
-                                    color = MeldColors.PureWhite,
-                                    border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                                    color = colors.surface,
+                                    border = BorderStroke(1.8.dp, colors.inkOnAccent)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
                                             imageVector = iconForTool(topRight),
                                             contentDescription = null,
-                                            tint = MeldColors.InkBlack,
+                                            tint = colors.textPrimary,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -502,14 +504,14 @@ fun MeldStudioHomeScreen(
                                 Text(
                                     text = topRight.title,
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = MeldColors.InkBlack
+                                    color = colors.inkOnAccent
                                 )
                             }
                         }
 
                         val bottomRight = quickTriple.third
                         TactileCard(
-                            backgroundColor = MeldColors.PeriwinkleBlue,
+                            backgroundColor = colors.periwinkle,
                             cornerRadius = 22.dp,
                             onClick = { onOpenTask(bottomRight) },
                             modifier = Modifier
@@ -533,14 +535,14 @@ fun MeldStudioHomeScreen(
                                 Surface(
                                     modifier = Modifier.size(36.dp),
                                     shape = CircleShape,
-                                    color = MeldColors.PureWhite,
-                                    border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                                    color = colors.surface,
+                                    border = BorderStroke(1.8.dp, colors.inkOnAccent)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
                                             imageVector = iconForTool(bottomRight),
                                             contentDescription = null,
-                                            tint = MeldColors.InkBlack,
+                                            tint = colors.textPrimary,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -548,7 +550,7 @@ fun MeldStudioHomeScreen(
                                 Text(
                                     text = bottomRight.title,
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = MeldColors.InkBlack
+                                    color = colors.inkOnAccent
                                 )
                             }
                         }
@@ -565,14 +567,14 @@ fun MeldStudioHomeScreen(
             }
             if (moreTools.isNotEmpty()) {
                 val tints = listOf(
-                    MeldColors.SoftLavender, MeldColors.PeachCream,
-                    MeldColors.PeriwinkleBlue, MeldColors.MintSage
+                    colors.lavender, colors.peach,
+                    colors.periwinkle, colors.mint
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
                         text = "More for this file",
                         style = MaterialTheme.typography.headlineSmall,
-                        color = MeldColors.InkBlack
+                        color = colors.textPrimary
                     )
                     moreTools.chunked(2).forEachIndexed { rowIdx, pair ->
                         Row(
@@ -596,14 +598,14 @@ fun MeldStudioHomeScreen(
                                         Icon(
                                             imageVector = iconForTool(tool),
                                             contentDescription = null,
-                                            tint = MeldColors.InkBlack,
+                                            tint = colors.inkOnAccent,
                                             modifier = Modifier.size(22.dp)
                                         )
                                         Spacer(modifier = Modifier.width(10.dp))
                                         Text(
                                             text = tool.title,
                                             style = MaterialTheme.typography.titleMedium,
-                                            color = MeldColors.InkBlack,
+                                            color = colors.inkOnAccent,
                                             maxLines = 2,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -622,7 +624,7 @@ fun MeldStudioHomeScreen(
             item {
                 val recT = if (!openingDriver.showOverlay) 1f else openingDriver.recAnim.value
                 TactileCard(
-                    backgroundColor = MeldColors.PureWhite,
+                    backgroundColor = colors.surface,
                     cornerRadius = 22.dp,
                     onClick = { onOpenResult(latest) },
                     modifier = Modifier
@@ -641,7 +643,7 @@ fun MeldStudioHomeScreen(
                         Icon(
                             imageVector = iconForTool(latest.tool),
                             contentDescription = null,
-                            tint = MeldColors.InkBlack,
+                            tint = colors.textPrimary,
                             modifier = Modifier.size(26.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
@@ -649,21 +651,21 @@ fun MeldStudioHomeScreen(
                             Text(
                                 text = latest.tool.title + " · " + latest.outputFile.extension.uppercase(),
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MeldColors.InkBlack,
+                                color = colors.textPrimary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
                                 text = "${SelectedFileInfo.formatByteCount(latest.outputSizeBytes)} · just now",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-                                color = MeldColors.TextSecondary
+                                color = colors.textSecondary
                             )
                         }
                         TactileCircleIconButton(
                             icon = Icons.Default.IosShare,
                             contentDescription = "Share result",
                             onClick = { onShareFile(latest.outputFile) },
-                            backgroundColor = MeldColors.PureWhite,
+                            backgroundColor = colors.surface,
                             size = 40.dp
                         )
                     }
@@ -682,6 +684,7 @@ fun MeldAllToolsScreen(
     onOpenTask: (MeldToolId) -> Unit,
     onOpenChangeFile: () -> Unit
 ) {
+    val colors = meldColors
     val filtered = remember(uiState.selectedMode, uiState.selectedCategory, uiState.searchQuery) {
         val q = uiState.searchQuery.trim().lowercase()
         MeldToolId.entries.filter { tool ->
@@ -692,11 +695,11 @@ fun MeldAllToolsScreen(
     }
 
     val pastelCycle = listOf(
-        MeldColors.PureWhite,
-        MeldColors.MintSage,
-        MeldColors.ButterYellow,
-        MeldColors.PeriwinkleBlue,
-        MeldColors.SoftLavender
+        colors.surface to true,
+        colors.mint to false,
+        colors.butter to false,
+        colors.periwinkle to false,
+        colors.lavender to false
     )
 
     LazyColumn(
@@ -714,12 +717,12 @@ fun MeldAllToolsScreen(
                     Text(
                         text = "All tools.",
                         style = MaterialTheme.typography.displayMedium,
-                        color = MeldColors.InkBlack
+                        color = colors.textPrimary
                     )
                     Text(
                         text = "Working on ${uiState.selectedFile?.cleanTitle ?: "sample file"}",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MeldColors.TextSecondary
+                        color = colors.textSecondary
                     )
                 }
                 Surface(
@@ -727,13 +730,13 @@ fun MeldAllToolsScreen(
                         .clip(CircleShape)
                         .clickable { onOpenChangeFile() },
                     shape = CircleShape,
-                    color = MeldColors.CoralOrange,
-                    border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+                    color = colors.coral,
+                    border = BorderStroke(MeldDimens.StrokeWidth, colors.border)
                 ) {
                     Text(
                         text = "Change file",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MeldColors.InkBlack,
+                        color = colors.inkOnAccent,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                     )
@@ -751,7 +754,7 @@ fun MeldAllToolsScreen(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = null,
-                        tint = MeldColors.InkBlack
+                        tint = colors.textPrimary
                     )
                 },
                 trailingIcon = if (uiState.searchQuery.isNotEmpty()) {
@@ -760,7 +763,7 @@ fun MeldAllToolsScreen(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = "Clear search",
-                                tint = MeldColors.InkBlack
+                                tint = colors.textPrimary
                             )
                         }
                     }
@@ -768,10 +771,15 @@ fun MeldAllToolsScreen(
                 singleLine = true,
                 shape = CircleShape,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = MeldColors.PureWhite,
-                    unfocusedContainerColor = MeldColors.PureWhite,
-                    focusedBorderColor = MeldColors.InkBlack,
-                    unfocusedBorderColor = MeldColors.InkBlack
+                    focusedContainerColor = colors.surface,
+                    unfocusedContainerColor = colors.surface,
+                    focusedBorderColor = colors.border,
+                    unfocusedBorderColor = colors.border,
+                    focusedTextColor = colors.textPrimary,
+                    unfocusedTextColor = colors.textPrimary,
+                    focusedPlaceholderColor = colors.textSecondary,
+                    unfocusedPlaceholderColor = colors.textSecondary,
+                    cursorColor = colors.coral
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -816,8 +824,8 @@ fun MeldAllToolsScreen(
             ) {
                 if (filtered.isEmpty()) {
                     TactileCard(
-                        backgroundColor = MeldColors.PureWhite,
-                        cornerRadius = MeldColors.CardCorner,
+                        backgroundColor = colors.surface,
+                        cornerRadius = MeldDimens.CardCorner,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -830,12 +838,12 @@ fun MeldAllToolsScreen(
                             Text(
                                 text = "No matching tools",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = MeldColors.InkBlack
+                                color = colors.textPrimary
                             )
                             Text(
                                 text = "Try another keyword or clear your filters.",
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MeldColors.TextSecondary
+                                color = colors.textSecondary
                             )
                             TactileChipPill(
                                 label = "Reset filters",
@@ -855,7 +863,11 @@ fun MeldAllToolsScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         pair.forEachIndexed { colIdx, tool ->
-                            val bg = pastelCycle[(rowIdx * 2 + colIdx) % pastelCycle.size]
+                            val (bg, isNeutral) = pastelCycle[(rowIdx * 2 + colIdx) % pastelCycle.size]
+                            val cardInk = if (isNeutral) colors.textPrimary else colors.inkOnAccent
+                            val cardSubInk = if (isNeutral) colors.textSecondary else colors.inkOnAccent.copy(alpha = 0.85f)
+                            val innerChipBg = if (isNeutral) colors.warmSurface else colors.surface
+                            val innerChipBorder = if (isNeutral) colors.border else colors.inkOnAccent
                             TactileCard(
                                 backgroundColor = bg,
                                 cornerRadius = 22.dp,
@@ -876,28 +888,28 @@ fun MeldAllToolsScreen(
                                         Surface(
                                             modifier = Modifier.size(34.dp),
                                             shape = CircleShape,
-                                            color = MeldColors.PureWhite,
-                                            border = BorderStroke(1.5.dp, MeldColors.InkBlack)
+                                            color = innerChipBg,
+                                            border = BorderStroke(1.5.dp, innerChipBorder)
                                         ) {
                                             Box(contentAlignment = Alignment.Center) {
                                                 Icon(
                                                     imageVector = iconForTool(tool),
                                                     contentDescription = null,
-                                                    tint = MeldColors.InkBlack,
+                                                    tint = colors.textPrimary,
                                                     modifier = Modifier.size(16.dp)
                                                 )
                                             }
                                         }
                                         Surface(
                                             shape = CircleShape,
-                                            color = MeldColors.PureWhite.copy(alpha = 0.85f),
-                                            border = BorderStroke(1.2.dp, MeldColors.InkBlack)
+                                            color = innerChipBg,
+                                            border = BorderStroke(1.2.dp, innerChipBorder)
                                         ) {
                                             Text(
                                                 text = tool.badge,
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontSize = 12.sp,
-                                                color = MeldColors.InkBlack,
+                                                color = colors.textPrimary,
                                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                             )
                                         }
@@ -905,14 +917,14 @@ fun MeldAllToolsScreen(
                                     Text(
                                         text = tool.title,
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = MeldColors.InkBlack,
+                                        color = cardInk,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = tool.subtitle,
                                         style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 16.sp),
-                                        color = MeldColors.InkBlack.copy(alpha = 0.78f),
+                                        color = cardSubInk,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -937,6 +949,7 @@ fun MeldSettingsScreen(
     onUpdateDefaultHandout: (Int) -> Unit,
     onReplayIntro: () -> Unit
 ) {
+    val colors = meldColors
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 136.dp),
@@ -947,12 +960,12 @@ fun MeldSettingsScreen(
                 Text(
                     text = "Preferences.",
                     style = MaterialTheme.typography.displayMedium,
-                    color = MeldColors.InkBlack
+                    color = colors.textPrimary
                 )
                 Text(
                     text = "Local rules and how MELD handles your files",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MeldColors.TextSecondary
+                    color = colors.textSecondary
                 )
             }
         }
@@ -961,7 +974,7 @@ fun MeldSettingsScreen(
 
         item {
             TactileCard(
-                backgroundColor = MeldColors.MintSage,
+                backgroundColor = colors.mint,
                 cornerRadius = 24.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -972,14 +985,14 @@ fun MeldSettingsScreen(
                     Surface(
                         modifier = Modifier.size(42.dp),
                         shape = CircleShape,
-                        color = MeldColors.PureWhite,
-                        border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                        color = colors.surface,
+                        border = BorderStroke(1.8.dp, colors.inkOnAccent)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Lock,
                                 contentDescription = null,
-                                tint = MeldColors.InkBlack
+                                tint = colors.textPrimary
                             )
                         }
                     }
@@ -988,12 +1001,12 @@ fun MeldSettingsScreen(
                         Text(
                             text = "100% On-device promise",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MeldColors.InkBlack
+                            color = colors.inkOnAccent
                         )
                         Text(
                             text = "MELD requests zero internet permission. Your documents never touch a server.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MeldColors.InkBlack.copy(alpha = 0.85f)
+                            color = colors.inkOnAccent.copy(alpha = 0.85f)
                         )
                     }
                 }
@@ -1004,7 +1017,7 @@ fun MeldSettingsScreen(
 
         item {
             TactileCard(
-                backgroundColor = MeldColors.PureWhite,
+                backgroundColor = colors.surface,
                 cornerRadius = 22.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -1024,7 +1037,7 @@ fun MeldSettingsScreen(
                         Text(
                             text = "Save directly to Downloads/MELD",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MeldColors.InkBlack
+                            color = colors.textPrimary
                         )
                         Text(
                             text = if (uiState.defaultSaveToDownloads) {
@@ -1033,15 +1046,19 @@ fun MeldSettingsScreen(
                                 "Off: files stay private inside MELD until you tap Save."
                             },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MeldColors.TextSecondary
+                            color = colors.textSecondary
                         )
                     }
                     Switch(
                         checked = uiState.defaultSaveToDownloads,
                         onCheckedChange = null,
                         colors = SwitchDefaults.colors(
-                            checkedThumbColor = MeldColors.PureWhite,
-                            checkedTrackColor = MeldColors.CoralOrange
+                            checkedThumbColor = colors.inkOnAccent,
+                            checkedTrackColor = colors.coral,
+                            checkedBorderColor = colors.border,
+                            uncheckedThumbColor = colors.textSecondary,
+                            uncheckedTrackColor = colors.warmSurface,
+                            uncheckedBorderColor = colors.border
                         )
                     )
                 }
@@ -1050,7 +1067,7 @@ fun MeldSettingsScreen(
 
         item {
             TactileCard(
-                backgroundColor = MeldColors.PureWhite,
+                backgroundColor = colors.surface,
                 cornerRadius = 22.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -1061,7 +1078,7 @@ fun MeldSettingsScreen(
                     Text(
                         text = "Default Study Handout Layout",
                         style = MaterialTheme.typography.titleMedium,
-                        color = MeldColors.InkBlack
+                        color = colors.textPrimary
                     )
                     Row(
                         modifier = Modifier
@@ -1085,7 +1102,7 @@ fun MeldSettingsScreen(
 
         item {
             TactileCard(
-                backgroundColor = MeldColors.ButterYellow,
+                backgroundColor = colors.butter,
                 cornerRadius = 22.dp,
                 onClick = onReplayIntro,
                 modifier = Modifier.fillMaxWidth()
@@ -1099,14 +1116,14 @@ fun MeldSettingsScreen(
                     Surface(
                         modifier = Modifier.size(40.dp),
                         shape = CircleShape,
-                        color = MeldColors.PureWhite,
-                        border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                        color = colors.surface,
+                        border = BorderStroke(1.8.dp, colors.inkOnAccent)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.PlayArrow,
                                 contentDescription = null,
-                                tint = MeldColors.InkBlack
+                                tint = colors.textPrimary
                             )
                         }
                     }
@@ -1115,12 +1132,12 @@ fun MeldSettingsScreen(
                         Text(
                             text = "Replay Opening Animation",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MeldColors.InkBlack
+                            color = colors.inkOnAccent
                         )
                         Text(
                             text = "Watch the MELD sheet fold & dock choreography",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MeldColors.InkBlack.copy(alpha = 0.8f)
+                            color = colors.inkOnAccent.copy(alpha = 0.85f)
                         )
                     }
                 }
@@ -1131,7 +1148,7 @@ fun MeldSettingsScreen(
 
         item {
             TactileCard(
-                backgroundColor = MeldColors.WarmSurface,
+                backgroundColor = colors.warmSurface,
                 cornerRadius = 22.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -1139,13 +1156,13 @@ fun MeldSettingsScreen(
                     Text(
                         text = "MELD for Android v${BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.titleMedium,
-                        color = MeldColors.InkBlack
+                        color = colors.textPrimary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "${MeldToolId.entries.size} local utility engines • Open source under github.com/meld-app",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MeldColors.TextSecondary
+                        color = colors.textSecondary
                     )
                 }
             }
@@ -1158,7 +1175,7 @@ private fun PrefsSectionLabel(text: String) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
-        color = MeldColors.TextSecondary,
+        color = meldColors.textSecondary,
         modifier = Modifier
             .padding(top = 6.dp, start = 4.dp)
             .semantics { heading() }
@@ -1172,6 +1189,7 @@ fun MeldFloatingBottomDock(
     onSelectTab: (DockTab) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = meldColors
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
     val reduceMotion = rememberReduceMotion()
@@ -1187,8 +1205,8 @@ fun MeldFloatingBottomDock(
             }
             .padding(horizontal = 20.dp, vertical = 14.dp),
         shape = CircleShape,
-        color = MeldColors.DockInk,
-        border = BorderStroke(2.dp, MeldColors.InkBlack),
+        color = colors.dockBg,
+        border = BorderStroke(2.dp, colors.dockBorder),
         shadowElevation = 8.dp
     ) {
         Row(
@@ -1206,7 +1224,7 @@ fun MeldFloatingBottomDock(
             items.forEach { (tab, label, icon) ->
                 val selected = tab == activeTab
                 val pillBg by animateColorAsState(
-                    targetValue = if (selected) MeldColors.CoralOrange else Color.Transparent,
+                    targetValue = if (selected) colors.dockSelectedBg else Color.Transparent,
                     animationSpec = MeldMotion.snapSpring(),
                     label = "dockPillBg"
                 )
@@ -1242,7 +1260,7 @@ fun MeldFloatingBottomDock(
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = if (selected) MeldColors.InkBlack else MeldColors.PureWhite.copy(alpha = 0.85f),
+                            tint = if (selected) colors.dockSelectedContent else colors.dockUnselectedContent,
                             modifier = Modifier
                                 .size(22.dp)
                                 .graphicsLayer {
@@ -1254,7 +1272,7 @@ fun MeldFloatingBottomDock(
                             text = label,
                             fontSize = 12.sp,
                             fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                            color = if (selected) MeldColors.InkBlack else MeldColors.PureWhite.copy(alpha = 0.85f),
+                            color = if (selected) colors.dockSelectedContent else colors.dockUnselectedContent,
                             maxLines = 1
                         )
                     }
@@ -1271,9 +1289,10 @@ fun MeldChangeFileBottomSheet(
     onBrowseStorage: () -> Unit,
     onPickSample: (SamplePreset) -> Unit
 ) {
+    val colors = meldColors
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MeldColors.CreamCanvas
+        containerColor = colors.canvas
     ) {
         Column(
             modifier = Modifier
@@ -1285,11 +1304,11 @@ fun MeldChangeFileBottomSheet(
             Text(
                 text = "Pick a file to work on",
                 style = MaterialTheme.typography.headlineSmall,
-                color = MeldColors.InkBlack
+                color = colors.textPrimary
             )
 
             TactileCard(
-                backgroundColor = MeldColors.CoralOrange,
+                backgroundColor = colors.coral,
                 cornerRadius = 20.dp,
                 onClick = onBrowseStorage,
                 modifier = Modifier.fillMaxWidth()
@@ -1301,14 +1320,14 @@ fun MeldChangeFileBottomSheet(
                     Surface(
                         modifier = Modifier.size(40.dp),
                         shape = CircleShape,
-                        color = MeldColors.PureWhite,
-                        border = BorderStroke(1.8.dp, MeldColors.InkBlack)
+                        color = colors.surface,
+                        border = BorderStroke(1.8.dp, colors.inkOnAccent)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.FolderOpen,
                                 contentDescription = null,
-                                tint = MeldColors.InkBlack
+                                tint = colors.textPrimary
                             )
                         }
                     }
@@ -1317,12 +1336,12 @@ fun MeldChangeFileBottomSheet(
                         Text(
                             text = "Browse phone storage",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MeldColors.InkBlack
+                            color = colors.inkOnAccent
                         )
                         Text(
                             text = "Pick any PDF, image, audio, or CSV",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MeldColors.InkBlack.copy(alpha = 0.8f)
+                            color = colors.inkOnAccent.copy(alpha = 0.85f)
                         )
                     }
                 }
@@ -1331,7 +1350,7 @@ fun MeldChangeFileBottomSheet(
             Text(
                 text = "Or try a built-in studio sample:",
                 style = MaterialTheme.typography.labelMedium,
-                color = MeldColors.TextSecondary
+                color = colors.textSecondary
             )
 
             SamplePreset.entries.chunked(2).forEach { pair ->
@@ -1341,7 +1360,7 @@ fun MeldChangeFileBottomSheet(
                 ) {
                     pair.forEach { preset ->
                         TactileCard(
-                            backgroundColor = MeldColors.PureWhite,
+                            backgroundColor = colors.surface,
                             cornerRadius = 18.dp,
                             onClick = { onPickSample(preset) },
                             modifier = Modifier.weight(1f)
@@ -1351,12 +1370,12 @@ fun MeldChangeFileBottomSheet(
                                     text = preset.label,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontSize = 14.sp,
-                                    color = MeldColors.InkBlack
+                                    color = colors.textPrimary
                                 )
                                 Text(
                                     text = preset.badge,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MeldColors.CoralOrange
+                                    color = colors.stageLaserRed
                                 )
                             }
                         }
