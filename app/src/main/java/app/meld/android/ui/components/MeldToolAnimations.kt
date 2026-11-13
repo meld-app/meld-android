@@ -1,5 +1,8 @@
 package app.meld.android.ui.components
 
+import androidx.compose.ui.res.stringResource
+import app.meld.android.R
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -364,7 +367,7 @@ fun CompressionRatioPill(
                 )
             }
             Text(
-                text = "-$pctSaved%",
+                text = stringResource(R.string.negative_percent_value, pctSaved),
                 style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                 color = colors.textPrimary,
                 fontWeight = FontWeight.ExtraBold
@@ -503,7 +506,7 @@ fun CompressPlatesStage(
                     border = BorderStroke(1.6.dp, colors.border)
                 ) {
                     Text(
-                        text = "$targetKb KB",
+                        text = stringResource(R.string.kb_value_format, targetKb),
                         style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum"),
                         color = colors.inkOnAccent,
                         modifier = Modifier.padding(horizontal = 13.dp, vertical = 3.dp)
@@ -737,13 +740,13 @@ fun SplitPageSpreadStage(
 
             Spacer(modifier = Modifier.height(14.dp))
             Text(
-                text = "EXTRACT RANGE",
+                text = stringResource(R.string.extract_range_label),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.inkOnAccent.copy(alpha = 0.85f)
             )
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "Pages $startPage to $endPage",
+                text = stringResource(R.string.pages_range_format, startPage, endPage),
                 style = MaterialTheme.typography.headlineLarge.copy(fontFeatureSettings = "tnum"),
                 color = colors.inkOnAccent
             )
@@ -791,7 +794,7 @@ fun SplitPageSpreadStage(
                                     .background(if (selected) colors.coral else colors.inkOnAccent.copy(alpha = 0.35f))
                             )
                             Text(
-                                text = "P$page",
+                                text = stringResource(R.string.page_tile_short, page),
                                 style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                                 fontWeight = FontWeight.ExtraBold,
                                 color = if (selected) colors.textPrimary else colors.inkOnAccent
@@ -874,7 +877,7 @@ fun StampSlamPreview(
                         border = BorderStroke(2.2.dp, colors.stageLaserRed)
                     ) {
                         Text(
-                            text = stampText.ifBlank { "LOCKED" }.uppercase(),
+                            text = stampText.ifBlank { stringResource(R.string.watermark_locked_fallback) }.uppercase(),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = 1.2.sp,
@@ -1044,7 +1047,7 @@ fun ResizeFrameStage(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(
-                    text = "$percent%",
+                    text = stringResource(R.string.percent_value, percent),
                     style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum"),
                     color = colors.inkOnAccent
                 )
@@ -1141,7 +1144,7 @@ fun SpecializedToolShowcaseCard(
     modifier: Modifier = Modifier
 ) {
     val colors = meldColors
-    val sourceExt = (file?.extension?.takeIf { it.isNotBlank() } ?: "FILE").uppercase()
+    val sourceExt = (file?.extension?.takeIf { it.isNotBlank() } ?: stringResource(R.string.stage_badge_file)).uppercase()
     val cardColor = when (tool.outputExtension) {
         "pdf" -> colors.periwinkle
         "png", "jpg", "webp", "bmp", "tiff" -> colors.butter
@@ -1188,12 +1191,12 @@ fun SpecializedToolShowcaseCard(
 
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = tool.subtitle,
+                    text = stringResource(tool.subtitleRes),
                     style = MaterialTheme.typography.headlineSmall,
                     color = colors.inkOnAccent
                 )
                 Text(
-                    text = "Runs completely offline on your phone · Tap stage to replay.",
+                    text = stringResource(R.string.stage_hint_offline),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.inkOnAccent.copy(alpha = 0.85f)
                 )
@@ -1792,7 +1795,7 @@ private fun AudioWaveformStage() {
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = "LIVE STUDIO WAVEFORM",
+                text = stringResource(R.string.stage_live_waveform),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.butter
             )
@@ -1825,7 +1828,7 @@ private fun AudioWaveformStage() {
                 }
             }
             Text(
-                text = "1920×600 PNG waveform render",
+                text = stringResource(R.string.stage_waveform_res),
                 style = MaterialTheme.typography.labelSmall,
                 color = colors.terminalText.copy(alpha = 0.8f)
             )
@@ -1861,7 +1864,7 @@ private fun SpeedRaceStage() {
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
-                    text = "2.0x DOUBLE TEMPO STREAM",
+                    text = stringResource(R.string.stage_double_tempo),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.ExtraBold,
                     color = colors.textPrimary

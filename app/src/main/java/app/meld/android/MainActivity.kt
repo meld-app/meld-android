@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.FileProvider
 import androidx.core.content.IntentCompat
+import app.meld.android.R
 import app.meld.android.ui.MeldAppRoot
 import app.meld.android.ui.MeldViewModel
 import app.meld.android.ui.theme.MeldTheme
@@ -164,7 +165,7 @@ class MainActivity : ComponentActivity() {
                 putExtra(Intent.EXTRA_STREAM, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            startActivity(Intent.createChooser(shareIntent, "Share MELD Output"))
+            startActivity(Intent.createChooser(shareIntent, getString(R.string.share_chooser_title)))
         }
     }
 }

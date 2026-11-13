@@ -1,5 +1,8 @@
 package app.meld.android.ui.screens
 
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
@@ -151,14 +154,16 @@ fun MeldStudioHomeScreen(
     val density = LocalDensity.current
     val fontScale = density.fontScale
     val largeFont = MeldAdaptiveLayout.isLargeFontScale(fontScale)
-    val greeting = remember {
-        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        when {
-            hour < 12 -> "Good morning."
-            hour < 17 -> "Good afternoon."
-            else -> "Good evening."
+    val greeting = stringResource(
+        remember {
+            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            when {
+                hour < 12 -> R.string.greeting_morning
+                hour < 17 -> R.string.greeting_afternoon
+                else -> R.string.greeting_evening
+            }
         }
-    }
+    )
 
     val ext = uiState.selectedFile?.extension?.lowercase() ?: "pdf"
     val quickTriple: Triple<MeldToolId, MeldToolId, MeldToolId> = remember(ext) {
@@ -206,14 +211,14 @@ fun MeldStudioHomeScreen(
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.meld_logo),
-                            contentDescription = "meld",
+                            contentDescription = stringResource(R.string.brand_wordmark),
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "meld",
+                        text = stringResource(R.string.brand_wordmark),
                         style = MaterialTheme.typography.headlineLarge,
                         fontWeight = FontWeight.ExtraBold,
                         color = colors.textPrimary
@@ -241,7 +246,7 @@ fun MeldStudioHomeScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Works offline",
+                            text = stringResource(R.string.works_offline),
                             style = MaterialTheme.typography.labelMedium,
                             color = colors.textPrimary,
                             maxLines = 1,
@@ -286,7 +291,7 @@ fun MeldStudioHomeScreen(
                     }
                 )
                 Text(
-                    text = "What needs sorting today?",
+                    text = stringResource(R.string.home_subtitle_prompt),
                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 16.sp),
                     color = colors.textSecondary,
                     modifier = Modifier.graphicsLayer {
@@ -345,14 +350,14 @@ fun MeldStudioHomeScreen(
                         Spacer(modifier = Modifier.width(20.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "WORKING ON",
+                                text = stringResource(R.string.working_on_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = colors.inkOnAccent.copy(alpha = 0.85f)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = file?.cleanTitle ?: "Lecture Deck",
+                                text = file?.cleanTitle ?: stringResource(R.string.default_lecture_deck),
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = colors.inkOnAccent,
                                 maxLines = if (largeFont) 2 else 1,
@@ -360,7 +365,7 @@ fun MeldStudioHomeScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = file?.formattedMetaLine ?: "Tap Change file to pick one",
+                                text = file?.localizedMetaLine() ?: stringResource(R.string.tap_change_file_hint),
                                 style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
                                 color = colors.inkOnAccent.copy(alpha = 0.88f)
                             )
@@ -374,7 +379,7 @@ fun MeldStudioHomeScreen(
                                 border = BorderStroke(MeldDimens.StrokeWidth, colors.inkOnAccent)
                             ) {
                                 Text(
-                                    text = "Change file",
+                                    text = stringResource(R.string.change_file),
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = colors.textPrimary,
@@ -406,12 +411,12 @@ fun MeldStudioHomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Quick tools",
+                        text = stringResource(R.string.quick_tools_heading),
                         style = MaterialTheme.typography.headlineSmall,
                         color = colors.textPrimary
                     )
                     Text(
-                        text = "All ${MeldToolId.entries.size}",
+                        text = stringResource(R.string.all_tools_count, MeldToolId.entries.size),
                         style = MaterialTheme.typography.labelMedium.copy(
                             textDecoration = TextDecoration.Underline
                         ),
@@ -582,7 +587,7 @@ fun MeldStudioHomeScreen(
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            text = "More for this file",
+                            text = stringResource(R.string.more_for_file_heading),
                             style = MaterialTheme.typography.headlineSmall,
                             color = colors.textPrimary
                         )
@@ -617,7 +622,7 @@ fun MeldStudioHomeScreen(
                                             )
                                             Spacer(modifier = Modifier.width(10.dp))
                                             Text(
-                                                text = tool.title,
+                                                text = stringResource(tool.titleRes),
                                                 style = MaterialTheme.typography.titleMedium,
                                                 color = colors.inkOnAccent,
                                                 maxLines = if (largeFont) Int.MAX_VALUE else 2,
@@ -666,21 +671,28 @@ fun MeldStudioHomeScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = latest.tool.title + " · " + latest.outputFile.extension.uppercase(),
+                                text = stringResource(
+                                    R.string.recent_title_with_ext,
+                                    stringResource(latest.tool.titleRes),
+                                    latest.outputFile.extension.uppercase()
+                                ),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = colors.textPrimary,
                                 maxLines = if (largeFont) 2 else 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "${SelectedFileInfo.formatByteCount(latest.outputSizeBytes)} · just now",
+                                text = stringResource(
+                                    R.string.recent_result_meta,
+                                    SelectedFileInfo.formatByteCount(latest.outputSizeBytes)
+                                ),
                                 style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
                                 color = colors.textSecondary
                             )
                         }
                         TactileCircleIconButton(
                             icon = Icons.Default.IosShare,
-                            contentDescription = "Share result",
+                            contentDescription = stringResource(R.string.cd_share_result),
                             onClick = { onShareFile(latest.outputFile) },
                             backgroundColor = colors.surface,
                             size = 40.dp
@@ -737,13 +749,13 @@ private fun QuickToolBentoCard(
             if (isPrimary) {
                 Column {
                     Text(
-                        text = tool.title,
+                        text = stringResource(tool.titleRes),
                         style = MaterialTheme.typography.headlineSmall,
                         color = colors.inkOnAccent
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = tool.subtitle,
+                        text = stringResource(tool.subtitleRes),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.inkOnAccent.copy(alpha = 0.85f),
                         maxLines = if (fillHeight) 3 else Int.MAX_VALUE,
@@ -752,7 +764,7 @@ private fun QuickToolBentoCard(
                 }
             } else {
                 Text(
-                    text = tool.title,
+                    text = stringResource(tool.titleRes),
                     style = MaterialTheme.typography.titleMedium,
                     color = colors.inkOnAccent
                 )
@@ -799,12 +811,12 @@ private fun QuickToolCompactRowCard(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = tool.title,
+                    text = stringResource(tool.titleRes),
                     style = MaterialTheme.typography.titleMedium,
                     color = colors.inkOnAccent
                 )
                 Text(
-                    text = tool.subtitle,
+                    text = stringResource(tool.subtitleRes),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.inkOnAccent.copy(alpha = 0.85f)
                 )
@@ -826,14 +838,18 @@ fun MeldAllToolsScreen(
     contentBottomPadding: Dp = 136.dp
 ) {
     val colors = meldColors
+    val context = LocalContext.current
     val fontScale = LocalDensity.current.fontScale
     val largeFont = MeldAdaptiveLayout.isLargeFontScale(fontScale)
-    val filtered = remember(uiState.selectedMode, uiState.selectedCategory, uiState.searchQuery) {
+    val filtered = remember(uiState.selectedMode, uiState.selectedCategory, uiState.searchQuery, context) {
         val q = uiState.searchQuery.trim().lowercase()
         MeldToolId.entries.filter { tool ->
             (uiState.selectedMode == MeldMode.ALL || tool.mode == uiState.selectedMode) &&
                 (uiState.selectedCategory == MeldCategory.ALL || tool.category == uiState.selectedCategory) &&
-                (q.isEmpty() || tool.title.lowercase().contains(q) || tool.subtitle.lowercase().contains(q) || tool.badge.lowercase().contains(q))
+                (q.isEmpty() ||
+                    context.getString(tool.titleRes).lowercase().contains(q) ||
+                    context.getString(tool.subtitleRes).lowercase().contains(q) ||
+                    context.getString(tool.badgeRes).lowercase().contains(q))
         }
     }
 
@@ -854,12 +870,15 @@ fun MeldAllToolsScreen(
             val titleBlock: @Composable (Modifier) -> Unit = { mod ->
                 Column(modifier = mod) {
                     Text(
-                        text = "All tools.",
+                        text = stringResource(R.string.all_tools_heading),
                         style = MaterialTheme.typography.displayMedium,
                         color = colors.textPrimary
                     )
                     Text(
-                        text = "Working on ${uiState.selectedFile?.cleanTitle ?: "sample file"}",
+                        text = stringResource(
+                            R.string.working_on_inline,
+                            uiState.selectedFile?.cleanTitle ?: stringResource(R.string.sample_file_fallback)
+                        ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.textSecondary
                     )
@@ -875,7 +894,7 @@ fun MeldAllToolsScreen(
                     border = BorderStroke(MeldDimens.StrokeWidth, colors.border)
                 ) {
                     Text(
-                        text = "Change file",
+                        text = stringResource(R.string.change_file),
                         style = MaterialTheme.typography.labelMedium,
                         color = colors.inkOnAccent,
                         fontWeight = FontWeight.Bold,
@@ -915,7 +934,7 @@ fun MeldAllToolsScreen(
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = onSearchChange,
-                placeholder = { Text("Find PDF, PNG, Word, Markdown, Remove BG...") },
+                placeholder = { Text(stringResource(R.string.search_tools_placeholder)) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -928,7 +947,7 @@ fun MeldAllToolsScreen(
                         IconButton(onClick = { onSearchChange("") }) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Clear search",
+                                contentDescription = stringResource(R.string.cd_clear_search),
                                 tint = colors.textPrimary
                             )
                         }
@@ -956,7 +975,7 @@ fun MeldAllToolsScreen(
             MeldAdaptiveChipRow {
                 MeldMode.entries.forEach { mode ->
                     TactileChipPill(
-                        label = mode.label,
+                        label = stringResource(mode.labelRes),
                         selected = uiState.selectedMode == mode,
                         onClick = { onSelectMode(mode) }
                     )
@@ -969,7 +988,7 @@ fun MeldAllToolsScreen(
             MeldAdaptiveChipRow {
                 MeldCategory.entries.forEach { cat ->
                     TactileChipPill(
-                        label = cat.label,
+                        label = stringResource(cat.labelRes),
                         selected = uiState.selectedCategory == cat,
                         onClick = { onSelectCategory(cat) }
                     )
@@ -997,17 +1016,17 @@ fun MeldAllToolsScreen(
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
-                                text = "No matching tools",
+                                text = stringResource(R.string.no_matching_tools_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = colors.textPrimary
                             )
                             Text(
-                                text = "Try another keyword or clear your filters.",
+                                text = stringResource(R.string.no_matching_tools_subtitle),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = colors.textSecondary
                             )
                             TactileChipPill(
-                                label = "Reset filters",
+                                label = stringResource(R.string.reset_filters),
                                 selected = true,
                                 onClick = {
                                     onSelectMode(MeldMode.ALL)
@@ -1075,7 +1094,7 @@ fun MeldAllToolsScreen(
                                                         border = BorderStroke(1.2.dp, innerChipBorder)
                                                     ) {
                                                         Text(
-                                                            text = tool.badge,
+                                                            text = stringResource(tool.badgeRes),
                                                             style = MaterialTheme.typography.labelSmall,
                                                             fontSize = 12.sp,
                                                             color = colors.textPrimary,
@@ -1084,14 +1103,14 @@ fun MeldAllToolsScreen(
                                                     }
                                                 }
                                                 Text(
-                                                    text = tool.title,
+                                                    text = stringResource(tool.titleRes),
                                                     style = MaterialTheme.typography.titleMedium,
                                                     color = cardInk,
                                                     maxLines = if (largeFont) Int.MAX_VALUE else 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Text(
-                                                    text = tool.subtitle,
+                                                    text = stringResource(tool.subtitleRes),
                                                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 16.sp),
                                                     color = cardSubInk,
                                                     maxLines = if (largeFont) Int.MAX_VALUE else 2,
@@ -1131,19 +1150,19 @@ fun MeldSettingsScreen(
         item {
             Column {
                 Text(
-                    text = "Preferences.",
+                    text = stringResource(R.string.prefs_heading),
                     style = MaterialTheme.typography.displayMedium,
                     color = colors.textPrimary
                 )
                 Text(
-                    text = "Local rules and how MELD handles your files",
+                    text = stringResource(R.string.prefs_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = colors.textSecondary
                 )
             }
         }
 
-        item { PrefsSectionLabel("PRIVACY") }
+        item { PrefsSectionLabel(stringResource(R.string.prefs_section_privacy)) }
 
         item {
             TactileCard(
@@ -1172,12 +1191,12 @@ fun MeldSettingsScreen(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(
-                            text = "100% On-device promise",
+                            text = stringResource(R.string.privacy_promise_title),
                             style = MaterialTheme.typography.titleMedium,
                             color = colors.inkOnAccent
                         )
                         Text(
-                            text = "MELD requests zero internet permission. Your documents never touch a server.",
+                            text = stringResource(R.string.privacy_promise_body),
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.inkOnAccent.copy(alpha = 0.85f)
                         )
@@ -1186,7 +1205,7 @@ fun MeldSettingsScreen(
             }
         }
 
-        item { PrefsSectionLabel("OUTPUT") }
+        item { PrefsSectionLabel(stringResource(R.string.prefs_section_output)) }
 
         item {
             TactileCard(
@@ -1212,15 +1231,15 @@ fun MeldSettingsScreen(
                             .padding(end = 12.dp)
                     ) {
                         Text(
-                            text = "Save directly to Downloads/MELD",
+                            text = stringResource(R.string.auto_downloads_title),
                             style = MaterialTheme.typography.titleMedium,
                             color = colors.textPrimary
                         )
                         Text(
                             text = if (uiState.defaultSaveToDownloads) {
-                                "On: every result is also copied to Downloads/MELD."
+                                stringResource(R.string.auto_downloads_on_desc)
                             } else {
-                                "Off: files stay private inside MELD until you tap Save."
+                                stringResource(R.string.auto_downloads_off_desc)
                             },
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.textSecondary
@@ -1253,14 +1272,18 @@ fun MeldSettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "Default Study Handout Layout",
+                        text = stringResource(R.string.default_handout_layout_title),
                         style = MaterialTheme.typography.titleMedium,
                         color = colors.textPrimary
                     )
                     MeldAdaptiveChipRow {
-                        listOf(2 to "2-up + notes", 3 to "3-up notes", 4 to "4-up grid").forEach { (n, label) ->
+                        listOf(
+                            2 to R.string.handout_2_up,
+                            3 to R.string.handout_3_up_short,
+                            4 to R.string.handout_4_up
+                        ).forEach { (n, labelRes) ->
                             TactileChipPill(
-                                label = label,
+                                label = stringResource(labelRes),
                                 selected = uiState.options.handoutPagesPerSheet == n,
                                 onClick = { onUpdateDefaultHandout(n) }
                             )
@@ -1270,7 +1293,7 @@ fun MeldSettingsScreen(
             }
         }
 
-        item { PrefsSectionLabel("EXPERIENCE") }
+        item { PrefsSectionLabel(stringResource(R.string.prefs_section_experience)) }
 
         item {
             TactileCard(
@@ -1302,12 +1325,12 @@ fun MeldSettingsScreen(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(
-                            text = "Replay Opening Animation",
+                            text = stringResource(R.string.replay_intro_title),
                             style = MaterialTheme.typography.titleMedium,
                             color = colors.inkOnAccent
                         )
                         Text(
-                            text = "Watch the MELD sheet fold & dock choreography",
+                            text = stringResource(R.string.replay_intro_subtitle),
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.inkOnAccent.copy(alpha = 0.85f)
                         )
@@ -1316,7 +1339,7 @@ fun MeldSettingsScreen(
             }
         }
 
-        item { PrefsSectionLabel("ABOUT") }
+        item { PrefsSectionLabel(stringResource(R.string.prefs_section_about)) }
 
         item {
             TactileCard(
@@ -1326,13 +1349,13 @@ fun MeldSettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
-                        text = "MELD for Android v${BuildConfig.VERSION_NAME}",
+                        text = stringResource(R.string.about_version_title, BuildConfig.VERSION_NAME),
                         style = MaterialTheme.typography.titleMedium,
                         color = colors.textPrimary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "${MeldToolId.entries.size} local utility engines • Open source under github.com/meld-app",
+                        text = stringResource(R.string.about_version_subtitle, MeldToolId.entries.size),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.textSecondary
                     )
@@ -1355,9 +1378,9 @@ private fun PrefsSectionLabel(text: String) {
 }
 
 private val MeldNavItems = listOf(
-    Triple(DockTab.STUDIO, "Studio", Icons.Default.GridView),
-    Triple(DockTab.ALL_TOOLS, "Tools", Icons.Default.Build),
-    Triple(DockTab.SETTINGS, "Prefs", Icons.Default.Tune)
+    Triple(DockTab.STUDIO, DockTab.STUDIO.labelRes, Icons.Default.GridView),
+    Triple(DockTab.ALL_TOOLS, DockTab.ALL_TOOLS.labelRes, Icons.Default.Build),
+    Triple(DockTab.SETTINGS, DockTab.SETTINGS.labelRes, Icons.Default.Tune)
 )
 
 @Composable
@@ -1466,10 +1489,10 @@ fun MeldFloatingBottomDock(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            MeldNavItems.forEach { (tab, label, icon) ->
+            MeldNavItems.forEach { (tab, labelRes, icon) ->
                 MeldNavTabPill(
                     tab = tab,
-                    label = label,
+                    label = stringResource(labelRes),
                     icon = icon,
                     activeTab = activeTab,
                     onSelectTab = onSelectTab,
@@ -1524,10 +1547,10 @@ fun MeldNavigationRail(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                MeldNavItems.forEach { (tab, label, icon) ->
+                MeldNavItems.forEach { (tab, labelRes, icon) ->
                     MeldNavTabPill(
                         tab = tab,
-                        label = label,
+                        label = stringResource(labelRes),
                         icon = icon,
                         activeTab = activeTab,
                         onSelectTab = onSelectTab,
@@ -1566,7 +1589,7 @@ fun MeldChangeFileBottomSheet(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
-                text = "Pick a file to work on",
+                text = stringResource(R.string.sheet_pick_file_title),
                 style = MaterialTheme.typography.headlineSmall,
                 color = colors.textPrimary
             )
@@ -1598,12 +1621,12 @@ fun MeldChangeFileBottomSheet(
                     Spacer(modifier = Modifier.width(14.dp))
                     Column {
                         Text(
-                            text = "Browse phone storage",
+                            text = stringResource(R.string.sheet_browse_title),
                             style = MaterialTheme.typography.titleMedium,
                             color = colors.inkOnAccent
                         )
                         Text(
-                            text = "Pick any PDF, image, audio, or CSV",
+                            text = stringResource(R.string.sheet_browse_subtitle),
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.inkOnAccent.copy(alpha = 0.85f)
                         )
@@ -1612,7 +1635,7 @@ fun MeldChangeFileBottomSheet(
             }
 
             Text(
-                text = "Or try a built-in studio sample:",
+                text = stringResource(R.string.sheet_try_sample_label),
                 style = MaterialTheme.typography.labelMedium,
                 color = colors.textSecondary
             )
@@ -1635,13 +1658,13 @@ fun MeldChangeFileBottomSheet(
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Text(
-                                    text = preset.label,
+                                    text = stringResource(preset.labelRes),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontSize = 14.sp,
                                     color = colors.textPrimary
                                 )
                                 Text(
-                                    text = preset.badge,
+                                    text = stringResource(preset.badgeRes),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = colors.stageLaserRed
                                 )

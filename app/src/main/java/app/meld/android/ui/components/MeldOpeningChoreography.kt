@@ -38,6 +38,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -394,14 +395,14 @@ fun MeldOpeningOverlay(
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.meld_logo),
-                    contentDescription = "meld",
+                    contentDescription = stringResource(R.string.brand_wordmark),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
             }
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                text = "meld",
+                text = stringResource(R.string.brand_wordmark),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = colors.textPrimary
@@ -418,7 +419,7 @@ fun MeldOpeningOverlay(
                 contentAlignment = Alignment.TopCenter
             ) {
                 Text(
-                    text = "TRANSFORM · CONVERT · ORGANIZE",
+                    text = stringResource(R.string.app_tagline),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 2.sp,

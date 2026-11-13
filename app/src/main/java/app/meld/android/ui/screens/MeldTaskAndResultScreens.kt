@@ -1,5 +1,9 @@
 package app.meld.android.ui.screens
 
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
+import app.meld.android.R
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -130,9 +134,13 @@ fun MeldTaskScreen(
     val options = uiState.options
     val usesSampleFallback = file != null && tool != MeldToolId.SCAN_QR && !tool.acceptsExtension(file.extension)
     val fileSubtitle = when {
-        tool == MeldToolId.SCAN_QR -> "Encodes text or URLs offline into an ISO QR card"
-        file != null -> "${file.cleanTitle} · ${file.formattedMetaLine}"
-        else -> "Built-in studio sample ready"
+        tool == MeldToolId.SCAN_QR -> stringResource(R.string.qr_task_subtitle)
+        file != null -> stringResource(
+            R.string.file_info_inline,
+            file.cleanTitle,
+            file.localizedMetaLine()
+        )
+        else -> stringResource(R.string.built_in_sample_ready)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -150,13 +158,13 @@ fun MeldTaskScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TactileCircleIconButton(
                             icon = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
+                            contentDescription = stringResource(R.string.cd_back),
                             onClick = onBack,
                             size = 44.dp
                         )
                         Spacer(modifier = Modifier.width(14.dp))
                         Text(
-                            text = tool.title,
+                            text = stringResource(tool.titleRes),
                             style = MaterialTheme.typography.headlineLarge,
                             color = colors.textPrimary
                         )
@@ -271,14 +279,17 @@ fun MeldTaskScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Selected .${file.extension.uppercase()} isn't compatible — runs on studio sample or tap to pick another file.",
+                                text = stringResource(
+                                    R.string.incompatible_file_notice,
+                                    file.extension.uppercase()
+                                ),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = colors.textPrimary,
                                 modifier = Modifier.weight(1f)
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Change",
+                                text = stringResource(R.string.change_short),
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     textDecoration = TextDecoration.Underline
                                 ),
@@ -307,7 +318,7 @@ fun MeldTaskScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Stays on your phone. Nothing is uploaded.",
+                        text = stringResource(R.string.privacy_banner_task),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.textSecondary
                     )
@@ -323,7 +334,7 @@ fun MeldTaskScreen(
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
             TactilePillButton(
-                text = tool.ctaLabel,
+                text = stringResource(tool.ctaLabelRes),
                 icon = iconForTool(tool),
                 backgroundColor = colors.coral,
                 enabled = !uiState.isProcessing && (tool != MeldToolId.REDACT || options.redactionZones.isNotEmpty()),
@@ -343,7 +354,7 @@ fun MeldTaskScreen(
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Working on it...",
+                                text = stringResource(R.string.working_on_it),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = colors.inkOnAccent
@@ -395,7 +406,7 @@ private fun CompressTaskControls(
                 val aimForBlock: @Composable () -> Unit = {
                     Column {
                         Text(
-                            text = "AIM FOR",
+                            text = stringResource(R.string.aim_for_label),
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = colors.inkOnAccent.copy(alpha = 0.85f)
@@ -412,7 +423,7 @@ private fun CompressTaskControls(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "KB",
+                                text = stringResource(R.string.unit_kb),
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = colors.inkOnAccent,
@@ -464,12 +475,12 @@ private fun CompressTaskControls(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "10 KB",
+                        text = stringResource(R.string.kb_value_format, 10),
                         style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                         color = colors.inkOnAccent
                     )
                     Text(
-                        text = "$maxSliderKb KB",
+                        text = stringResource(R.string.kb_value_format, maxSliderKb),
                         style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                         color = colors.inkOnAccent
                     )
@@ -480,7 +491,7 @@ private fun CompressTaskControls(
         // Now vs After Comparison Pill Bars
         BeforeAfterComparisonCard(
             nowLabel = SelectedFileInfo.formatByteCount(sourceBytes),
-            afterLabel = "$targetKb KB",
+            afterLabel = stringResource(R.string.kb_value_format, targetKb),
             afterRatio = (targetKb.toFloat() / max(1, sourceKb).toFloat())
         )
 
@@ -489,7 +500,7 @@ private fun CompressTaskControls(
         MeldAdaptiveChipRow(horizontalSpacing = 10.dp) {
             presets.forEach { preset ->
                 TactileChipPill(
-                    label = "$preset KB",
+                    label = stringResource(R.string.kb_value_format, preset),
                     selected = !showCustomInput && targetKb == preset,
                     onClick = {
                         showCustomInput = false
@@ -499,7 +510,7 @@ private fun CompressTaskControls(
                 )
             }
             TactileChipPill(
-                label = "Custom",
+                label = stringResource(R.string.custom_preset_label),
                 selected = showCustomInput || !presets.contains(targetKb),
                 onClick = {
                     showCustomInput = !showCustomInput
@@ -520,7 +531,7 @@ private fun CompressTaskControls(
                         }
                     }
                 },
-                label = { Text("Custom size limit (10–$maxSliderKb KB)") },
+                label = { Text(stringResource(R.string.custom_kb_input_label, maxSliderKb)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
@@ -555,16 +566,16 @@ private fun HandoutTaskControls(
         ) {
             Column(modifier = Modifier.padding(22.dp)) {
                 Text(
-                    text = "STUDY LAYOUT",
+                    text = stringResource(R.string.study_layout_label),
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.inkOnAccent.copy(alpha = 0.85f)
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = when (pagesPerSheet) {
-                        2 -> "2 slides + generous note lines"
-                        3 -> "3 slides + ruled lecture notes"
-                        else -> "4 slides compact 2x2 grid"
+                        2 -> stringResource(R.string.study_layout_2up_desc)
+                        3 -> stringResource(R.string.study_layout_3up_desc)
+                        else -> stringResource(R.string.study_layout_4up_desc)
                     },
                     style = MaterialTheme.typography.headlineSmall,
                     color = colors.inkOnAccent
@@ -577,9 +588,13 @@ private fun HandoutTaskControls(
         }
 
         MeldAdaptiveChipRow(horizontalSpacing = 10.dp) {
-            listOf(2 to "2-up + notes", 3 to "3-up (Mac style)", 4 to "4-up grid").forEach { (mode, label) ->
+            listOf(
+                2 to R.string.handout_2_up,
+                3 to R.string.handout_3_up_long,
+                4 to R.string.handout_4_up
+            ).forEach { (mode, labelRes) ->
                 TactileChipPill(
-                    label = label,
+                    label = stringResource(labelRes),
                     selected = pagesPerSheet == mode,
                     onClick = { onUpdateHandoutMode(mode) }
                 )
@@ -619,14 +634,14 @@ private fun SplitPdfTaskControls(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 PageStepperCard(
-                    title = "From page",
+                    title = stringResource(R.string.from_page_label),
                     value = startPage,
                     onMinus = { onUpdateRange(max(1, startPage - 1), endPage) },
                     onPlus = { onUpdateRange(minOf(endPage, startPage + 1), endPage) },
                     modifier = Modifier.fillMaxWidth()
                 )
                 PageStepperCard(
-                    title = "To page",
+                    title = stringResource(R.string.to_page_label),
                     value = endPage,
                     onMinus = { onUpdateRange(startPage, max(startPage, endPage - 1)) },
                     onPlus = { onUpdateRange(startPage, minOf(safeTotal, endPage + 1)) },
@@ -639,14 +654,14 @@ private fun SplitPdfTaskControls(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 PageStepperCard(
-                    title = "From page",
+                    title = stringResource(R.string.from_page_label),
                     value = startPage,
                     onMinus = { onUpdateRange(max(1, startPage - 1), endPage) },
                     onPlus = { onUpdateRange(minOf(endPage, startPage + 1), endPage) },
                     modifier = Modifier.weight(1f)
                 )
                 PageStepperCard(
-                    title = "To page",
+                    title = stringResource(R.string.to_page_label),
                     value = endPage,
                     onMinus = { onUpdateRange(startPage, max(startPage, endPage - 1)) },
                     onPlus = { onUpdateRange(startPage, minOf(safeTotal, endPage + 1)) },
@@ -687,7 +702,7 @@ private fun PageStepperCard(
             ) {
                 TactileCircleIconButton(
                     icon = Icons.Default.Remove,
-                    contentDescription = "Decrease",
+                    contentDescription = stringResource(R.string.cd_decrease),
                     onClick = onMinus,
                     size = 34.dp
                 )
@@ -698,7 +713,7 @@ private fun PageStepperCard(
                 )
                 TactileCircleIconButton(
                     icon = Icons.Default.Add,
-                    contentDescription = "Increase",
+                    contentDescription = stringResource(R.string.cd_increase),
                     onClick = onPlus,
                     size = 34.dp
                 )
@@ -719,7 +734,7 @@ private fun StampTaskControls(
         OutlinedTextField(
             value = stampText,
             onValueChange = onUpdateStampText,
-            label = { Text("Diagonal Watermark Text") },
+            label = { Text(stringResource(R.string.watermark_input_label)) },
             singleLine = true,
             shape = RoundedCornerShape(18.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -737,7 +752,13 @@ private fun StampTaskControls(
         )
 
         MeldAdaptiveChipRow {
-            listOf("CONFIDENTIAL", "MELD VERIFIED", "DRAFT COPY", "INTERNAL ONLY").forEach { preset ->
+            listOf(
+                R.string.watermark_preset_confidential,
+                R.string.watermark_preset_verified,
+                R.string.watermark_preset_draft,
+                R.string.watermark_preset_internal
+            ).forEach { presetRes ->
+                val preset = stringResource(presetRes)
                 TactileChipPill(
                     label = preset,
                     selected = stampText == preset,
@@ -766,13 +787,13 @@ private fun ResizeTaskControls(
                 ResizeFrameStage(percent = percent, addFrame = addFrame)
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "SCALE OUTPUT TO",
+                    text = stringResource(R.string.scale_output_label),
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.inkOnAccent.copy(alpha = 0.85f)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "$percent%",
+                    text = stringResource(R.string.percent_value, percent),
                     style = TextStyle(fontFeatureSettings = "tnum"),
                     fontSize = 54.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -790,12 +811,12 @@ private fun ResizeTaskControls(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        "25%",
+                        text = stringResource(R.string.percent_value, 25),
                         style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                         color = colors.inkOnAccent
                     )
                     Text(
-                        "200%",
+                        text = stringResource(R.string.percent_value, 200),
                         style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
                         color = colors.inkOnAccent
                     )
@@ -821,12 +842,12 @@ private fun ResizeTaskControls(
                         .padding(end = 12.dp)
                 ) {
                     Text(
-                        text = "Add Dark Studio Border",
+                        text = stringResource(R.string.add_studio_border_title),
                         style = MaterialTheme.typography.titleMedium,
                         color = colors.textPrimary
                     )
                     Text(
-                        text = "Frames your image neatly with dimension stamp",
+                        text = stringResource(R.string.add_studio_border_subtitle),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.textSecondary
                     )
@@ -863,7 +884,7 @@ private fun RemoveBgTaskControls(
             RemoveBgCurtainStage(tolerance = tolerance)
             Spacer(modifier = Modifier.height(14.dp))
             Text(
-                text = "EDGE FEATHERING",
+                text = stringResource(R.string.edge_feathering_label),
                 style = MaterialTheme.typography.labelSmall,
                 color = removeColors.inkOnAccent.copy(alpha = 0.85f)
             )
@@ -876,7 +897,7 @@ private fun RemoveBgTaskControls(
                 color = removeColors.inkOnAccent
             )
             Text(
-                text = "Higher values strip slightly more backdrop halo into alpha",
+                text = stringResource(R.string.edge_feathering_hint),
                 style = MaterialTheme.typography.bodyMedium,
                 color = removeColors.inkOnAccent.copy(alpha = 0.85f)
             )
@@ -903,7 +924,7 @@ private fun QrTaskControls(
         OutlinedTextField(
             value = payload,
             onValueChange = onUpdatePayload,
-            label = { Text("Link or text to encode") },
+            label = { Text(stringResource(R.string.qr_payload_label)) },
             singleLine = true,
             shape = RoundedCornerShape(18.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -922,6 +943,14 @@ private fun QrTaskControls(
     }
 }
 
+private data class RedactionPreset(
+    val rect: RedactionRect,
+    @StringRes val labelRes: Int
+)
+
+private fun RedactionRect.matchesBounds(other: RedactionRect): Boolean =
+    left == other.left && top == other.top && right == other.right && bottom == other.bottom
+
 @Composable
 private fun RedactTaskControls(
     file: SelectedFileInfo?,
@@ -930,11 +959,11 @@ private fun RedactTaskControls(
 ) {
     val presetZones = remember {
         listOf(
-            RedactionRect(0.08f, 0.08f, 0.92f, 0.17f, "Header / ID"),
-            RedactionRect(0.10f, 0.24f, 0.90f, 0.34f, "Upper strip"),
-            RedactionRect(0.10f, 0.42f, 0.90f, 0.56f, "Mid block"),
-            RedactionRect(0.10f, 0.76f, 0.90f, 0.88f, "Footer / Sig"),
-            RedactionRect(0.04f, 0.04f, 0.96f, 0.96f, "Full page scrub")
+            RedactionPreset(RedactionRect(0.08f, 0.08f, 0.92f, 0.17f), R.string.redact_zone_header_id),
+            RedactionPreset(RedactionRect(0.10f, 0.24f, 0.90f, 0.34f), R.string.redact_zone_upper_strip),
+            RedactionPreset(RedactionRect(0.10f, 0.42f, 0.90f, 0.56f), R.string.redact_zone_mid_block),
+            RedactionPreset(RedactionRect(0.10f, 0.76f, 0.90f, 0.88f), R.string.redact_zone_footer_sig),
+            RedactionPreset(RedactionRect(0.04f, 0.04f, 0.96f, 0.96f), R.string.redact_zone_full_page)
         )
     }
 
@@ -969,7 +998,7 @@ private fun RedactTaskControls(
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        text = "PAGE 1 REDACTION TARGETS (${selectedZones.size} ACTIVE)",
+                        text = stringResource(R.string.redaction_targets_header, selectedZones.size),
                         style = MaterialTheme.typography.labelSmall,
                         color = colors.textSecondary
                     )
@@ -983,7 +1012,7 @@ private fun RedactTaskControls(
                         pdfPreview?.let { bmp ->
                             Image(
                                 bitmap = bmp.asImageBitmap(),
-                                contentDescription = "PDF Page 1 Redaction Preview",
+                                contentDescription = stringResource(R.string.cd_redact_preview),
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -1013,16 +1042,16 @@ private fun RedactTaskControls(
         }
 
         MeldAdaptiveChipRow(horizontalSpacing = 10.dp) {
-            presetZones.forEach { zone ->
-                val isSelected = selectedZones.any { it.label == zone.label }
+            presetZones.forEach { preset ->
+                val isSelected = selectedZones.any { it.matchesBounds(preset.rect) }
                 TactileChipPill(
-                    label = zone.label,
+                    label = stringResource(preset.labelRes),
                     selected = isSelected,
                     onClick = {
                         val updated = if (isSelected) {
-                            selectedZones.filterNot { it.label == zone.label }
+                            selectedZones.filterNot { it.matchesBounds(preset.rect) }
                         } else {
-                            selectedZones + zone
+                            selectedZones + preset.rect
                         }
                         onUpdateZones(updated)
                     }
@@ -1173,13 +1202,13 @@ fun MeldResultScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     TactileCircleIconButton(
                         icon = Icons.Default.Close,
-                        contentDescription = "Close",
+                        contentDescription = stringResource(R.string.cd_close),
                         onClick = onClose,
                         size = 44.dp
                     )
                     Spacer(modifier = Modifier.width(14.dp))
                     Text(
-                        text = "Result",
+                        text = stringResource(R.string.result_heading),
                         style = MaterialTheme.typography.headlineLarge,
                         color = colors.textPrimary
                     )
@@ -1198,7 +1227,7 @@ fun MeldResultScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = result.tool.resultHeadline,
+                        text = stringResource(result.tool.resultHeadlineRes),
                         style = MaterialTheme.typography.displayMedium,
                         color = colors.textPrimary
                     )
@@ -1286,14 +1315,14 @@ fun MeldResultScreen(
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            text = "Keep going",
+                            text = stringResource(R.string.keep_going_label),
                             style = MaterialTheme.typography.titleMedium,
                             color = colors.textSecondary
                         )
                         MeldAdaptiveChipRow(horizontalSpacing = 10.dp) {
                             followUps.forEach { nextTool ->
                                 TactileChipPill(
-                                    label = nextTool.title,
+                                    label = stringResource(nextTool.titleRes),
                                     selected = false,
                                     onClick = { onContinueTool(nextTool) }
                                 )
@@ -1313,7 +1342,7 @@ fun MeldResultScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             TactilePillButton(
-                text = "Save",
+                text = stringResource(R.string.action_save),
                 icon = Icons.Default.Download,
                 backgroundColor = colors.coral,
                 onClick = { onSaveToDownloads(result.outputFile) },
@@ -1321,7 +1350,7 @@ fun MeldResultScreen(
             )
 
             TactilePillButton(
-                text = "Share",
+                text = stringResource(R.string.action_share),
                 icon = Icons.Default.IosShare,
                 backgroundColor = colors.surface,
                 contentColor = colors.textPrimary,
