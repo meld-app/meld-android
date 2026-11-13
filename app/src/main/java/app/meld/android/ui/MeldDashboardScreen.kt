@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import app.meld.android.model.MeldCategory
 import app.meld.android.model.MeldMode
 import app.meld.android.model.MeldToolId
@@ -133,6 +134,7 @@ fun MeldAppRoot(
     }
 
     val colors = meldColors
+    val fontScale = LocalDensity.current.fontScale
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -146,8 +148,8 @@ fun MeldAppRoot(
                 .displayCutoutPadding()
                 .imePadding()
         ) {
-            val adaptiveSpec = remember(maxWidth, maxHeight) {
-                MeldAdaptiveLayout.specForWindow(maxWidth.value, maxHeight.value)
+            val adaptiveSpec = remember(maxWidth, maxHeight, fontScale) {
+                MeldAdaptiveLayout.specForWindow(maxWidth.value, maxHeight.value, fontScale)
             }
             Box(
                 modifier = Modifier

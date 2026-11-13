@@ -11,10 +11,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,7 +27,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -77,11 +77,13 @@ import app.meld.android.model.ConversionResult
 import app.meld.android.model.MeldToolId
 import app.meld.android.model.RedactionRect
 import app.meld.android.model.SelectedFileInfo
+import app.meld.android.ui.MeldAdaptiveLayout
 import app.meld.android.ui.MeldUiState
 import app.meld.android.ui.components.AnimatedHandoutDiagram
 import app.meld.android.ui.components.BeforeAfterComparisonCard
 import app.meld.android.ui.components.CompressPlatesStage
 import app.meld.android.ui.components.CompressionRatioPill
+import app.meld.android.ui.components.MeldAdaptiveChipRow
 import app.meld.android.ui.components.QrMatrixStage
 import app.meld.android.ui.components.RedactSweepStage
 import app.meld.android.ui.components.RemoveBgCurtainStage
@@ -354,6 +356,7 @@ fun MeldTaskScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CompressTaskControls(
     sourceBytes: Long,
@@ -369,6 +372,7 @@ private fun CompressTaskControls(
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "displayTargetKb"
     )
+    val largeFont = MeldAdaptiveLayout.isLargeFontScale(LocalDensity.current.fontScale)
 
     val colors = meldColors
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -388,11 +392,7 @@ private fun CompressTaskControls(
                     targetKb = targetKb
                 )
                 Spacer(modifier = Modifier.height(14.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
+                val aimForBlock: @Composable () -> Unit = {
                     Column {
                         Text(
                             text = "AIM FOR",
@@ -420,10 +420,29 @@ private fun CompressTaskControls(
                             )
                         }
                     }
-
-                    CompressionRatioPill(
-                        ratio = targetKb.toFloat() / max(1, sourceKb).toFloat()
-                    )
+                }
+                if (largeFont) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        aimForBlock()
+                        CompressionRatioPill(
+                            ratio = targetKb.toFloat() / max(1, sourceKb).toFloat()
+                        )
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        aimForBlock()
+                        CompressionRatioPill(
+                            ratio = targetKb.toFloat() / max(1, sourceKb).toFloat()
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -467,12 +486,7 @@ private fun CompressTaskControls(
 
         // Presets Row matching Reference Page 2
         val presets = listOf(25, 40, 60)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        MeldAdaptiveChipRow(horizontalSpacing = 10.dp) {
             presets.forEach { preset ->
                 TactileChipPill(
                     label = "$preset KB",
@@ -562,12 +576,7 @@ private fun HandoutTaskControls(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        MeldAdaptiveChipRow(horizontalSpacing = 10.dp) {
             listOf(2 to "2-up + notes", 3 to "3-up (Mac style)", 4 to "4-up grid").forEach { (mode, label) ->
                 TactileChipPill(
                     label = label,
@@ -587,6 +596,7 @@ private fun SplitPdfTaskControls(
     onUpdateRange: (Int, Int) -> Unit
 ) {
     val safeTotal = max(1, totalPages)
+    val largeFont = MeldAdaptiveLayout.isLargeFontScale(LocalDensity.current.fontScale)
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SplitPageSpreadStage(
             totalPages = safeTotal,
@@ -603,24 +613,46 @@ private fun SplitPdfTaskControls(
             }
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            PageStepperCard(
-                title = "From page",
-                value = startPage,
-                onMinus = { onUpdateRange(max(1, startPage - 1), endPage) },
-                onPlus = { onUpdateRange(minOf(endPage, startPage + 1), endPage) },
-                modifier = Modifier.weight(1f)
-            )
-            PageStepperCard(
-                title = "To page",
-                value = endPage,
-                onMinus = { onUpdateRange(startPage, max(startPage, endPage - 1)) },
-                onPlus = { onUpdateRange(startPage, minOf(safeTotal, endPage + 1)) },
-                modifier = Modifier.weight(1f)
-            )
+        if (largeFont) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                PageStepperCard(
+                    title = "From page",
+                    value = startPage,
+                    onMinus = { onUpdateRange(max(1, startPage - 1), endPage) },
+                    onPlus = { onUpdateRange(minOf(endPage, startPage + 1), endPage) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                PageStepperCard(
+                    title = "To page",
+                    value = endPage,
+                    onMinus = { onUpdateRange(startPage, max(startPage, endPage - 1)) },
+                    onPlus = { onUpdateRange(startPage, minOf(safeTotal, endPage + 1)) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                PageStepperCard(
+                    title = "From page",
+                    value = startPage,
+                    onMinus = { onUpdateRange(max(1, startPage - 1), endPage) },
+                    onPlus = { onUpdateRange(minOf(endPage, startPage + 1), endPage) },
+                    modifier = Modifier.weight(1f)
+                )
+                PageStepperCard(
+                    title = "To page",
+                    value = endPage,
+                    onMinus = { onUpdateRange(startPage, max(startPage, endPage - 1)) },
+                    onPlus = { onUpdateRange(startPage, minOf(safeTotal, endPage + 1)) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }
@@ -704,12 +736,7 @@ private fun StampTaskControls(
             modifier = Modifier.fillMaxWidth()
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
+        MeldAdaptiveChipRow {
             listOf("CONFIDENTIAL", "MELD VERIFIED", "DRAFT COPY", "INTERNAL ONLY").forEach { preset ->
                 TactileChipPill(
                     label = preset,
@@ -788,7 +815,11 @@ private fun ResizeTaskControls(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 12.dp)
+                ) {
                     Text(
                         text = "Add Dark Studio Border",
                         style = MaterialTheme.typography.titleMedium,
@@ -981,12 +1012,7 @@ private fun RedactTaskControls(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+        MeldAdaptiveChipRow(horizontalSpacing = 10.dp) {
             presetZones.forEach { zone ->
                 val isSelected = selectedZones.any { it.label == zone.label }
                 TactileChipPill(
@@ -1131,6 +1157,7 @@ fun MeldResultScreen(
     onShare: (File) -> Unit
 ) {
     val colors = meldColors
+    val largeFont = MeldAdaptiveLayout.isLargeFontScale(LocalDensity.current.fontScale)
     val followUps = remember(result.tool) { result.tool.followUpTools() }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -1190,27 +1217,49 @@ fun MeldResultScreen(
                     cornerRadius = 18.dp,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = result.outputFile.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = colors.textPrimary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = SelectedFileInfo.formatByteCount(result.outputSizeBytes),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textSecondary
-                        )
+                    if (largeFont) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = result.outputFile.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = colors.textPrimary,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = SelectedFileInfo.formatByteCount(result.outputSizeBytes),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.textSecondary
+                            )
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = result.outputFile.name,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = colors.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = SelectedFileInfo.formatByteCount(result.outputSizeBytes),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.textSecondary
+                            )
+                        }
                     }
                 }
             }
@@ -1241,12 +1290,7 @@ fun MeldResultScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = colors.textSecondary
                         )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
+                        MeldAdaptiveChipRow(horizontalSpacing = 10.dp) {
                             followUps.forEach { nextTool ->
                                 TactileChipPill(
                                     label = nextTool.title,

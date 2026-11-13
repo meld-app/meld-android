@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -80,6 +82,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -115,6 +118,7 @@ import app.meld.android.ui.DockTab
 import app.meld.android.ui.MeldAdaptiveLayout
 import app.meld.android.ui.MeldUiState
 import app.meld.android.ui.SamplePreset
+import app.meld.android.ui.components.MeldAdaptiveChipRow
 import app.meld.android.ui.components.MeldOpeningDriver
 import app.meld.android.ui.components.TactileCard
 import app.meld.android.ui.components.TactileChipPill
@@ -129,6 +133,7 @@ import java.io.File
 import java.util.Calendar
 import kotlin.math.hypot
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MeldStudioHomeScreen(
     uiState: MeldUiState,
@@ -144,6 +149,8 @@ fun MeldStudioHomeScreen(
 ) {
     val colors = meldColors
     val density = LocalDensity.current
+    val fontScale = density.fontScale
+    val largeFont = MeldAdaptiveLayout.isLargeFontScale(fontScale)
     val greeting = remember {
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         when {
@@ -177,11 +184,7 @@ fun MeldStudioHomeScreen(
     ) {
         // Top Brand Row: M meld (tap to replay opening!) + Works offline pill
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            val brandBadge: @Composable () -> Unit = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -216,7 +219,8 @@ fun MeldStudioHomeScreen(
                         color = colors.textPrimary
                     )
                 }
-
+            }
+            val offlinePill: @Composable () -> Unit = {
                 Surface(
                     modifier = Modifier.graphicsLayer {
                         alpha = if (!openingDriver.showOverlay) 1f else openingDriver.pillAlpha.value.coerceIn(0f, 1f)
@@ -239,9 +243,30 @@ fun MeldStudioHomeScreen(
                         Text(
                             text = "Works offline",
                             style = MaterialTheme.typography.labelMedium,
-                            color = colors.textPrimary
+                            color = colors.textPrimary,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
+                }
+            }
+            if (largeFont) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    brandBadge()
+                    offlinePill()
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    brandBadge()
+                    offlinePill()
                 }
             }
         }
@@ -330,7 +355,7 @@ fun MeldStudioHomeScreen(
                                 text = file?.cleanTitle ?: "Lecture Deck",
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = colors.inkOnAccent,
-                                maxLines = 1,
+                                maxLines = if (largeFont) 2 else 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Spacer(modifier = Modifier.height(2.dp))
@@ -398,168 +423,141 @@ fun MeldStudioHomeScreen(
                     )
                 }
 
-                // Asymmetric Bento Grid matching Reference Page 1
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(236.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Left Tall Yellow Card (`t1`)
-                    val primaryTool = quickTriple.first
-                    TactileCard(
-                        backgroundColor = colors.butter,
-                        cornerRadius = 24.dp,
-                        onClick = { onOpenTask(primaryTool) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .meldSharedToolBounds("tool-${primaryTool.name}")
-                            .graphicsLayer {
-                                alpha = t1T.coerceIn(0f, 1f)
-                                translationY = (1f - t1T) * slide26Px
-                                val sc = lerp(0.92f, 1f, t1T)
-                                scaleX = sc
-                                scaleY = sc
-                            }
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Surface(
-                                modifier = Modifier.size(44.dp),
-                                shape = CircleShape,
-                                color = colors.surface,
-                                border = BorderStroke(1.8.dp, colors.inkOnAccent)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = iconForTool(primaryTool),
-                                        contentDescription = null,
-                                        tint = colors.textPrimary,
-                                        modifier = Modifier.size(20.dp)
+                val primaryTool = quickTriple.first
+                val topRight = quickTriple.second
+                val bottomRight = quickTriple.third
+                val primaryAnimModifier: Modifier.(Float) -> Modifier = { t ->
+                    this.graphicsLayer {
+                        alpha = t.coerceIn(0f, 1f)
+                        translationY = (1f - t) * slide26Px
+                        val sc = lerp(0.92f, 1f, t)
+                        scaleX = sc
+                        scaleY = sc
+                    }
+                }
+
+                if (largeFont) {
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val quickCols = MeldAdaptiveLayout.toolColumnsForGridWidth(maxWidth.value, fontScale)
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            QuickToolBentoCard(
+                                tool = primaryTool,
+                                backgroundColor = colors.butter,
+                                cornerRadius = 24.dp,
+                                isPrimary = true,
+                                onClick = { onOpenTask(primaryTool) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .meldSharedToolBounds("tool-${primaryTool.name}")
+                                    .primaryAnimModifier(t1T)
+                            )
+                            if (quickCols >= 2) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(IntrinsicSize.Min),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    QuickToolBentoCard(
+                                        tool = topRight,
+                                        backgroundColor = colors.mint,
+                                        cornerRadius = 22.dp,
+                                        isPrimary = false,
+                                        onClick = { onOpenTask(topRight) },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .meldSharedToolBounds("tool-${topRight.name}")
+                                            .primaryAnimModifier(t2T)
+                                    )
+                                    QuickToolBentoCard(
+                                        tool = bottomRight,
+                                        backgroundColor = colors.periwinkle,
+                                        cornerRadius = 22.dp,
+                                        isPrimary = false,
+                                        onClick = { onOpenTask(bottomRight) },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .fillMaxHeight()
+                                            .meldSharedToolBounds("tool-${bottomRight.name}")
+                                            .primaryAnimModifier(t3T)
                                     )
                                 }
-                            }
-
-                            Column {
-                                Text(
-                                    text = primaryTool.title,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = colors.inkOnAccent
+                            } else {
+                                QuickToolCompactRowCard(
+                                    tool = topRight,
+                                    backgroundColor = colors.mint,
+                                    onClick = { onOpenTask(topRight) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .meldSharedToolBounds("tool-${topRight.name}")
+                                        .primaryAnimModifier(t2T)
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = primaryTool.subtitle,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = colors.inkOnAccent.copy(alpha = 0.85f),
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis
+                                QuickToolCompactRowCard(
+                                    tool = bottomRight,
+                                    backgroundColor = colors.periwinkle,
+                                    onClick = { onOpenTask(bottomRight) },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .meldSharedToolBounds("tool-${bottomRight.name}")
+                                        .primaryAnimModifier(t3T)
                                 )
                             }
                         }
                     }
-
-                    // Right Column: 2 Stacked Pastel Cards (`t2` & `t3`)
-                    Column(
+                } else {
+                    // Asymmetric Bento Grid matching Reference Page 1
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                            .fillMaxWidth()
+                            .height(236.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        val topRight = quickTriple.second
-                        TactileCard(
-                            backgroundColor = colors.mint,
-                            cornerRadius = 22.dp,
-                            onClick = { onOpenTask(topRight) },
+                        QuickToolBentoCard(
+                            tool = primaryTool,
+                            backgroundColor = colors.butter,
+                            cornerRadius = 24.dp,
+                            isPrimary = true,
+                            fillHeight = true,
+                            onClick = { onOpenTask(primaryTool) },
                             modifier = Modifier
-                                .fillMaxWidth()
                                 .weight(1f)
-                                .meldSharedToolBounds("tool-${topRight.name}")
-                                .graphicsLayer {
-                                    alpha = t2T.coerceIn(0f, 1f)
-                                    translationY = (1f - t2T) * slide26Px
-                                    val sc = lerp(0.92f, 1f, t2T)
-                                    scaleX = sc
-                                    scaleY = sc
-                                }
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(14.dp),
-                                verticalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Surface(
-                                    modifier = Modifier.size(36.dp),
-                                    shape = CircleShape,
-                                    color = colors.surface,
-                                    border = BorderStroke(1.8.dp, colors.inkOnAccent)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = iconForTool(topRight),
-                                            contentDescription = null,
-                                            tint = colors.textPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-                                Text(
-                                    text = topRight.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = colors.inkOnAccent
-                                )
-                            }
-                        }
-
-                        val bottomRight = quickTriple.third
-                        TactileCard(
-                            backgroundColor = colors.periwinkle,
-                            cornerRadius = 22.dp,
-                            onClick = { onOpenTask(bottomRight) },
+                                .fillMaxHeight()
+                                .meldSharedToolBounds("tool-${primaryTool.name}")
+                                .primaryAnimModifier(t1T)
+                        )
+                        Column(
                             modifier = Modifier
-                                .fillMaxWidth()
                                 .weight(1f)
-                                .meldSharedToolBounds("tool-${bottomRight.name}")
-                                .graphicsLayer {
-                                    alpha = t3T.coerceIn(0f, 1f)
-                                    translationY = (1f - t3T) * slide26Px
-                                    val sc = lerp(0.92f, 1f, t3T)
-                                    scaleX = sc
-                                    scaleY = sc
-                                }
+                                .fillMaxHeight(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Column(
+                            QuickToolBentoCard(
+                                tool = topRight,
+                                backgroundColor = colors.mint,
+                                cornerRadius = 22.dp,
+                                isPrimary = false,
+                                fillHeight = true,
+                                onClick = { onOpenTask(topRight) },
                                 modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(14.dp),
-                                verticalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Surface(
-                                    modifier = Modifier.size(36.dp),
-                                    shape = CircleShape,
-                                    color = colors.surface,
-                                    border = BorderStroke(1.8.dp, colors.inkOnAccent)
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Icon(
-                                            imageVector = iconForTool(bottomRight),
-                                            contentDescription = null,
-                                            tint = colors.textPrimary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-                                Text(
-                                    text = bottomRight.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = colors.inkOnAccent
-                                )
-                            }
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .meldSharedToolBounds("tool-${topRight.name}")
+                                    .primaryAnimModifier(t2T)
+                            )
+                            QuickToolBentoCard(
+                                tool = bottomRight,
+                                backgroundColor = colors.periwinkle,
+                                cornerRadius = 22.dp,
+                                isPrimary = false,
+                                fillHeight = true,
+                                onClick = { onOpenTask(bottomRight) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .meldSharedToolBounds("tool-${bottomRight.name}")
+                                    .primaryAnimModifier(t3T)
+                            )
                         }
                     }
                 }
@@ -570,7 +568,7 @@ fun MeldStudioHomeScreen(
         item {
             val shown = setOf(quickTriple.first, quickTriple.second, quickTriple.third)
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val columns = MeldAdaptiveLayout.toolColumnsForGridWidth(maxWidth.value)
+                val columns = MeldAdaptiveLayout.toolColumnsForGridWidth(maxWidth.value, fontScale)
                 val maxMoreTools = if (columns >= 3) 6 else 4
                 val moreTools = remember(ext, maxMoreTools) {
                     MeldToolId.entries
@@ -622,7 +620,7 @@ fun MeldStudioHomeScreen(
                                                 text = tool.title,
                                                 style = MaterialTheme.typography.titleMedium,
                                                 color = colors.inkOnAccent,
-                                                maxLines = 2,
+                                                maxLines = if (largeFont) Int.MAX_VALUE else 2,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                         }
@@ -671,7 +669,7 @@ fun MeldStudioHomeScreen(
                                 text = latest.tool.title + " · " + latest.outputFile.extension.uppercase(),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = colors.textPrimary,
-                                maxLines = 1,
+                                maxLines = if (largeFont) 2 else 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
@@ -695,6 +693,128 @@ fun MeldStudioHomeScreen(
 }
 
 @Composable
+private fun QuickToolBentoCard(
+    tool: MeldToolId,
+    backgroundColor: Color,
+    cornerRadius: Dp,
+    isPrimary: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    fillHeight: Boolean = false
+) {
+    val colors = meldColors
+    val badgeSize = if (isPrimary) 44.dp else 36.dp
+    val iconSize = if (isPrimary) 20.dp else 18.dp
+    val pad = if (isPrimary) 16.dp else 14.dp
+
+    TactileCard(
+        backgroundColor = backgroundColor,
+        cornerRadius = cornerRadius,
+        onClick = onClick,
+        modifier = modifier
+    ) {
+        Column(
+            modifier = (if (fillHeight) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
+                .padding(pad),
+            verticalArrangement = if (fillHeight) Arrangement.SpaceBetween else Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(badgeSize),
+                shape = CircleShape,
+                color = colors.surface,
+                border = BorderStroke(1.8.dp, colors.inkOnAccent)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = iconForTool(tool),
+                        contentDescription = null,
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(iconSize)
+                    )
+                }
+            }
+
+            if (isPrimary) {
+                Column {
+                    Text(
+                        text = tool.title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = colors.inkOnAccent
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = tool.subtitle,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.inkOnAccent.copy(alpha = 0.85f),
+                        maxLines = if (fillHeight) 3 else Int.MAX_VALUE,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            } else {
+                Text(
+                    text = tool.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.inkOnAccent
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickToolCompactRowCard(
+    tool: MeldToolId,
+    backgroundColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = meldColors
+    TactileCard(
+        backgroundColor = backgroundColor,
+        cornerRadius = 22.dp,
+        onClick = onClick,
+        modifier = modifier
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(40.dp),
+                shape = CircleShape,
+                color = colors.surface,
+                border = BorderStroke(1.8.dp, colors.inkOnAccent)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = iconForTool(tool),
+                        contentDescription = null,
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = tool.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = colors.inkOnAccent
+                )
+                Text(
+                    text = tool.subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.inkOnAccent.copy(alpha = 0.85f)
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
 fun MeldAllToolsScreen(
     uiState: MeldUiState,
     onSelectMode: (MeldMode) -> Unit,
@@ -706,6 +826,8 @@ fun MeldAllToolsScreen(
     contentBottomPadding: Dp = 136.dp
 ) {
     val colors = meldColors
+    val fontScale = LocalDensity.current.fontScale
+    val largeFont = MeldAdaptiveLayout.isLargeFontScale(fontScale)
     val filtered = remember(uiState.selectedMode, uiState.selectedCategory, uiState.searchQuery) {
         val q = uiState.searchQuery.trim().lowercase()
         MeldToolId.entries.filter { tool ->
@@ -729,12 +851,8 @@ fun MeldAllToolsScreen(
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
+            val titleBlock: @Composable (Modifier) -> Unit = { mod ->
+                Column(modifier = mod) {
                     Text(
                         text = "All tools.",
                         style = MaterialTheme.typography.displayMedium,
@@ -746,6 +864,8 @@ fun MeldAllToolsScreen(
                         color = colors.textSecondary
                     )
                 }
+            }
+            val changeFilePill: @Composable () -> Unit = {
                 Surface(
                     modifier = Modifier
                         .clip(CircleShape)
@@ -759,8 +879,33 @@ fun MeldAllToolsScreen(
                         style = MaterialTheme.typography.labelMedium,
                         color = colors.inkOnAccent,
                         fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                     )
+                }
+            }
+            if (largeFont) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    titleBlock(Modifier)
+                    changeFilePill()
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    titleBlock(
+                        Modifier
+                            .weight(1f)
+                            .padding(end = 12.dp)
+                    )
+                    changeFilePill()
                 }
             }
         }
@@ -790,7 +935,7 @@ fun MeldAllToolsScreen(
                     }
                 } else null,
                 singleLine = true,
-                shape = CircleShape,
+                shape = RoundedCornerShape(28.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = colors.surface,
                     unfocusedContainerColor = colors.surface,
@@ -808,7 +953,7 @@ fun MeldAllToolsScreen(
 
         // Mode Pills
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MeldAdaptiveChipRow {
                 MeldMode.entries.forEach { mode ->
                     TactileChipPill(
                         label = mode.label,
@@ -821,12 +966,7 @@ fun MeldAllToolsScreen(
 
         // Category Filter Strip
         item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            MeldAdaptiveChipRow {
                 MeldCategory.entries.forEach { cat ->
                     TactileChipPill(
                         label = cat.label,
@@ -879,7 +1019,7 @@ fun MeldAllToolsScreen(
                     }
                 } else {
                     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                        val columns = MeldAdaptiveLayout.toolColumnsForGridWidth(maxWidth.value)
+                        val columns = MeldAdaptiveLayout.toolColumnsForGridWidth(maxWidth.value, fontScale)
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             filtered.chunked(columns).forEachIndexed { rowIdx, rowTools ->
                                 Row(
@@ -947,14 +1087,14 @@ fun MeldAllToolsScreen(
                                                     text = tool.title,
                                                     style = MaterialTheme.typography.titleMedium,
                                                     color = cardInk,
-                                                    maxLines = 1,
+                                                    maxLines = if (largeFont) Int.MAX_VALUE else 1,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                                 Text(
                                                     text = tool.subtitle,
                                                     style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 16.sp),
                                                     color = cardSubInk,
-                                                    maxLines = 2,
+                                                    maxLines = if (largeFont) Int.MAX_VALUE else 2,
                                                     overflow = TextOverflow.Ellipsis
                                                 )
                                             }
@@ -1066,7 +1206,11 @@ fun MeldSettingsScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 12.dp)
+                    ) {
                         Text(
                             text = "Save directly to Downloads/MELD",
                             style = MaterialTheme.typography.titleMedium,
@@ -1113,12 +1257,7 @@ fun MeldSettingsScreen(
                         style = MaterialTheme.typography.titleMedium,
                         color = colors.textPrimary
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    MeldAdaptiveChipRow {
                         listOf(2 to "2-up + notes", 3 to "3-up notes", 4 to "4-up grid").forEach { (n, label) ->
                             TactileChipPill(
                                 label = label,
@@ -1303,6 +1442,7 @@ fun MeldFloatingBottomDock(
 ) {
     val colors = meldColors
     val density = LocalDensity.current
+    val largeFont = MeldAdaptiveLayout.isLargeFontScale(density.fontScale)
     val slide90Px = with(density) { 90.dp.toPx() }
     val dockT = if (!openingDriver.showOverlay) 1f else openingDriver.navDockAnim.value
 
@@ -1333,9 +1473,9 @@ fun MeldFloatingBottomDock(
                     icon = icon,
                     activeTab = activeTab,
                     onSelectTab = onSelectTab,
-                    minWidth = 76.dp,
+                    minWidth = if (largeFont) 64.dp else 76.dp,
                     minHeight = 52.dp,
-                    horizontalPadding = 14.dp,
+                    horizontalPadding = if (largeFont) 10.dp else 14.dp,
                     cornerRadius = 999.dp
                 )
             }
@@ -1410,8 +1550,11 @@ fun MeldChangeFileBottomSheet(
     onPickSample: (SamplePreset) -> Unit
 ) {
     val colors = meldColors
+    val sampleColumns = MeldAdaptiveLayout.sampleColumnsForFontScale(LocalDensity.current.fontScale)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
+        sheetState = sheetState,
         containerColor = colors.canvas
     ) {
         Column(
@@ -1474,17 +1617,21 @@ fun MeldChangeFileBottomSheet(
                 color = colors.textSecondary
             )
 
-            SamplePreset.entries.chunked(2).forEach { pair ->
+            SamplePreset.entries.chunked(sampleColumns).forEach { rowPresets ->
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    pair.forEach { preset ->
+                    rowPresets.forEach { preset ->
                         TactileCard(
                             backgroundColor = colors.surface,
                             cornerRadius = 18.dp,
                             onClick = { onPickSample(preset) },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
                                 Text(
@@ -1500,6 +1647,9 @@ fun MeldChangeFileBottomSheet(
                                 )
                             }
                         }
+                    }
+                    repeat(sampleColumns - rowPresets.size) {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }

@@ -49,5 +49,37 @@ class MeldAdaptiveLayoutTest {
         assertFalse(landscapeTablet.isCompactHeight)
         assertEquals(3, MeldAdaptiveLayout.toolColumnsForGridWidth(820f))
     }
+
+    @Test
+    fun largeFontScaleAdaptsDockClearanceAndGridColumns() {
+        assertFalse(MeldAdaptiveLayout.isLargeFontScale(1.0f))
+        assertFalse(MeldAdaptiveLayout.isLargeFontScale(1.3f))
+        assertTrue(MeldAdaptiveLayout.isLargeFontScale(1.5f))
+        assertTrue(MeldAdaptiveLayout.isLargeFontScale(2.0f))
+
+        val portrait200 = MeldAdaptiveLayout.specForWindow(
+            windowWidthDp = 411f,
+            windowHeightDp = 923f,
+            fontScale = 2.0f
+        )
+        assertFalse(portrait200.useNavigationRail)
+        assertEquals(176f, portrait200.listBottomPadding.value)
+
+        val landscape200 = MeldAdaptiveLayout.specForWindow(
+            windowWidthDp = 850f,
+            windowHeightDp = 380f,
+            fontScale = 2.0f
+        )
+        assertTrue(landscape200.useNavigationRail)
+        assertEquals(24f, landscape200.listBottomPadding.value)
+
+        assertEquals(1, MeldAdaptiveLayout.toolColumnsForGridWidth(371f, fontScale = 2.0f))
+        assertEquals(2, MeldAdaptiveLayout.toolColumnsForGridWidth(690f, fontScale = 2.0f))
+        assertEquals(1, MeldAdaptiveLayout.toolColumnsForPaneWidth(440f, fontScale = 2.0f))
+        assertEquals(2, MeldAdaptiveLayout.toolColumnsForPaneWidth(700f, fontScale = 2.0f))
+
+        assertEquals(2, MeldAdaptiveLayout.sampleColumnsForFontScale(1.0f))
+        assertEquals(1, MeldAdaptiveLayout.sampleColumnsForFontScale(2.0f))
+    }
 }
 

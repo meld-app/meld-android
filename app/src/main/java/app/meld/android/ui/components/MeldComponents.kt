@@ -27,22 +27,29 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -78,10 +85,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.meld.android.model.ConversionResult
+import app.meld.android.ui.MeldAdaptiveLayout
 import app.meld.android.ui.theme.MeldDimens
 import app.meld.android.ui.theme.MeldMotion
 import app.meld.android.ui.theme.meldColors
@@ -265,7 +275,7 @@ fun TactileChipPill(
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(CircleShape)
+            .clip(RoundedCornerShape(22.dp))
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -274,7 +284,7 @@ fun TactileChipPill(
                     onClick()
                 }
             ),
-        shape = CircleShape,
+        shape = RoundedCornerShape(22.dp),
         color = if (selected) colors.chipSelectedBg else colors.surface,
         border = BorderStroke(MeldDimens.StrokeWidth, colors.border)
     ) {
@@ -284,6 +294,40 @@ fun TactileChipPill(
             color = if (selected) colors.chipSelectedContent else colors.textPrimary,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
         )
+    }
+}
+
+/**
+ * Displays filter or option chips in a single horizontal scroller at standard font sizes and wraps
+ * them into a multi-line FlowRow when large accessibility font scales are active.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun MeldAdaptiveChipRow(
+    modifier: Modifier = Modifier,
+    horizontalSpacing: Dp = 8.dp,
+    verticalSpacing: Dp = 8.dp,
+    content: @Composable () -> Unit
+) {
+    val largeFont = MeldAdaptiveLayout.isLargeFontScale(LocalDensity.current.fontScale)
+    if (largeFont) {
+        FlowRow(
+            modifier = modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(horizontalSpacing),
+            verticalArrangement = Arrangement.spacedBy(verticalSpacing)
+        ) {
+            content()
+        }
+    } else {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(horizontalSpacing),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            content()
+        }
     }
 }
 
@@ -321,20 +365,24 @@ fun TactilePillButton(
         label = "pillBtnPress"
     )
 
-    Box(modifier = modifier.height(height + 3.dp)) {
+    val btnShape = RoundedCornerShape(height / 2)
+
+    Box(
+        modifier = modifier.padding(bottom = 3.dp),
+        propagateMinConstraints = true
+    ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(height)
+                .matchParentSize()
                 .offset(y = 3.dp)
-                .clip(CircleShape)
+                .clip(btnShape)
                 .background(colors.hardShadow)
         )
 
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(height)
+                .defaultMinSize(minHeight = height)
                 .graphicsLayer {
                     if (!reduceMotion) {
                         translationY = pressPx * pressProgress
@@ -343,7 +391,7 @@ fun TactilePillButton(
                         scaleY = s
                     }
                 }
-                .clip(CircleShape)
+                .clip(btnShape)
                 .clickable(
                     enabled = enabled,
                     interactionSource = interactionSource,
@@ -353,17 +401,24 @@ fun TactilePillButton(
                         onClick()
                     }
                 ),
-            shape = CircleShape,
+            shape = btnShape,
             color = backgroundColor,
             border = BorderStroke(MeldDimens.StrokeWidth, colors.border)
         ) {
             if (customContent != null) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     customContent()
                 }
             } else {
                 Row(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -380,7 +435,9 @@ fun TactilePillButton(
                         text = text,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = contentColor
+                        color = contentColor,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2
                     )
                 }
             }
@@ -550,6 +607,8 @@ fun BeforeAfterComparisonCard(
         label = "afterBarRatio"
     )
 
+    val largeFont = MeldAdaptiveLayout.isLargeFontScale(LocalDensity.current.fontScale)
+
     TactileCard(
         backgroundColor = colors.surface,
         cornerRadius = 22.dp,
@@ -559,63 +618,83 @@ fun BeforeAfterComparisonCard(
             modifier = Modifier.padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = "Now",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.textSecondary,
-                    modifier = Modifier.width(52.dp)
-                )
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(34.dp)
-                        .clip(CircleShape)
-                        .background(colors.track)
-                        .border(MeldDimens.StrokeWidth, colors.border, CircleShape),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    Text(
-                        text = nowLabel,
-                        style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                        color = colors.textPrimary,
-                        modifier = Modifier.padding(end = 14.dp)
-                    )
-                }
-            }
+            BeforeAfterBarRow(
+                label = "Now",
+                sizeLabel = nowLabel,
+                barColor = colors.track,
+                textColor = colors.textPrimary,
+                barFraction = 1f,
+                largeFont = largeFont
+            )
+            BeforeAfterBarRow(
+                label = "After",
+                sizeLabel = afterLabel,
+                barColor = colors.mint,
+                textColor = colors.inkOnAccent,
+                barFraction = animatedRatio,
+                largeFont = largeFont
+            )
+        }
+    }
+}
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+@Composable
+private fun BeforeAfterBarRow(
+    label: String,
+    sizeLabel: String,
+    barColor: Color,
+    textColor: Color,
+    barFraction: Float,
+    largeFont: Boolean
+) {
+    val colors = meldColors
+    val barContent: @Composable (Modifier) -> Unit = { containerMod ->
+        Box(modifier = containerMod) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(barFraction)
+                    .defaultMinSize(minWidth = if (largeFont) 92.dp else 68.dp, minHeight = 34.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(barColor)
+                    .border(MeldDimens.StrokeWidth, colors.border, RoundedCornerShape(20.dp)),
+                contentAlignment = Alignment.CenterEnd
             ) {
                 Text(
-                    text = "After",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.textSecondary,
-                    modifier = Modifier.width(52.dp)
+                    text = sizeLabel,
+                    style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                    color = textColor,
+                    maxLines = 1,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
                 )
-                Box(modifier = Modifier.weight(1f)) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(animatedRatio)
-                            .height(34.dp)
-                            .clip(CircleShape)
-                            .background(colors.mint)
-                            .border(MeldDimens.StrokeWidth, colors.border, CircleShape),
-                        contentAlignment = Alignment.CenterEnd
-                    ) {
-                        Text(
-                            text = afterLabel,
-                            style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                            color = colors.inkOnAccent,
-                            modifier = Modifier.padding(horizontal = 14.dp)
-                        )
-                    }
-                }
             }
+        }
+    }
+
+    if (largeFont) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textSecondary
+            )
+            barContent(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textSecondary,
+                modifier = Modifier.widthIn(min = 48.dp)
+            )
+            barContent(Modifier.weight(1f))
         }
     }
 }
@@ -784,9 +863,11 @@ fun ResultShowcaseCard(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
-                                    text = "MELD STUDIO",
+                                    text = "MELD",
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.ExtraBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Clip,
                                     color = colors.paperStroke
                                 )
                                 repeat(4) {
