@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -149,6 +150,8 @@ fun MeldStageViewport(
     val colors = meldColors
     val reduceMotion = rememberReduceMotion()
     val haptic = LocalHapticFeedback.current
+    val fontScale = LocalDensity.current.fontScale
+    val effectiveHeight = if (fontScale > 1.25f) height * fontScale.coerceIn(1f, 1.35f) else height
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(
@@ -160,7 +163,7 @@ fun MeldStageViewport(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .height(height)
+            .height(effectiveHeight)
             .graphicsLayer {
                 scaleX = pressScale
                 scaleY = pressScale
@@ -459,48 +462,53 @@ fun CompressPlatesStage(
                 }
         )
 
-        // Swapping pills at bottom (cross-fade opacity + gentle scale settle)
+        // Swapping pills at bottom (sequential fade so before/after labels never overlap at any scale)
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 10.dp),
             contentAlignment = Alignment.Center
         ) {
-            Surface(
-                modifier = Modifier.graphicsLayer {
-                    alpha = (1f - pillSwap).coerceIn(0f, 1f)
-                    val s = 0.94f + 0.06f * (1f - pillSwap)
-                    scaleX = s
-                    scaleY = s
-                },
-                shape = CircleShape,
-                color = colors.surface,
-                border = BorderStroke(1.6.dp, colors.border)
-            ) {
-                Text(
-                    text = SelectedFileInfo.formatByteCount(sourceBytes),
-                    style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum"),
-                    color = colors.textPrimary,
-                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 3.dp)
-                )
-            }
-            Surface(
-                modifier = Modifier.graphicsLayer {
-                    alpha = pillSwap.coerceIn(0f, 1f)
-                    val s = 0.92f + 0.08f * pillSwap
-                    scaleX = s
-                    scaleY = s
-                },
-                shape = CircleShape,
-                color = colors.mint,
-                border = BorderStroke(1.6.dp, colors.border)
-            ) {
-                Text(
-                    text = "$targetKb KB",
-                    style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum"),
-                    color = colors.inkOnAccent,
-                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 3.dp)
-                )
+            if (pillSwap < 0.5f) {
+                val t = 1f - (pillSwap * 2f).coerceIn(0f, 1f)
+                Surface(
+                    modifier = Modifier.graphicsLayer {
+                        alpha = t
+                        val s = 0.94f + 0.06f * t
+                        scaleX = s
+                        scaleY = s
+                    },
+                    shape = CircleShape,
+                    color = colors.surface,
+                    border = BorderStroke(1.6.dp, colors.border)
+                ) {
+                    Text(
+                        text = SelectedFileInfo.formatByteCount(sourceBytes),
+                        style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum"),
+                        color = colors.textPrimary,
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 3.dp)
+                    )
+                }
+            } else {
+                val t = ((pillSwap - 0.5f) * 2f).coerceIn(0f, 1f)
+                Surface(
+                    modifier = Modifier.graphicsLayer {
+                        alpha = t
+                        val s = 0.92f + 0.08f * t
+                        scaleX = s
+                        scaleY = s
+                    },
+                    shape = CircleShape,
+                    color = colors.mint,
+                    border = BorderStroke(1.6.dp, colors.border)
+                ) {
+                    Text(
+                        text = "$targetKb KB",
+                        style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, fontFeatureSettings = "tnum"),
+                        color = colors.inkOnAccent,
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 3.dp)
+                    )
+                }
             }
         }
     }
@@ -755,7 +763,7 @@ fun SplitPageSpreadStage(
                     Surface(
                         modifier = Modifier
                             .weight(1f)
-                            .height(56.dp)
+                            .defaultMinSize(minHeight = 56.dp)
                             .graphicsLayer {
                                 scaleX = scale
                                 scaleY = scale
@@ -1879,7 +1887,8 @@ private fun SpeedRaceStage() {
                                     text = label,
                                     style = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"),
                                     color = colors.textPrimary,
-                                    modifier = Modifier.width(34.dp)
+                                    maxLines = 1,
+                                    modifier = Modifier.defaultMinSize(minWidth = 34.dp)
                                 )
                                 Box(
                                     modifier = Modifier
@@ -1962,17 +1971,21 @@ private fun TableTransformStage(
             )
 
             Surface(
-                modifier = Modifier.size(width = 76.dp, height = 64.dp),
+                modifier = Modifier.defaultMinSize(minWidth = 76.dp, minHeight = 64.dp),
                 shape = RoundedCornerShape(12.dp),
                 color = badgeColor,
                 border = BorderStroke(1.8.dp, colors.inkOnAccent)
             ) {
-                Box(contentAlignment = Alignment.Center) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
                     Text(
                         text = targetExt,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = colors.inkOnAccent
+                        color = colors.inkOnAccent,
+                        maxLines = 1
                     )
                 }
             }
