@@ -21,7 +21,9 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,6 +39,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AspectRatio
@@ -97,6 +100,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
@@ -108,6 +112,7 @@ import app.meld.android.model.MeldMode
 import app.meld.android.model.MeldToolId
 import app.meld.android.model.SelectedFileInfo
 import app.meld.android.ui.DockTab
+import app.meld.android.ui.MeldAdaptiveLayout
 import app.meld.android.ui.MeldUiState
 import app.meld.android.ui.SamplePreset
 import app.meld.android.ui.components.MeldOpeningDriver
@@ -133,7 +138,9 @@ fun MeldStudioHomeScreen(
     onOpenTask: (MeldToolId) -> Unit,
     onSeeAllTools: () -> Unit,
     onOpenResult: (ConversionResult) -> Unit,
-    onShareFile: (File) -> Unit
+    onShareFile: (File) -> Unit,
+    contentStartPadding: Dp = 20.dp,
+    contentBottomPadding: Dp = 136.dp
 ) {
     val colors = meldColors
     val density = LocalDensity.current
@@ -165,7 +172,7 @@ fun MeldStudioHomeScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 136.dp),
+        contentPadding = PaddingValues(start = contentStartPadding, end = 20.dp, top = 12.dp, bottom = contentBottomPadding),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         // Top Brand Row: M meld (tap to replay opening!) + Works offline pill
@@ -562,57 +569,69 @@ fun MeldStudioHomeScreen(
         // More tools that also work on the current file (fills the lower Home area)
         item {
             val shown = setOf(quickTriple.first, quickTriple.second, quickTriple.third)
-            val moreTools = remember(ext) {
-                MeldToolId.entries.filter { it.acceptsExtension(ext) && it !in shown && it != MeldToolId.SCAN_QR }.take(4)
-            }
-            if (moreTools.isNotEmpty()) {
-                val tints = listOf(
-                    colors.lavender, colors.peach,
-                    colors.periwinkle, colors.mint
-                )
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "More for this file",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = colors.textPrimary
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val columns = MeldAdaptiveLayout.toolColumnsForGridWidth(maxWidth.value)
+                val maxMoreTools = if (columns >= 3) 6 else 4
+                val moreTools = remember(ext, maxMoreTools) {
+                    MeldToolId.entries
+                        .filter { it.acceptsExtension(ext) && it !in shown && it != MeldToolId.SCAN_QR }
+                        .take(maxMoreTools)
+                }
+                if (moreTools.isNotEmpty()) {
+                    val tints = listOf(
+                        colors.lavender, colors.peach,
+                        colors.periwinkle, colors.mint
                     )
-                    moreTools.chunked(2).forEachIndexed { rowIdx, pair ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            pair.forEachIndexed { colIdx, tool ->
-                                TactileCard(
-                                    backgroundColor = tints[(rowIdx * 2 + colIdx) % tints.size],
-                                    cornerRadius = 20.dp,
-                                    onClick = { onOpenTask(tool) },
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Row(
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "More for this file",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = colors.textPrimary
+                        )
+                        moreTools.chunked(columns).forEachIndexed { rowIdx, rowTools ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(IntrinsicSize.Min),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                rowTools.forEachIndexed { colIdx, tool ->
+                                    TactileCard(
+                                        backgroundColor = tints[(rowIdx * columns + colIdx) % tints.size],
+                                        cornerRadius = 20.dp,
+                                        onClick = { onOpenTask(tool) },
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .defaultMinSize(minHeight = 64.dp)
-                                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
+                                            .weight(1f)
+                                            .fillMaxHeight()
                                     ) {
-                                        Icon(
-                                            imageVector = iconForTool(tool),
-                                            contentDescription = null,
-                                            tint = colors.inkOnAccent,
-                                            modifier = Modifier.size(22.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Text(
-                                            text = tool.title,
-                                            style = MaterialTheme.typography.titleMedium,
-                                            color = colors.inkOnAccent,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .defaultMinSize(minHeight = 64.dp)
+                                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = iconForTool(tool),
+                                                contentDescription = null,
+                                                tint = colors.inkOnAccent,
+                                                modifier = Modifier.size(22.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                text = tool.title,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                color = colors.inkOnAccent,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
                                     }
                                 }
+                                repeat(columns - rowTools.size) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
-                            if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -682,7 +701,9 @@ fun MeldAllToolsScreen(
     onSelectCategory: (MeldCategory) -> Unit,
     onSearchChange: (String) -> Unit,
     onOpenTask: (MeldToolId) -> Unit,
-    onOpenChangeFile: () -> Unit
+    onOpenChangeFile: () -> Unit,
+    contentStartPadding: Dp = 20.dp,
+    contentBottomPadding: Dp = 136.dp
 ) {
     val colors = meldColors
     val filtered = remember(uiState.selectedMode, uiState.selectedCategory, uiState.searchQuery) {
@@ -704,7 +725,7 @@ fun MeldAllToolsScreen(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 136.dp),
+        contentPadding = PaddingValues(start = contentStartPadding, end = 20.dp, top = 12.dp, bottom = contentBottomPadding),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
@@ -857,85 +878,95 @@ fun MeldAllToolsScreen(
                         }
                     }
                 } else {
-                    filtered.chunked(2).forEachIndexed { rowIdx, pair ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        pair.forEachIndexed { colIdx, tool ->
-                            val (bg, isNeutral) = pastelCycle[(rowIdx * 2 + colIdx) % pastelCycle.size]
-                            val cardInk = if (isNeutral) colors.textPrimary else colors.inkOnAccent
-                            val cardSubInk = if (isNeutral) colors.textSecondary else colors.inkOnAccent.copy(alpha = 0.85f)
-                            val innerChipBg = if (isNeutral) colors.warmSurface else colors.surface
-                            val innerChipBorder = if (isNeutral) colors.border else colors.inkOnAccent
-                            TactileCard(
-                                backgroundColor = bg,
-                                cornerRadius = 22.dp,
-                                onClick = { onOpenTask(tool) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .meldSharedToolBounds("tool-${tool.name}")
-                            ) {
-                                Column(
-                                    modifier = Modifier.padding(14.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                        val columns = MeldAdaptiveLayout.toolColumnsForGridWidth(maxWidth.value)
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            filtered.chunked(columns).forEachIndexed { rowIdx, rowTools ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(IntrinsicSize.Min),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Surface(
-                                            modifier = Modifier.size(34.dp),
-                                            shape = CircleShape,
-                                            color = innerChipBg,
-                                            border = BorderStroke(1.5.dp, innerChipBorder)
+                                    rowTools.forEachIndexed { colIdx, tool ->
+                                        val (bg, isNeutral) = pastelCycle[(rowIdx * columns + colIdx) % pastelCycle.size]
+                                        val cardInk = if (isNeutral) colors.textPrimary else colors.inkOnAccent
+                                        val cardSubInk = if (isNeutral) colors.textSecondary else colors.inkOnAccent.copy(alpha = 0.85f)
+                                        val innerChipBg = if (isNeutral) colors.warmSurface else colors.surface
+                                        val innerChipBorder = if (isNeutral) colors.border else colors.inkOnAccent
+                                        TactileCard(
+                                            backgroundColor = bg,
+                                            cornerRadius = 22.dp,
+                                            onClick = { onOpenTask(tool) },
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .meldSharedToolBounds("tool-${tool.name}")
                                         ) {
-                                            Box(contentAlignment = Alignment.Center) {
-                                                Icon(
-                                                    imageVector = iconForTool(tool),
-                                                    contentDescription = null,
-                                                    tint = colors.textPrimary,
-                                                    modifier = Modifier.size(16.dp)
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .padding(14.dp),
+                                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Surface(
+                                                        modifier = Modifier.size(34.dp),
+                                                        shape = CircleShape,
+                                                        color = innerChipBg,
+                                                        border = BorderStroke(1.5.dp, innerChipBorder)
+                                                    ) {
+                                                        Box(contentAlignment = Alignment.Center) {
+                                                            Icon(
+                                                                imageVector = iconForTool(tool),
+                                                                contentDescription = null,
+                                                                tint = colors.textPrimary,
+                                                                modifier = Modifier.size(16.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                    Surface(
+                                                        shape = CircleShape,
+                                                        color = innerChipBg,
+                                                        border = BorderStroke(1.2.dp, innerChipBorder)
+                                                    ) {
+                                                        Text(
+                                                            text = tool.badge,
+                                                            style = MaterialTheme.typography.labelSmall,
+                                                            fontSize = 12.sp,
+                                                            color = colors.textPrimary,
+                                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    text = tool.title,
+                                                    style = MaterialTheme.typography.titleMedium,
+                                                    color = cardInk,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Text(
+                                                    text = tool.subtitle,
+                                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 16.sp),
+                                                    color = cardSubInk,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                             }
                                         }
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = innerChipBg,
-                                            border = BorderStroke(1.2.dp, innerChipBorder)
-                                        ) {
-                                            Text(
-                                                text = tool.badge,
-                                                style = MaterialTheme.typography.labelSmall,
-                                                fontSize = 12.sp,
-                                                color = colors.textPrimary,
-                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                            )
-                                        }
                                     }
-                                    Text(
-                                        text = tool.title,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = cardInk,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = tool.subtitle,
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 16.sp),
-                                        color = cardSubInk,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    repeat(columns - rowTools.size) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
                                 }
                             }
                         }
-                        if (pair.size == 1) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
                     }
-                }
                 }
             }
         }
@@ -947,12 +978,14 @@ fun MeldSettingsScreen(
     uiState: MeldUiState,
     onToggleAutoDownloads: (Boolean) -> Unit,
     onUpdateDefaultHandout: (Int) -> Unit,
-    onReplayIntro: () -> Unit
+    onReplayIntro: () -> Unit,
+    contentStartPadding: Dp = 20.dp,
+    contentBottomPadding: Dp = 136.dp
 ) {
     val colors = meldColors
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 136.dp),
+        contentPadding = PaddingValues(start = contentStartPadding, end = 20.dp, top = 12.dp, bottom = contentBottomPadding),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
@@ -1182,6 +1215,85 @@ private fun PrefsSectionLabel(text: String) {
     )
 }
 
+private val MeldNavItems = listOf(
+    Triple(DockTab.STUDIO, "Studio", Icons.Default.GridView),
+    Triple(DockTab.ALL_TOOLS, "Tools", Icons.Default.Build),
+    Triple(DockTab.SETTINGS, "Prefs", Icons.Default.Tune)
+)
+
+@Composable
+private fun MeldNavTabPill(
+    tab: DockTab,
+    label: String,
+    icon: ImageVector,
+    activeTab: DockTab,
+    onSelectTab: (DockTab) -> Unit,
+    minWidth: Dp,
+    minHeight: Dp,
+    horizontalPadding: Dp,
+    cornerRadius: Dp
+) {
+    val colors = meldColors
+    val haptic = LocalHapticFeedback.current
+    val reduceMotion = rememberReduceMotion()
+    val selected = tab == activeTab
+    val pillBg by animateColorAsState(
+        targetValue = if (selected) colors.dockSelectedBg else Color.Transparent,
+        animationSpec = MeldMotion.snapSpring(),
+        label = "dockPillBg"
+    )
+    val iconScale by animateFloatAsState(
+        targetValue = if (reduceMotion) 1f else if (selected) 1.06f else 1f,
+        animationSpec = MeldMotion.popSpring(),
+        label = "dockIconScale"
+    )
+    val shape = RoundedCornerShape(cornerRadius)
+
+    Surface(
+        modifier = Modifier
+            .clip(shape)
+            .semantics {
+                role = androidx.compose.ui.semantics.Role.Tab
+                this.selected = selected
+            }
+            .clickable {
+                if (tab != activeTab) {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onSelectTab(tab)
+                }
+            },
+        shape = shape,
+        color = pillBg
+    ) {
+        Column(
+            modifier = Modifier
+                .defaultMinSize(minWidth = minWidth, minHeight = minHeight)
+                .padding(horizontal = horizontalPadding, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (selected) colors.dockSelectedContent else colors.dockUnselectedContent,
+                modifier = Modifier
+                    .size(22.dp)
+                    .graphicsLayer {
+                        scaleX = iconScale
+                        scaleY = iconScale
+                    }
+            )
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                color = if (selected) colors.dockSelectedContent else colors.dockUnselectedContent,
+                maxLines = 1
+            )
+        }
+    }
+}
+
 @Composable
 fun MeldFloatingBottomDock(
     activeTab: DockTab,
@@ -1191,8 +1303,6 @@ fun MeldFloatingBottomDock(
 ) {
     val colors = meldColors
     val density = LocalDensity.current
-    val haptic = LocalHapticFeedback.current
-    val reduceMotion = rememberReduceMotion()
     val slide90Px = with(density) { 90.dp.toPx() }
     val dockT = if (!openingDriver.showOverlay) 1f else openingDriver.navDockAnim.value
 
@@ -1216,66 +1326,76 @@ fun MeldFloatingBottomDock(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val items = listOf(
-                Triple(DockTab.STUDIO, "Studio", Icons.Default.GridView),
-                Triple(DockTab.ALL_TOOLS, "Tools", Icons.Default.Build),
-                Triple(DockTab.SETTINGS, "Prefs", Icons.Default.Tune)
-            )
-            items.forEach { (tab, label, icon) ->
-                val selected = tab == activeTab
-                val pillBg by animateColorAsState(
-                    targetValue = if (selected) colors.dockSelectedBg else Color.Transparent,
-                    animationSpec = MeldMotion.snapSpring(),
-                    label = "dockPillBg"
+            MeldNavItems.forEach { (tab, label, icon) ->
+                MeldNavTabPill(
+                    tab = tab,
+                    label = label,
+                    icon = icon,
+                    activeTab = activeTab,
+                    onSelectTab = onSelectTab,
+                    minWidth = 76.dp,
+                    minHeight = 52.dp,
+                    horizontalPadding = 14.dp,
+                    cornerRadius = 999.dp
                 )
-                val iconScale by animateFloatAsState(
-                    targetValue = if (reduceMotion) 1f else if (selected) 1.06f else 1f,
-                    animationSpec = MeldMotion.popSpring(),
-                    label = "dockIconScale"
-                )
+            }
+        }
+    }
+}
 
-                Surface(
-                    modifier = Modifier
-                        .clip(CircleShape)
-                        .semantics {
-                            role = androidx.compose.ui.semantics.Role.Tab
-                            this.selected = selected
-                        }
-                        .clickable {
-                            if (tab != activeTab) {
-                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                onSelectTab(tab)
-                            }
-                        },
-                    shape = CircleShape,
-                    color = pillBg
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .defaultMinSize(minWidth = 76.dp, minHeight = 52.dp)
-                            .padding(horizontal = 14.dp, vertical = 6.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = if (selected) colors.dockSelectedContent else colors.dockUnselectedContent,
-                            modifier = Modifier
-                                .size(22.dp)
-                                .graphicsLayer {
-                                    scaleX = iconScale
-                                    scaleY = iconScale
-                                }
-                        )
-                        Text(
-                            text = label,
-                            fontSize = 12.sp,
-                            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.SemiBold,
-                            color = if (selected) colors.dockSelectedContent else colors.dockUnselectedContent,
-                            maxLines = 1
-                        )
-                    }
+/**
+ * Compact vertical navigation rail replacing [MeldFloatingBottomDock] on short landscape viewports
+ * and medium/expanded tablet widths so content scrolls unobstructed without overlapping chrome.
+ */
+@Composable
+fun MeldNavigationRail(
+    activeTab: DockTab,
+    openingDriver: MeldOpeningDriver,
+    onSelectTab: (DockTab) -> Unit,
+    compactHeight: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val colors = meldColors
+    val density = LocalDensity.current
+    val slide90Px = with(density) { 90.dp.toPx() }
+    val dockT = if (!openingDriver.showOverlay) 1f else openingDriver.navDockAnim.value
+
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+        contentAlignment = if (compactHeight) Alignment.Center else Alignment.TopCenter
+    ) {
+        Surface(
+            modifier = Modifier
+                .graphicsLayer {
+                    alpha = dockT.coerceIn(0f, 1f)
+                    translationX = -(1f - dockT) * slide90Px
+                },
+            shape = RoundedCornerShape(28.dp),
+            color = colors.dockBg,
+            border = BorderStroke(2.dp, colors.dockBorder),
+            shadowElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 8.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MeldNavItems.forEach { (tab, label, icon) ->
+                    MeldNavTabPill(
+                        tab = tab,
+                        label = label,
+                        icon = icon,
+                        activeTab = activeTab,
+                        onSelectTab = onSelectTab,
+                        minWidth = 62.dp,
+                        minHeight = 56.dp,
+                        horizontalPadding = 10.dp,
+                        cornerRadius = 20.dp
+                    )
                 }
             }
         }
@@ -1297,6 +1417,7 @@ fun MeldChangeFileBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp, vertical = 8.dp)
                 .padding(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
