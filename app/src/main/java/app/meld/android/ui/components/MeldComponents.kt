@@ -1,5 +1,6 @@
 package app.meld.android.ui.components
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
@@ -82,14 +83,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.meld.android.R
 import app.meld.android.model.ConversionResult
 import app.meld.android.ui.MeldAdaptiveLayout
 import app.meld.android.ui.theme.MeldDimens
@@ -619,7 +623,7 @@ fun BeforeAfterComparisonCard(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             BeforeAfterBarRow(
-                label = "Now",
+                label = stringResource(R.string.before_now_label),
                 sizeLabel = nowLabel,
                 barColor = colors.track,
                 textColor = colors.textPrimary,
@@ -627,7 +631,7 @@ fun BeforeAfterComparisonCard(
                 largeFont = largeFont
             )
             BeforeAfterBarRow(
-                label = "After",
+                label = stringResource(R.string.after_target_label),
                 sizeLabel = afterLabel,
                 barColor = colors.mint,
                 textColor = colors.inkOnAccent,
@@ -863,7 +867,7 @@ fun ResultShowcaseCard(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
-                                    text = "MELD",
+                                    text = stringResource(R.string.app_name),
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     maxLines = 1,
@@ -900,7 +904,7 @@ fun ResultShowcaseCard(
                         ) {
                             Image(
                                 bitmap = renderedPreview.asImageBitmap(),
-                                contentDescription = "Result preview",
+                                contentDescription = stringResource(R.string.cd_result_preview),
                                 contentScale = ContentScale.Fit,
                                 modifier = Modifier
                                     .fillMaxSize()
@@ -909,6 +913,7 @@ fun ResultShowcaseCard(
                         }
                     }
                 } else if (state == 1) {
+                    val previewContext = LocalContext.current
                     val previewText by produceState(
                         initialValue = result.summary,
                         result.outputFile.absolutePath,
@@ -916,7 +921,7 @@ fun ResultShowcaseCard(
                         result.durationMs
                     ) {
                         value = withContext(Dispatchers.IO) {
-                            buildRichOutputPreview(result)
+                            buildRichOutputPreview(previewContext, result)
                         }
                     }
                     Box(
@@ -1049,7 +1054,7 @@ private fun readBoundedText(reader: java.io.Reader, maxChars: Int): String {
     return String(buf, 0, total)
 }
 
-private fun buildRichOutputPreview(result: ConversionResult): String {
+private fun buildRichOutputPreview(context: Context, result: ConversionResult): String {
     val file = result.outputFile
     val ext = file.extension.lowercase()
     return runCatching {
@@ -1059,7 +1064,9 @@ private fun buildRichOutputPreview(result: ConversionResult): String {
                 file.bufferedReader().use { readBoundedText(it, 240) }
             ext == "zip" -> ZipFile(file).use { zf ->
                 val entries = zf.entries().asSequence().take(4).joinToString("\n") { "• ${it.name}" }
-                "ZIP Archive (${zf.size()} item${if (zf.size() == 1) "" else "s"})\n$entries"
+                val count = zf.size()
+                val itemsLabel = context.resources.getQuantityString(R.plurals.preview_zip_items, count, count)
+                context.getString(R.string.preview_zip_header, itemsLabel, entries)
             }
             ext == "wav" && file.length() >= 44 -> {
                 val hdr = ByteArray(44)
@@ -1069,7 +1076,13 @@ private fun buildRichOutputPreview(result: ConversionResult): String {
                 val sr = bb.getInt(24).coerceAtLeast(8000)
                 val dataBytes = (file.length() - 44L).coerceAtLeast(0L)
                 val secs = dataBytes.toDouble() / (sr * ch * 2.0)
-                "PCM WAV Audio\n${sr} Hz · ${if (ch == 2) "Stereo" else "Mono"} · ${String.format("%.1fs", secs)}"
+                val chLabel = context.getString(if (ch == 2) R.string.audio_stereo else R.string.audio_mono)
+                context.getString(
+                    R.string.preview_wav_header,
+                    sr,
+                    chLabel,
+                    String.format("%.1fs", secs)
+                )
             }
             ext == "docx" -> ZipFile(file).use { zf ->
                 val docEntry = zf.getEntry("word/document.xml")
@@ -1079,9 +1092,13 @@ private fun buildRichOutputPreview(result: ConversionResult): String {
                         .replace(Regex("\\s+"), " ")
                         .trim()
                 } else ""
-                "OpenXML Word (.docx)\n${plain.take(180)}"
+                context.getString(R.string.preview_docx_header, plain.take(180))
             }
-            else -> "${result.tool.title}\n${result.summary}"
+            else -> context.getString(
+                R.string.preview_fallback_header,
+                context.getString(result.tool.titleRes),
+                result.summary
+            )
         }
     }.getOrElse { result.summary }
 }

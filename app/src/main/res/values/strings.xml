@@ -1,5 +1,382 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App Identity & Branding -->
     <string name="app_name">MELD</string>
+    <string name="brand_wordmark">meld</string>
     <string name="app_tagline">TRANSFORM • CONVERT • ORGANIZE</string>
-</resources>
+    <string name="works_offline">Works offline</string>
+    <string name="privacy_banner_task">Stays on your phone. Nothing is uploaded.</string>
+    <string name="share_chooser_title">Share MELD Output</string>
 
+    <!-- Studio Greeting & Home -->
+    <string name="greeting_morning">Good morning.</string>
+    <string name="greeting_afternoon">Good afternoon.</string>
+    <string name="greeting_evening">Good evening.</string>
+    <string name="home_subtitle_prompt">What needs sorting today?</string>
+    <string name="working_on_label">WORKING ON</string>
+    <string name="default_lecture_deck">Lecture Deck</string>
+    <string name="tap_change_file_hint">Tap Change file to pick one</string>
+    <string name="change_file">Change file</string>
+    <string name="quick_tools_heading">Quick tools</string>
+    <string name="all_tools_count">All %1$d</string>
+    <string name="more_for_file_heading">More for this file</string>
+    <string name="recent_title_with_ext">%1$s · %2$s</string>
+    <string name="recent_result_meta">%1$s · just now</string>
+    <string name="cd_share_result">Share result</string>
+
+    <!-- Navigation Dock & Rail -->
+    <string name="nav_studio">Studio</string>
+    <string name="nav_tools">Tools</string>
+    <string name="nav_prefs">Prefs</string>
+
+    <!-- Tool Modes & Categories -->
+    <string name="mode_all">All</string>
+    <string name="mode_convert">Convert</string>
+    <string name="mode_tools">Tools</string>
+
+    <string name="category_all">All</string>
+    <string name="category_pdfs">PDFs</string>
+    <string name="category_images">Images</string>
+    <string name="category_audio">Audio</string>
+    <string name="category_tables_zip">Tables &amp; Zip</string>
+
+    <!-- Built-in Sample Presets & File Metadata -->
+    <string name="sample_pdf_label">Lecture Deck.pdf</string>
+    <string name="sample_pdf_badge">4 pages</string>
+    <string name="sample_image_label">Studio Subject.png</string>
+    <string name="sample_image_badge">1080×1080</string>
+    <string name="sample_audio_label">Studio Synth.wav</string>
+    <string name="sample_audio_badge">PCM WAV</string>
+    <string name="sample_csv_label">Benchmark.csv</string>
+    <string name="sample_csv_badge">5 rows</string>
+
+    <plurals name="file_page_count">
+        <item quantity="one">%1$d page</item>
+        <item quantity="other">%1$d pages</item>
+    </plurals>
+    <string name="file_meta_pages_size">%1$s · %2$s</string>
+    <string name="file_meta_ext_size">%1$s · %2$s</string>
+
+    <!-- All Tools Tab -->
+    <string name="all_tools_heading">All tools.</string>
+    <string name="working_on_inline">Working on %1$s</string>
+    <string name="sample_file_fallback">sample file</string>
+    <string name="search_tools_placeholder">Find PDF, PNG, Word, Markdown, Remove BG…</string>
+    <string name="cd_clear_search">Clear search</string>
+    <string name="no_matching_tools_title">No matching tools</string>
+    <string name="no_matching_tools_subtitle">Try another keyword or clear your filters.</string>
+    <string name="reset_filters">Reset filters</string>
+
+    <!-- Preferences Tab -->
+    <string name="prefs_heading">Preferences.</string>
+    <string name="prefs_subtitle">Local rules and how MELD handles your files</string>
+    <string name="prefs_section_privacy">PRIVACY</string>
+    <string name="prefs_section_output">OUTPUT</string>
+    <string name="prefs_section_experience">EXPERIENCE</string>
+    <string name="prefs_section_about">ABOUT</string>
+    <string name="privacy_promise_title">100% On-device promise</string>
+    <string name="privacy_promise_body">MELD requests zero internet permission. Your documents never touch a server.</string>
+    <string name="auto_downloads_title">Save directly to Downloads/MELD</string>
+    <string name="auto_downloads_on_desc">On: every result is also copied to Downloads/MELD.</string>
+    <string name="auto_downloads_off_desc">Off: files stay private inside MELD until you tap Save.</string>
+    <string name="default_handout_layout_title">Default Study Handout Layout</string>
+    <string name="handout_2_up">2-up + notes</string>
+    <string name="handout_3_up_short">3-up notes</string>
+    <string name="handout_3_up_long">3-up (Mac style)</string>
+    <string name="handout_4_up">4-up grid</string>
+    <string name="replay_intro_title">Replay Opening Animation</string>
+    <string name="replay_intro_subtitle">Watch the MELD sheet fold &amp; dock choreography</string>
+    <string name="about_version_title">MELD for Android v%1$s</string>
+    <string name="about_version_subtitle">%1$d local utility engines • Open source under github.com/meld-app</string>
+
+    <!-- Change File Bottom Sheet -->
+    <string name="sheet_pick_file_title">Pick a file to work on</string>
+    <string name="sheet_browse_title">Browse phone storage</string>
+    <string name="sheet_browse_subtitle">Pick any PDF, image, audio, or CSV</string>
+    <string name="sheet_try_sample_label">Or try a built-in studio sample:</string>
+
+    <!-- Task & Result Screens -->
+    <string name="cd_back">Back</string>
+    <string name="cd_close">Close</string>
+    <string name="cd_decrease">Decrease</string>
+    <string name="cd_increase">Increase</string>
+    <string name="qr_task_subtitle">Encodes text or URLs offline into an ISO QR card</string>
+    <string name="file_info_inline">%1$s · %2$s</string>
+    <string name="built_in_sample_ready">Built-in studio sample ready</string>
+    <string name="incompatible_file_notice">Selected .%1$s isn\'t compatible — runs on studio sample or tap to pick another file.</string>
+    <string name="change_short">Change</string>
+    <string name="working_on_it">Working on it…</string>
+
+    <string name="aim_for_label">AIM FOR</string>
+    <string name="unit_kb">KB</string>
+    <string name="kb_value_format">%1$d KB</string>
+    <string name="custom_preset_label">Custom</string>
+    <string name="custom_kb_input_label">Custom size limit (10–%1$d KB)</string>
+    <string name="before_now_label">Now</string>
+    <string name="after_target_label">After</string>
+    <string name="negative_percent_value">-%1$d%%</string>
+
+    <string name="study_layout_label">STUDY LAYOUT</string>
+    <string name="study_layout_2up_desc">2 slides + generous note lines</string>
+    <string name="study_layout_3up_desc">3 slides + ruled lecture notes</string>
+    <string name="study_layout_4up_desc">4 slides compact 2x2 grid</string>
+
+    <string name="extract_range_label">EXTRACT RANGE</string>
+    <string name="pages_range_format">Pages %1$d to %2$d</string>
+    <string name="from_page_label">From page</string>
+    <string name="to_page_label">To page</string>
+    <string name="page_tile_short">P%1$d</string>
+
+    <string name="watermark_input_label">Diagonal Watermark Text</string>
+    <string name="watermark_locked_fallback">LOCKED</string>
+    <string name="watermark_preset_confidential">CONFIDENTIAL</string>
+    <string name="watermark_preset_verified">MELD VERIFIED</string>
+    <string name="watermark_preset_draft">DRAFT COPY</string>
+    <string name="watermark_preset_internal">INTERNAL ONLY</string>
+
+    <string name="scale_output_label">SCALE OUTPUT TO</string>
+    <string name="percent_value">%1$d%%</string>
+    <string name="add_studio_border_title">Add Dark Studio Border</string>
+    <string name="add_studio_border_subtitle">Frames your image neatly with dimension stamp</string>
+
+    <string name="edge_feathering_label">EDGE FEATHERING</string>
+    <string name="edge_feathering_hint">Higher values strip slightly more backdrop halo into alpha</string>
+
+    <string name="qr_payload_label">Link or text to encode</string>
+
+    <string name="redaction_targets_header">PAGE 1 REDACTION TARGETS (%1$d ACTIVE)</string>
+    <string name="cd_redact_preview">PDF Page 1 Redaction Preview</string>
+    <string name="redact_zone_header_id">Header / ID</string>
+    <string name="redact_zone_upper_strip">Upper strip</string>
+    <string name="redact_zone_mid_block">Mid block</string>
+    <string name="redact_zone_footer_sig">Footer / Sig</string>
+    <string name="redact_zone_full_page">Full page scrub</string>
+
+    <string name="result_heading">Result</string>
+    <string name="cd_result_preview">Result preview</string>
+    <string name="keep_going_label">Keep going</string>
+    <string name="action_save">Save</string>
+    <string name="action_share">Share</string>
+
+    <!-- Rich Output Previews & Tool Animation Stages -->
+    <plurals name="preview_zip_items">
+        <item quantity="one">%1$d item</item>
+        <item quantity="other">%1$d items</item>
+    </plurals>
+    <string name="preview_zip_header">ZIP Archive (%1$s)\n%2$s</string>
+    <string name="preview_wav_header">PCM WAV Audio\n%1$d Hz · %2$s · %3$s</string>
+    <string name="audio_stereo">Stereo</string>
+    <string name="audio_mono">Mono</string>
+    <string name="preview_docx_header">OpenXML Word (.docx)\n%1$s</string>
+    <string name="preview_fallback_header">%1$s\n%2$s</string>
+
+    <string name="stage_hint_offline">Runs completely offline on your phone · Tap stage to replay.</string>
+    <string name="stage_badge_file">FILE</string>
+    <string name="stage_live_waveform">LIVE STUDIO WAVEFORM</string>
+    <string name="stage_waveform_res">1920×600 PNG waveform render</string>
+    <string name="stage_double_tempo">2.0x DOUBLE TEMPO STREAM</string>
+
+    <!-- ViewModel Status & Error Messages -->
+    <string name="vm_loaded_sample">Loaded %1$s</string>
+    <string name="vm_failed_create_sample">Failed to create sample</string>
+    <string name="vm_err_content_uri_only">Only content:// URIs can be imported safely.</string>
+    <string name="vm_err_internal_uri">Cannot import internal MELD FileProvider URI.</string>
+    <string name="vm_err_exceeds_limit">File exceeds the 100 MB offline safety limit.</string>
+    <string name="vm_err_cannot_read_stream">Cannot read selected file permission or stream</string>
+    <string name="vm_err_stream_exceeds_limit">Imported stream exceeds 100 MB safety cap.</string>
+    <string name="vm_err_empty_file">Selected file appears to be empty</string>
+    <string name="vm_ready_file">Ready: %1$s</string>
+    <string name="vm_err_could_not_open">Could not open the selected file.</string>
+    <string name="vm_result_summary_with_duration">%1$s. Took %2$d ms.</string>
+    <string name="vm_auto_saved_to">Auto-saved to %1$s</string>
+    <string name="vm_err_running_tool">Something went wrong while running %1$s.</string>
+    <string name="vm_saved_to">Saved to %1$s</string>
+    <string name="vm_saved_locally_share">Saved locally — tap Share to export</string>
+
+    <!-- Tool Catalog: Titles, Badges, Subtitles, CTAs, Result Headlines -->
+    <string name="tool_img_to_jpg_title">To JPG</string>
+    <string name="tool_img_to_jpg_badge">JPG</string>
+    <string name="tool_img_to_jpg_subtitle">Save any PNG, WebP, BMP, or TIFF as a compact JPEG</string>
+    <string name="tool_img_to_jpg_cta">Convert to JPG</string>
+    <string name="tool_img_to_jpg_result">JPEG ready.</string>
+
+    <string name="tool_img_to_png_title">To PNG</string>
+    <string name="tool_img_to_png_badge">PNG</string>
+    <string name="tool_img_to_png_subtitle">Convert into a crisp lossless 32-bit PNG</string>
+    <string name="tool_img_to_png_cta">Convert to PNG</string>
+    <string name="tool_img_to_png_result">PNG ready.</string>
+
+    <string name="tool_img_to_webp_title">To WebP</string>
+    <string name="tool_img_to_webp_badge">WebP</string>
+    <string name="tool_img_to_webp_subtitle">Turn an image into a lighter modern WebP file</string>
+    <string name="tool_img_to_webp_cta">Convert to WebP</string>
+    <string name="tool_img_to_webp_result">WebP ready.</string>
+
+    <string name="tool_img_to_bmp_title">To BMP</string>
+    <string name="tool_img_to_bmp_badge">BMP</string>
+    <string name="tool_img_to_bmp_subtitle">Export uncompressed 24-bit Windows Bitmap</string>
+    <string name="tool_img_to_bmp_cta">Convert to BMP</string>
+    <string name="tool_img_to_bmp_result">Bitmap ready.</string>
+
+    <string name="tool_img_to_tiff_title">To TIFF</string>
+    <string name="tool_img_to_tiff_badge">TIFF</string>
+    <string name="tool_img_to_tiff_subtitle">Export archival uncompressed RGB TIFF</string>
+    <string name="tool_img_to_tiff_cta">Convert to TIFF</string>
+    <string name="tool_img_to_tiff_result">TIFF ready.</string>
+
+    <string name="tool_img_to_pdf_title">Image to PDF</string>
+    <string name="tool_img_to_pdf_badge">A4 PDF</string>
+    <string name="tool_img_to_pdf_subtitle">Center an image cleanly onto a print-ready A4 page</string>
+    <string name="tool_img_to_pdf_cta">Create PDF</string>
+    <string name="tool_img_to_pdf_result">PDF ready.</string>
+
+    <string name="tool_remove_bg_title">Remove BG</string>
+    <string name="tool_remove_bg_badge">Alpha</string>
+    <string name="tool_remove_bg_subtitle">Lift the subject cleanly onto a transparent PNG</string>
+    <string name="tool_remove_bg_cta">Remove background</string>
+    <string name="tool_remove_bg_result">Background removed.</string>
+
+    <string name="tool_compress_img_title">Compress Img</string>
+    <string name="tool_compress_img_badge">Target KB</string>
+    <string name="tool_compress_img_subtitle">Squeeze an image under any portal upload limit</string>
+    <string name="tool_compress_img_cta">Compress image</string>
+    <string name="tool_compress_img_result">Compressed cleanly.</string>
+
+    <string name="tool_resize_image_title">Resize &amp; Frame</string>
+    <string name="tool_resize_image_badge">Scale</string>
+    <string name="tool_resize_image_subtitle">Scale dimensions &amp; add an optional studio border</string>
+    <string name="tool_resize_image_cta">Resize image</string>
+    <string name="tool_resize_image_result">Resized cleanly.</string>
+
+    <string name="tool_collage_title">Photo Collage</string>
+    <string name="tool_collage_badge">2x2 Grid</string>
+    <string name="tool_collage_subtitle">Arrange a 2x2 studio contact sheet with borders</string>
+    <string name="tool_collage_cta">Build collage</string>
+    <string name="tool_collage_result">Collage ready.</string>
+
+    <string name="tool_strip_exif_title">Strip EXIF</string>
+    <string name="tool_strip_exif_badge">Privacy</string>
+    <string name="tool_strip_exif_subtitle">Wipe GPS location &amp; camera tags before sharing</string>
+    <string name="tool_strip_exif_cta">Strip metadata</string>
+    <string name="tool_strip_exif_result">Metadata wiped.</string>
+
+    <string name="tool_scan_qr_title">QR Studio</string>
+    <string name="tool_scan_qr_badge">QR Card</string>
+    <string name="tool_scan_qr_subtitle">Generate a crisp offline QR card for any link</string>
+    <string name="tool_scan_qr_cta">Create QR card</string>
+    <string name="tool_scan_qr_result">QR card ready.</string>
+
+    <string name="tool_pdf_to_png_title">PDF to PNG</string>
+    <string name="tool_pdf_to_png_badge">HD PNG</string>
+    <string name="tool_pdf_to_png_subtitle">Render PDF pages as crisp lossless images</string>
+    <string name="tool_pdf_to_png_cta">Export PNG</string>
+    <string name="tool_pdf_to_png_result">Image ready.</string>
+
+    <string name="tool_pdf_to_jpg_title">PDF to JPG</string>
+    <string name="tool_pdf_to_jpg_badge">HD JPG</string>
+    <string name="tool_pdf_to_jpg_subtitle">Save PDF pages as shareable JPEG photos</string>
+    <string name="tool_pdf_to_jpg_cta">Export JPG</string>
+    <string name="tool_pdf_to_jpg_result">JPEG ready.</string>
+
+    <string name="tool_pdf_to_md_title">PDF to Markdown</string>
+    <string name="tool_pdf_to_md_badge">MD</string>
+    <string name="tool_pdf_to_md_subtitle">Extract document structure into clean Markdown notes</string>
+    <string name="tool_pdf_to_md_cta">Convert to Markdown</string>
+    <string name="tool_pdf_to_md_result">Markdown ready.</string>
+
+    <string name="tool_pdf_to_html_title">PDF to HTML5</string>
+    <string name="tool_pdf_to_html_badge">Web Doc</string>
+    <string name="tool_pdf_to_html_subtitle">Build a standalone offline HTML5 reader page</string>
+    <string name="tool_pdf_to_html_cta">Export HTML5</string>
+    <string name="tool_pdf_to_html_result">Reader ready.</string>
+
+    <string name="tool_pdf_to_docx_title">PDF to Word</string>
+    <string name="tool_pdf_to_docx_badge">DOCX</string>
+    <string name="tool_pdf_to_docx_subtitle">Convert PDF into an editable Microsoft Word file</string>
+    <string name="tool_pdf_to_docx_cta">Export to Word</string>
+    <string name="tool_pdf_to_docx_result">Word file ready.</string>
+
+    <string name="tool_pdf_to_txt_title">PDF to Text</string>
+    <string name="tool_pdf_to_txt_badge">TXT</string>
+    <string name="tool_pdf_to_txt_subtitle">Pull plain text &amp; page summary from your PDF</string>
+    <string name="tool_pdf_to_txt_cta">Extract text</string>
+    <string name="tool_pdf_to_txt_result">Text extracted.</string>
+
+    <string name="tool_compress_pdf_title">Compress</string>
+    <string name="tool_compress_pdf_badge">Target KB</string>
+    <string name="tool_compress_pdf_subtitle">Squeeze a PDF under any upload limit</string>
+    <string name="tool_compress_pdf_cta">Compress PDF</string>
+    <string name="tool_compress_pdf_result">Compressed cleanly.</string>
+
+    <string name="tool_handout_title">Handout</string>
+    <string name="tool_handout_badge">2/3/4-up</string>
+    <string name="tool_handout_subtitle">Arrange slides into 2, 3, or 4-up notes sheets</string>
+    <string name="tool_handout_cta">Create handout</string>
+    <string name="tool_handout_result">Handout ready.</string>
+
+    <string name="tool_pdf_extract_title">Split</string>
+    <string name="tool_pdf_extract_badge">Pages</string>
+    <string name="tool_pdf_extract_subtitle">Keep just the page range you actually need</string>
+    <string name="tool_pdf_extract_cta">Extract pages</string>
+    <string name="tool_pdf_extract_result">Pages split.</string>
+
+    <string name="tool_lock_stamp_title">Lock &amp; Stamp</string>
+    <string name="tool_lock_stamp_badge">Watermark</string>
+    <string name="tool_lock_stamp_subtitle">Stamp a diagonal security watermark across pages</string>
+    <string name="tool_lock_stamp_cta">Stamp PDF</string>
+    <string name="tool_lock_stamp_result">PDF stamped.</string>
+
+    <string name="tool_redact_title">Redact</string>
+    <string name="tool_redact_badge">Sanitize</string>
+    <string name="tool_redact_subtitle">Black out private zones &amp; flatten pages permanently</string>
+    <string name="tool_redact_cta">Redact &amp; flatten</string>
+    <string name="tool_redact_result">PDF redacted.</string>
+
+    <string name="tool_pdf_merge_title">Merge Booklet</string>
+    <string name="tool_pdf_merge_badge">Combine</string>
+    <string name="tool_pdf_merge_subtitle">Combine pages into a unified multi-page deck</string>
+    <string name="tool_pdf_merge_cta">Build booklet</string>
+    <string name="tool_pdf_merge_result">Booklet merged.</string>
+
+    <string name="tool_strip_pdf_meta_title">Sanitize PDF</string>
+    <string name="tool_strip_pdf_meta_badge">No Meta</string>
+    <string name="tool_strip_pdf_meta_subtitle">Strip author, producer &amp; hidden XMP properties</string>
+    <string name="tool_strip_pdf_meta_cta">Strip PDF metadata</string>
+    <string name="tool_strip_pdf_meta_result">Metadata stripped.</string>
+
+    <string name="tool_visualize_title">Waveform PNG</string>
+    <string name="tool_visualize_badge">Waveform</string>
+    <string name="tool_visualize_subtitle">Turn audio into a high-res gradient waveform banner</string>
+    <string name="tool_visualize_cta">Render waveform</string>
+    <string name="tool_visualize_result">Waveform ready.</string>
+
+    <string name="tool_speed_2x_title">Speed 2x</string>
+    <string name="tool_speed_2x_badge">2.0x</string>
+    <string name="tool_speed_2x_subtitle">Double audio playback speed locally in WAV</string>
+    <string name="tool_speed_2x_cta">Speed up 2x</string>
+    <string name="tool_speed_2x_result">2x audio ready.</string>
+
+    <string name="tool_sheet_to_pdf_title">Table to PDF</string>
+    <string name="tool_sheet_to_pdf_badge">A4 PDF</string>
+    <string name="tool_sheet_to_pdf_subtitle">Render CSV data into a crisp printable table PDF</string>
+    <string name="tool_sheet_to_pdf_cta">Export table PDF</string>
+    <string name="tool_sheet_to_pdf_result">Table PDF ready.</string>
+
+    <string name="tool_sheet_to_md_title">Table to MD</string>
+    <string name="tool_sheet_to_md_badge">Markdown</string>
+    <string name="tool_sheet_to_md_subtitle">Format spreadsheet rows into a Markdown table</string>
+    <string name="tool_sheet_to_md_cta">Convert to Markdown</string>
+    <string name="tool_sheet_to_md_result">Markdown table ready.</string>
+
+    <string name="tool_table_convert_title">Table to JSON</string>
+    <string name="tool_table_convert_badge">JSON</string>
+    <string name="tool_table_convert_subtitle">Parse spreadsheet rows into clean structured JSON</string>
+    <string name="tool_table_convert_cta">Convert to JSON</string>
+    <string name="tool_table_convert_result">JSON ready.</string>
+
+    <string name="tool_pack_zip_title">Zip Archive</string>
+    <string name="tool_pack_zip_badge">ZIP</string>
+    <string name="tool_pack_zip_subtitle">Pack your working file into a neat .zip archive</string>
+    <string name="tool_pack_zip_cta">Create ZIP</string>
+    <string name="tool_pack_zip_result">Archive packed.</string>
+</resources>

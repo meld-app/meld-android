@@ -10,8 +10,10 @@ import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.meld.android.R
 import app.meld.android.engine.DocumentEngine
 import app.meld.android.engine.ImageEngine
 import app.meld.android.engine.MediaEngine
@@ -36,17 +38,17 @@ import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.atomic.AtomicInteger
 
-enum class SamplePreset(val label: String, val badge: String) {
-    PDF_DECK("Lecture Deck.pdf", "4 pages"),
-    STUDIO_IMAGE("Studio Subject.png", "1080×1080"),
-    SYNTH_AUDIO("Studio Synth.wav", "PCM WAV"),
-    BENCHMARK_CSV("Benchmark.csv", "5 rows")
+enum class SamplePreset(@StringRes val labelRes: Int, @StringRes val badgeRes: Int) {
+    PDF_DECK(R.string.sample_pdf_label, R.string.sample_pdf_badge),
+    STUDIO_IMAGE(R.string.sample_image_label, R.string.sample_image_badge),
+    SYNTH_AUDIO(R.string.sample_audio_label, R.string.sample_audio_badge),
+    BENCHMARK_CSV(R.string.sample_csv_label, R.string.sample_csv_badge)
 }
 
-enum class DockTab(val label: String) {
-    STUDIO("Studio"),
-    ALL_TOOLS("Tools"),
-    SETTINGS("Prefs")
+enum class DockTab(@StringRes val labelRes: Int) {
+    STUDIO(R.string.nav_studio),
+    ALL_TOOLS(R.string.nav_tools),
+    SETTINGS(R.string.nav_prefs)
 }
 
 sealed class MeldScreenRoute {
@@ -244,7 +246,7 @@ class MeldViewModel : ViewModel() {
                         selectedFile = info,
                         isSelectedFileSample = true,
                         options = clampOptionsForFile(info, it.options),
-                        bannerMessage = "Loaded ${info.cleanTitle}",
+                        bannerMessage = context.getString(R.string.vm_loaded_sample, info.cleanTitle),
                         isBannerError = false
                     )
                 }
@@ -252,7 +254,7 @@ class MeldViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isProcessing = false,
-                        bannerMessage = err.message ?: "Failed to create sample",
+                        bannerMessage = err.message ?: context.getString(R.string.vm_failed_create_sample),
                         isBannerError = true
                     )
                 }
@@ -273,11 +275,11 @@ class MeldViewModel : ViewModel() {
                     withContext(Dispatchers.IO) {
                         val scheme = uri.scheme?.lowercase()
                         require(scheme == "content") {
-                            "Only content:// URIs can be imported safely."
+                            context.getString(R.string.vm_err_content_uri_only)
                         }
                         val selfAuthority = "${context.packageName}.fileprovider"
                         require(!uri.authority.equals(selfAuthority, ignoreCase = true)) {
-                            "Cannot import internal MELD FileProvider URI."
+                            context.getString(R.string.vm_err_internal_uri)
                         }
 
                         val resolver = context.contentResolver
@@ -296,7 +298,7 @@ class MeldViewModel : ViewModel() {
                             }
                         }
                         if (declaredSize > MAX_IMPORT_BYTES) {
-                            throw IllegalArgumentException("File exceeds the 100 MB offline safety limit.")
+                            throw IllegalArgumentException(context.getString(R.string.vm_err_exceeds_limit))
                         }
 
                         val sanitized = displayName
@@ -323,7 +325,7 @@ class MeldViewModel : ViewModel() {
                         val stream = resolver.openInputStream(uri)
                             ?: run {
                                 destFile.delete()
-                                throw IllegalStateException("Cannot read selected file permission or stream")
+                                throw IllegalStateException(context.getString(R.string.vm_err_cannot_read_stream))
                             }
 
                         var copyCompleted = false
@@ -338,7 +340,7 @@ class MeldViewModel : ViewModel() {
                                         if (read == -1) break
                                         totalBytes += read
                                         if (totalBytes > MAX_IMPORT_BYTES) {
-                                            throw IllegalArgumentException("Imported stream exceeds 100 MB safety cap.")
+                                            throw IllegalArgumentException(context.getString(R.string.vm_err_stream_exceeds_limit))
                                         }
                                         output.write(buffer, 0, read)
                                     }
@@ -346,7 +348,7 @@ class MeldViewModel : ViewModel() {
                                 }
                             }
                             if (!destFile.exists() || destFile.length() == 0L) {
-                                throw IllegalStateException("Selected file appears to be empty")
+                                throw IllegalStateException(context.getString(R.string.vm_err_empty_file))
                             }
                             copyCompleted = true
                         } finally {
@@ -364,7 +366,7 @@ class MeldViewModel : ViewModel() {
                             selectedFile = imported,
                             isSelectedFileSample = false,
                             options = clampOptionsForFile(imported, it.options),
-                            bannerMessage = "Ready: ${imported.cleanTitle}",
+                            bannerMessage = context.getString(R.string.vm_ready_file, imported.cleanTitle),
                             isBannerError = false
                         )
                     }
@@ -373,7 +375,7 @@ class MeldViewModel : ViewModel() {
                     _uiState.update {
                         it.copy(
                             isProcessing = false,
-                            bannerMessage = err.message ?: "Could not open the selected file.",
+                            bannerMessage = err.message ?: context.getString(R.string.vm_err_could_not_open),
                             isBannerError = true
                         )
                     }
@@ -564,7 +566,7 @@ class MeldViewModel : ViewModel() {
                         outputFile = outFile,
                         inputSizeBytes = recordedInputSize,
                         outputSizeBytes = outFile.length(),
-                        summary = "$summary. Took $elapsed ms.",
+                        summary = context.getString(R.string.vm_result_summary_with_duration, summary, elapsed),
                         durationMs = elapsed
                     )
                 }
@@ -584,7 +586,7 @@ class MeldViewModel : ViewModel() {
                         isProcessing = false,
                         route = MeldScreenRoute.Result(result),
                         recentResults = (listOf(result) + state.recentResults).take(12),
-                        bannerMessage = autoSavedPath?.let { "Auto-saved to $it" },
+                        bannerMessage = autoSavedPath?.let { context.getString(R.string.vm_auto_saved_to, it) },
                         isBannerError = false
                     )
                 }
@@ -596,7 +598,10 @@ class MeldViewModel : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isProcessing = false,
-                        bannerMessage = err.message ?: "Something went wrong while running ${tool.title}.",
+                        bannerMessage = err.message ?: context.getString(
+                            R.string.vm_err_running_tool,
+                            context.getString(tool.titleRes)
+                        ),
                         isBannerError = true
                     )
                 }
@@ -610,9 +615,9 @@ class MeldViewModel : ViewModel() {
             _uiState.update {
                 it.copy(
                     bannerMessage = if (savedPath != null) {
-                        "Saved to $savedPath"
+                        context.getString(R.string.vm_saved_to, savedPath)
                     } else {
-                        "Saved locally — tap Share to export"
+                        context.getString(R.string.vm_saved_locally_share)
                     },
                     isBannerError = false
                 )
