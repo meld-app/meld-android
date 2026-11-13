@@ -26,10 +26,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val creamColor = android.graphics.Color.parseColor("#FAF4EC")
+        val lightCanvas = android.graphics.Color.parseColor("#FAF4EC")
+        val darkCanvas = android.graphics.Color.parseColor("#151210")
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.light(creamColor, creamColor),
-            navigationBarStyle = SystemBarStyle.light(creamColor, creamColor)
+            statusBarStyle = SystemBarStyle.auto(lightCanvas, darkCanvas),
+            navigationBarStyle = SystemBarStyle.auto(lightCanvas, darkCanvas)
         )
 
         // Handle incoming "Share to MELD" intent on fresh launch (skip on rotation/history relaunch)

@@ -82,8 +82,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.meld.android.model.ConversionResult
-import app.meld.android.ui.theme.MeldColors
+import app.meld.android.ui.theme.MeldDimens
 import app.meld.android.ui.theme.MeldMotion
+import app.meld.android.ui.theme.meldColors
 import app.meld.android.ui.theme.rememberReduceMotion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -103,8 +104,10 @@ import kotlin.math.sin
 fun TactileCard(
     backgroundColor: Color,
     modifier: Modifier = Modifier,
-    cornerRadius: Dp = MeldColors.CardCorner,
+    cornerRadius: Dp = MeldDimens.CardCorner,
     elevationOffset: Dp = 3.dp,
+    borderColor: Color = meldColors.border,
+    shadowColor: Color = meldColors.hardShadow,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
@@ -129,7 +132,8 @@ fun TactileCard(
                 scaleX = s
                 scaleY = s
             }
-        }
+        },
+        propagateMinConstraints = true
     ) {
         if (elevationOffset > 0.dp) {
             Box(
@@ -137,13 +141,12 @@ fun TactileCard(
                     .matchParentSize()
                     .offset(y = elevationOffset)
                     .clip(shape)
-                    .background(MeldColors.InkBlack)
+                    .background(shadowColor)
             )
         }
 
         val clickModifier = if (onClick != null) {
             Modifier
-                .fillMaxSize()
                 .graphicsLayer {
                     if (!reduceMotion) {
                         translationY = pressPx * pressProgress
@@ -161,7 +164,6 @@ fun TactileCard(
                 )
         } else {
             Modifier
-                .fillMaxSize()
                 .clip(shape)
         }
 
@@ -169,7 +171,7 @@ fun TactileCard(
             modifier = clickModifier,
             shape = shape,
             color = backgroundColor,
-            border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+            border = BorderStroke(MeldDimens.StrokeWidth, borderColor)
         ) {
             Box(content = content)
         }
@@ -182,8 +184,9 @@ fun TactileCircleIconButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    backgroundColor: Color = MeldColors.PureWhite,
-    iconTint: Color = MeldColors.InkBlack,
+    backgroundColor: Color = meldColors.surface,
+    iconTint: Color = meldColors.textPrimary,
+    borderColor: Color = meldColors.border,
     size: Dp = 44.dp
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -223,7 +226,7 @@ fun TactileCircleIconButton(
                 },
             shape = CircleShape,
             color = backgroundColor,
-            border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+            border = BorderStroke(MeldDimens.StrokeWidth, borderColor)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
@@ -244,6 +247,7 @@ fun TactileChipPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = meldColors
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val reduceMotion = rememberReduceMotion()
@@ -271,13 +275,13 @@ fun TactileChipPill(
                 }
             ),
         shape = CircleShape,
-        color = if (selected) MeldColors.InkBlack else MeldColors.PureWhite,
-        border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+        color = if (selected) colors.chipSelectedBg else colors.surface,
+        border = BorderStroke(MeldDimens.StrokeWidth, colors.border)
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
-            color = if (selected) MeldColors.PureWhite else MeldColors.InkBlack,
+            color = if (selected) colors.chipSelectedContent else colors.textPrimary,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
         )
     }
@@ -287,14 +291,23 @@ fun TactileChipPill(
 fun TactilePillButton(
     text: String,
     icon: ImageVector? = null,
-    backgroundColor: Color = MeldColors.CoralOrange,
-    contentColor: Color = MeldColors.InkBlack,
+    backgroundColor: Color = meldColors.coral,
+    contentColor: Color = if (
+        backgroundColor == meldColors.surface ||
+        backgroundColor == meldColors.warmSurface ||
+        backgroundColor == meldColors.canvas
+    ) {
+        meldColors.textPrimary
+    } else {
+        meldColors.inkOnAccent
+    },
     enabled: Boolean = true,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     height: Dp = 56.dp,
     customContent: (@Composable () -> Unit)? = null
 ) {
+    val colors = meldColors
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val reduceMotion = rememberReduceMotion()
@@ -315,7 +328,7 @@ fun TactilePillButton(
                 .height(height)
                 .offset(y = 3.dp)
                 .clip(CircleShape)
-                .background(MeldColors.InkBlack)
+                .background(colors.hardShadow)
         )
 
         Surface(
@@ -342,7 +355,7 @@ fun TactilePillButton(
                 ),
             shape = CircleShape,
             color = backgroundColor,
-            border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+            border = BorderStroke(MeldDimens.StrokeWidth, colors.border)
         ) {
             if (customContent != null) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -381,6 +394,7 @@ fun WorkingDocumentIllustration(
     modifier: Modifier = Modifier,
     lineFractions: List<Float> = listOf(1f, 1f, 1f, 1f, 1f)
 ) {
+    val colors = meldColors
     Canvas(modifier = modifier.size(72.dp, 90.dp)) {
         val w = size.width
         val h = size.height
@@ -395,10 +409,10 @@ fun WorkingDocumentIllustration(
             close()
         }
 
-        drawPath(path = path, color = Color(0xFFFFFFFF))
+        drawPath(path = path, color = colors.paperFill)
         drawPath(
             path = path,
-            color = MeldColors.InkBlack,
+            color = colors.paperStroke,
             style = Stroke(width = 2.dp.toPx())
         )
 
@@ -410,14 +424,14 @@ fun WorkingDocumentIllustration(
 
         if (l0 > 0.01f) {
             drawRoundRect(
-                color = MeldColors.InkBlack,
+                color = colors.paperStroke,
                 topLeft = Offset(13.dp.toPx(), 16.dp.toPx()),
                 size = Size((w * 0.44f) * l0, 7.5.dp.toPx()),
                 cornerRadius = CornerRadius(3.dp.toPx())
             )
         }
 
-        val lineColor = Color(0xFFD8D2C4)
+        val lineColor = colors.paperLine
         val fullLineW = w * 0.64f
         val leftX = 13.dp.toPx()
         val ys = listOf(31.dp.toPx(), 41.dp.toPx(), 51.dp.toPx(), 61.dp.toPx())
@@ -444,6 +458,7 @@ fun TactileRulerSlider(
     onValueChange: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val colors = meldColors
     val safeMax = maxValue.coerceAtLeast(minValue + 10)
     val rawFraction = ((value - minValue).toFloat() / (safeMax - minValue).toFloat()).coerceIn(0f, 1f)
     val reduceMotion = rememberReduceMotion()
@@ -494,7 +509,7 @@ fun TactileRulerSlider(
                 val x = startX + (i.toFloat() / tickCount) * usableWidth
                 val tickH = if (i % 4 == 0) 28.dp.toPx() else 16.dp.toPx()
                 drawLine(
-                    color = MeldColors.InkBlack,
+                    color = colors.inkOnAccent,
                     start = Offset(x, bottomY - tickH),
                     end = Offset(x, bottomY),
                     strokeWidth = 2.dp.toPx()
@@ -505,13 +520,13 @@ fun TactileRulerSlider(
             val needleWidth = 8.dp.toPx()
             val needleHeight = 52.dp.toPx()
             drawRoundRect(
-                color = MeldColors.CoralOrange,
+                color = colors.coral,
                 topLeft = Offset(needleX - needleWidth / 2f, bottomY - needleHeight),
                 size = Size(needleWidth, needleHeight),
                 cornerRadius = CornerRadius(needleWidth / 2f)
             )
             drawRoundRect(
-                color = MeldColors.InkBlack,
+                color = colors.inkOnAccent,
                 topLeft = Offset(needleX - needleWidth / 2f, bottomY - needleHeight),
                 size = Size(needleWidth, needleHeight),
                 cornerRadius = CornerRadius(needleWidth / 2f),
@@ -527,6 +542,7 @@ fun BeforeAfterComparisonCard(
     afterLabel: String,
     afterRatio: Float
 ) {
+    val colors = meldColors
     val reduceMotion = rememberReduceMotion()
     val animatedRatio by animateFloatAsState(
         targetValue = afterRatio.coerceIn(0.18f, 0.96f),
@@ -535,7 +551,7 @@ fun BeforeAfterComparisonCard(
     )
 
     TactileCard(
-        backgroundColor = MeldColors.PureWhite,
+        backgroundColor = colors.surface,
         cornerRadius = 22.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -550,7 +566,7 @@ fun BeforeAfterComparisonCard(
                 Text(
                     text = "Now",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MeldColors.TextSecondary,
+                    color = colors.textSecondary,
                     modifier = Modifier.width(52.dp)
                 )
                 Box(
@@ -558,14 +574,14 @@ fun BeforeAfterComparisonCard(
                         .weight(1f)
                         .height(34.dp)
                         .clip(CircleShape)
-                        .background(MeldColors.TrackGray)
-                        .border(MeldColors.StrokeWidth, MeldColors.InkBlack, CircleShape),
+                        .background(colors.track)
+                        .border(MeldDimens.StrokeWidth, colors.border, CircleShape),
                     contentAlignment = Alignment.CenterEnd
                 ) {
                     Text(
                         text = nowLabel,
                         style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                        color = MeldColors.InkBlack,
+                        color = colors.textPrimary,
                         modifier = Modifier.padding(end = 14.dp)
                     )
                 }
@@ -578,7 +594,7 @@ fun BeforeAfterComparisonCard(
                 Text(
                     text = "After",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MeldColors.TextSecondary,
+                    color = colors.textSecondary,
                     modifier = Modifier.width(52.dp)
                 )
                 Box(modifier = Modifier.weight(1f)) {
@@ -587,14 +603,14 @@ fun BeforeAfterComparisonCard(
                             .fillMaxWidth(animatedRatio)
                             .height(34.dp)
                             .clip(CircleShape)
-                            .background(MeldColors.MintSage)
-                            .border(MeldColors.StrokeWidth, MeldColors.InkBlack, CircleShape),
+                            .background(colors.mint)
+                            .border(MeldDimens.StrokeWidth, colors.border, CircleShape),
                         contentAlignment = Alignment.CenterEnd
                     ) {
                         Text(
                             text = afterLabel,
                             style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
-                            color = MeldColors.InkBlack,
+                            color = colors.inkOnAccent,
                             modifier = Modifier.padding(horizontal = 14.dp)
                         )
                     }
@@ -705,6 +721,7 @@ fun ResultShowcaseCard(
         }
     }
 
+    val colors = meldColors
     val density = LocalDensity.current
     val renderedPreview = previewBitmap
     val ext = result.outputFile.extension.lowercase()
@@ -717,7 +734,7 @@ fun ResultShowcaseCard(
 
     Box(modifier = modifier.fillMaxWidth()) {
         TactileCard(
-            backgroundColor = MeldColors.SoftLavender,
+            backgroundColor = colors.lavender,
             cornerRadius = 26.dp,
             modifier = Modifier
                 .fillMaxWidth()
@@ -759,8 +776,8 @@ fun ResultShowcaseCard(
                                     alpha = 0.6f + 0.4f * fanProgress.value
                                 },
                             shape = RoundedCornerShape(14.dp),
-                            color = MeldColors.PureWhite,
-                            border = BorderStroke(2.dp, MeldColors.InkBlack)
+                            color = colors.paperFill,
+                            border = BorderStroke(2.dp, colors.paperStroke)
                         ) {
                             Column(
                                 modifier = Modifier.padding(10.dp),
@@ -770,7 +787,7 @@ fun ResultShowcaseCard(
                                     text = "MELD STUDIO",
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = MeldColors.InkBlack
+                                    color = colors.paperStroke
                                 )
                                 repeat(4) {
                                     Box(
@@ -778,7 +795,7 @@ fun ResultShowcaseCard(
                                             .fillMaxWidth()
                                             .height(20.dp)
                                             .clip(RoundedCornerShape(4.dp))
-                                            .background(MeldColors.WarmSurface)
+                                            .background(colors.paperLine.copy(alpha = 0.65f))
                                     )
                                 }
                             }
@@ -797,8 +814,8 @@ fun ResultShowcaseCard(
                                     scaleY = s
                                 },
                             shape = RoundedCornerShape(14.dp),
-                            color = MeldColors.PureWhite,
-                            border = BorderStroke(2.dp, MeldColors.InkBlack)
+                            color = colors.paperFill,
+                            border = BorderStroke(2.dp, colors.paperStroke)
                         ) {
                             Image(
                                 bitmap = renderedPreview.asImageBitmap(),
@@ -828,7 +845,7 @@ fun ResultShowcaseCard(
                         contentAlignment = Alignment.Center
                     ) {
                         TactileCard(
-                            backgroundColor = MeldColors.PureWhite,
+                            backgroundColor = colors.surface,
                             cornerRadius = 16.dp,
                             elevationOffset = 2.dp,
                             modifier = Modifier
@@ -843,13 +860,13 @@ fun ResultShowcaseCard(
                                 Text(
                                     text = result.outputFile.extension.uppercase(),
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = MeldColors.CoralOrange
+                                    color = colors.coral
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
                                 Text(
                                     text = previewText,
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = MeldColors.InkBlack,
+                                    color = colors.textPrimary,
                                     maxLines = 5
                                 )
                             }
@@ -868,8 +885,8 @@ fun ResultShowcaseCard(
                                 .fillMaxHeight(0.92f)
                                 .width(155.dp),
                             shape = RoundedCornerShape(14.dp),
-                            color = MeldColors.PureWhite.copy(alpha = 0.72f),
-                            border = BorderStroke(2.dp, MeldColors.InkBlack.copy(alpha = 0.25f))
+                            color = colors.paperFill.copy(alpha = 0.72f),
+                            border = BorderStroke(2.dp, colors.paperStroke.copy(alpha = 0.25f))
                         ) {}
                     }
                 }
@@ -890,7 +907,7 @@ fun ResultShowcaseCard(
                         scaleY = ringScale
                         alpha = ringAlpha
                     }
-                    .border(2.5.dp, MeldColors.CoralOrange, CircleShape)
+                    .border(2.5.dp, colors.coral, CircleShape)
             )
         }
 
@@ -907,8 +924,8 @@ fun ResultShowcaseCard(
                     alpha = badgeReveal.value.coerceIn(0f, 1f)
                 },
             shape = CircleShape,
-            color = MeldColors.CoralOrange,
-            border = BorderStroke(MeldColors.StrokeWidth, MeldColors.InkBlack)
+            color = colors.coral,
+            border = BorderStroke(MeldDimens.StrokeWidth, colors.border)
         ) {
             Canvas(modifier = Modifier.fillMaxSize().padding(14.dp)) {
                 val fullCheck = Path().apply {
@@ -922,7 +939,7 @@ fun ResultShowcaseCard(
                 pm.getSegment(0f, pm.length * checkDraw.value.coerceIn(0f, 1f), seg, true)
                 drawPath(
                     path = seg,
-                    color = MeldColors.InkBlack,
+                    color = colors.inkOnAccent,
                     style = Stroke(
                         width = 3.2.dp.toPx(),
                         cap = StrokeCap.Round,
