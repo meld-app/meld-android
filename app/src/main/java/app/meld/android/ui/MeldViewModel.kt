@@ -75,6 +75,7 @@ data class MeldUiState(
     val bannerMessage: String? = null,
     val isBannerError: Boolean = false,
     val recentResults: List<ConversionResult> = emptyList(),
+    val stagedBatchFiles: List<SelectedFileInfo> = emptyList(),
     val defaultSaveToDownloads: Boolean = false
 )
 
@@ -149,7 +150,14 @@ class MeldViewModel : ViewModel() {
     }
 
     fun openTask(tool: MeldToolId) {
-        _uiState.update { it.copy(route = MeldScreenRoute.Task(tool), bannerMessage = null, isBannerError = false) }
+        _uiState.update {
+            it.copy(
+                route = MeldScreenRoute.Task(tool),
+                stagedBatchFiles = seedBatchForTool(tool, it.selectedFile),
+                bannerMessage = null,
+                isBannerError = false
+            )
+        }
     }
 
     fun openResult(conversion: ConversionResult) {
@@ -218,11 +226,140 @@ class MeldViewModel : ViewModel() {
                 it.copy(
                     selectedFile = info,
                     isSelectedFileSample = false,
+                    stagedBatchFiles = seedBatchForTool(nextTool, info),
                     options = clampOptionsForFile(info, it.options),
                     route = MeldScreenRoute.Task(nextTool),
                     bannerMessage = null,
                     isBannerError = false
                 )
+            }
+        }
+    }
+
+    private fun seedBatchForTool(tool: MeldToolId, file: SelectedFileInfo?): List<SelectedFileInfo> {
+        if (!tool.supportsBatchQueue || file == null || !file.file.isFile) return emptyList()
+        return if (isCompatibleForBatch(tool, file)) listOf(file) else emptyList()
+    }
+
+    private fun isCompatibleForBatch(tool: MeldToolId, info: SelectedFileInfo): Boolean =
+        when (tool) {
+            MeldToolId.PDF_MERGE -> info.extension.equals("pdf", ignoreCase = true)
+            MeldToolId.COLLAGE -> tool.acceptsExtension(info.extension)
+            MeldToolId.PACK_ZIP -> true
+            else -> false
+        }
+
+    fun appendSampleToBatch(context: Context, tool: MeldToolId) {
+        val current = _uiState.value
+        if (current.isProcessing || !tool.supportsBatchQueue) return
+        if (current.stagedBatchFiles.size >= tool.maxBatchCount) {
+            _uiState.update {
+                it.copy(bannerMessage = context.getString(R.string.vm_batch_limit_reached, tool.maxBatchCount), isBannerError = false)
+            }
+            return
+        }
+        viewModelScope.launch {
+            val info = runCatching {
+                withContext(Dispatchers.IO) {
+                    val sampleDir = File(context.cacheDir, "samples").apply { mkdirs() }
+                    val sampleFile = when (tool) {
+                        MeldToolId.PDF_MERGE -> SampleFileFactory.createSamplePdf(sampleDir)
+                        MeldToolId.COLLAGE -> SampleFileFactory.createSampleImage(sampleDir)
+                        MeldToolId.PACK_ZIP -> {
+                            val existingNames = current.stagedBatchFiles.map { it.displayName }.toSet()
+                            val candidates = listOf(
+                                SampleFileFactory.createSamplePdf(sampleDir),
+                                SampleFileFactory.createSampleImage(sampleDir),
+                                SampleFileFactory.createSamplePptx(sampleDir),
+                                SampleFileFactory.createSampleCsv(sampleDir),
+                                SampleFileFactory.createSampleAudioWav(sampleDir)
+                            )
+                            candidates.firstOrNull { it.name !in existingNames }
+                                ?: candidates[current.stagedBatchFiles.size % candidates.size]
+                        }
+                        else -> autoProvideSampleForTool(context, tool)
+                    }
+                    buildFileInfo(sampleFile)
+                }
+            }
+            info.onSuccess { added ->
+                _uiState.update { state ->
+                    if (state.stagedBatchFiles.size >= tool.maxBatchCount) state
+                    else state.copy(
+                        stagedBatchFiles = state.stagedBatchFiles + added,
+                        bannerMessage = context.getString(R.string.vm_batch_added_one, added.cleanTitle),
+                        isBannerError = false
+                    )
+                }
+            }.onFailure { err ->
+                _uiState.update {
+                    it.copy(bannerMessage = err.message ?: context.getString(R.string.vm_failed_create_sample), isBannerError = true)
+                }
+            }
+        }
+    }
+
+    fun appendRecentResultToBatch(context: Context, tool: MeldToolId, conversion: ConversionResult) {
+        val current = _uiState.value
+        if (current.isProcessing || !tool.supportsBatchQueue) return
+        if (current.stagedBatchFiles.size >= tool.maxBatchCount) {
+            _uiState.update {
+                it.copy(bannerMessage = context.getString(R.string.vm_batch_limit_reached, tool.maxBatchCount), isBannerError = false)
+            }
+            return
+        }
+        viewModelScope.launch {
+            val info = withContext(Dispatchers.IO) {
+                if (conversion.outputFile.isFile) buildFileInfo(conversion.outputFile) else null
+            }
+            if (info != null && isCompatibleForBatch(tool, info)) {
+                _uiState.update { state ->
+                    if (state.stagedBatchFiles.size >= tool.maxBatchCount) state
+                    else state.copy(
+                        stagedBatchFiles = state.stagedBatchFiles + info,
+                        bannerMessage = context.getString(R.string.vm_batch_added_one, info.cleanTitle),
+                        isBannerError = false
+                    )
+                }
+            }
+        }
+    }
+
+    fun duplicateBatchItem(context: Context, tool: MeldToolId, index: Int) {
+        val current = _uiState.value
+        val item = current.stagedBatchFiles.getOrNull(index) ?: return
+        if (current.stagedBatchFiles.size >= tool.maxBatchCount) {
+            _uiState.update {
+                it.copy(bannerMessage = context.getString(R.string.vm_batch_limit_reached, tool.maxBatchCount), isBannerError = false)
+            }
+            return
+        }
+        val updated = current.stagedBatchFiles.toMutableList().apply {
+            add((index + 1).coerceAtMost(size), item)
+        }
+        _uiState.update { it.copy(stagedBatchFiles = updated, bannerMessage = null, isBannerError = false) }
+    }
+
+    fun moveBatchItem(index: Int, delta: Int) {
+        _uiState.update { state ->
+            val list = state.stagedBatchFiles.toMutableList()
+            val target = index + delta
+            if (index !in list.indices || target !in list.indices || delta == 0) {
+                state
+            } else {
+                val moved = list.removeAt(index)
+                list.add(target, moved)
+                state.copy(stagedBatchFiles = list)
+            }
+        }
+    }
+
+    fun removeBatchItem(index: Int) {
+        _uiState.update { state ->
+            if (index !in state.stagedBatchFiles.indices) state
+            else {
+                val updated = state.stagedBatchFiles.toMutableList().apply { removeAt(index) }
+                state.copy(stagedBatchFiles = updated)
             }
         }
     }
@@ -277,99 +414,20 @@ class MeldViewModel : ViewModel() {
             _uiState.update { it.copy(isProcessing = true, showFileSheet = false, bannerMessage = null, isBannerError = false) }
             try {
                 val result = runCatching {
-                    withContext(Dispatchers.IO) {
-                        val scheme = uri.scheme?.lowercase()
-                        require(scheme == "content") {
-                            context.getString(R.string.vm_err_content_uri_only)
-                        }
-                        val selfAuthority = "${context.packageName}.fileprovider"
-                        require(!uri.authority.equals(selfAuthority, ignoreCase = true)) {
-                            context.getString(R.string.vm_err_internal_uri)
-                        }
-
-                        val resolver = context.contentResolver
-                        var displayName = "document"
-                        var declaredSize = -1L
-                        resolver.query(uri, null, null, null, null)?.use { cursor ->
-                            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                            if (cursor.moveToFirst()) {
-                                if (nameIndex >= 0) {
-                                    displayName = cursor.getString(nameIndex) ?: displayName
-                                }
-                                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) {
-                                    declaredSize = cursor.getLong(sizeIndex)
-                                }
-                            }
-                        }
-                        if (declaredSize > MAX_IMPORT_BYTES) {
-                            throw IllegalArgumentException(context.getString(R.string.vm_err_exceeds_limit))
-                        }
-
-                        val sanitized = displayName
-                            .replace(Regex("[^A-Za-z0-9._-]"), "_")
-                            .trim('.')
-                            .let { candidate ->
-                                if (candidate.isBlank() || candidate == "." || candidate == "..") "document" else candidate
-                            }
-
-                        val candidateExt = if (sanitized.contains('.')) sanitized.substringAfterLast('.', "") else ""
-                        val withExt = if (VALID_EXT_REGEX.matches(candidateExt)) {
-                            sanitized
-                        } else {
-                            val mime = resolver.getType(uri)
-                            val inferred = mime?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
-                            val baseOnly = sanitized.substringBeforeLast('.').ifBlank { "document" }
-                            if (!inferred.isNullOrBlank()) "$baseOnly.$inferred" else sanitized
-                        }
-
-                        val importDir = File(context.cacheDir, "imports").apply { mkdirs() }
-                        pruneOldCacheFiles(importDir, maxKeep = MAX_CACHED_FILES)
-
-                        val destFile = File.createTempFile("imp_", "_$withExt", importDir)
-                        val stream = resolver.openInputStream(uri)
-                            ?: run {
-                                destFile.delete()
-                                throw IllegalStateException(context.getString(R.string.vm_err_cannot_read_stream))
-                            }
-
-                        var copyCompleted = false
-                        try {
-                            stream.use { input ->
-                                FileOutputStream(destFile).use { output ->
-                                    val buffer = ByteArray(16 * 1024)
-                                    var totalBytes = 0L
-                                    while (true) {
-                                        ensureActive()
-                                        val read = input.read(buffer)
-                                        if (read == -1) break
-                                        totalBytes += read
-                                        if (totalBytes > MAX_IMPORT_BYTES) {
-                                            throw IllegalArgumentException(context.getString(R.string.vm_err_stream_exceeds_limit))
-                                        }
-                                        output.write(buffer, 0, read)
-                                    }
-                                    output.flush()
-                                }
-                            }
-                            if (!destFile.exists() || destFile.length() == 0L) {
-                                throw IllegalStateException(context.getString(R.string.vm_err_empty_file))
-                            }
-                            copyCompleted = true
-                        } finally {
-                            if (!copyCompleted) {
-                                destFile.delete()
-                            }
-                        }
-                        buildFileInfo(destFile, friendlyDisplayName = withExt)
-                    }
+                    withContext(Dispatchers.IO) { copyContentUriToFileInfo(context, uri) }
                 }
                 result.onSuccess { imported ->
                     _uiState.update {
+                        val activeTaskTool = (it.route as? MeldScreenRoute.Task)?.tool
                         it.copy(
                             isProcessing = false,
                             selectedFile = imported,
                             isSelectedFileSample = false,
+                            stagedBatchFiles = if (activeTaskTool != null) {
+                                seedBatchForTool(activeTaskTool, imported)
+                            } else {
+                                it.stagedBatchFiles
+                            },
                             options = clampOptionsForFile(imported, it.options),
                             bannerMessage = context.getString(R.string.vm_ready_file, imported.cleanTitle),
                             isBannerError = false
@@ -391,6 +449,223 @@ class MeldViewModel : ViewModel() {
         }
     }
 
+    fun appendExternalUrisToBatch(context: Context, tool: MeldToolId, uris: List<Uri>) {
+        if (uris.isEmpty() || !tool.supportsBatchQueue) return
+        val remainingSlots = (tool.maxBatchCount - _uiState.value.stagedBatchFiles.size).coerceAtLeast(0)
+        if (remainingSlots == 0) {
+            _uiState.update {
+                it.copy(bannerMessage = context.getString(R.string.vm_batch_limit_reached, tool.maxBatchCount), isBannerError = false)
+            }
+            return
+        }
+
+        activeImportJob?.cancel()
+        importInFlightCount.incrementAndGet()
+        activeImportJob = viewModelScope.launch {
+            _uiState.update { it.copy(isProcessing = true, bannerMessage = null, isBannerError = false) }
+            try {
+                val result = runCatching {
+                    withContext(Dispatchers.IO) {
+                        val accepted = mutableListOf<SelectedFileInfo>()
+                        var skipped = 0
+                        for (uri in uris) {
+                            if (accepted.size >= remainingSlots) {
+                                skipped++
+                                continue
+                            }
+                            val info = copyContentUriToFileInfo(context, uri)
+                            if (isCompatibleForBatch(tool, info)) {
+                                accepted.add(info)
+                            } else {
+                                skipped++
+                            }
+                        }
+                        accepted to skipped
+                    }
+                }
+                result.onSuccess { (accepted, skipped) ->
+                    _uiState.update { state ->
+                        val updatedBatch = (state.stagedBatchFiles + accepted).take(tool.maxBatchCount)
+                        val primaryFile = state.selectedFile ?: accepted.firstOrNull()
+                        val msg = when {
+                            accepted.isEmpty() -> context.getString(R.string.vm_batch_no_compatible)
+                            skipped > 0 -> context.getString(R.string.vm_batch_added_filtered, accepted.size, skipped)
+                            accepted.size == 1 -> context.getString(R.string.vm_batch_added_one, accepted.first().cleanTitle)
+                            else -> context.getString(R.string.vm_batch_added_many, accepted.size)
+                        }
+                        state.copy(
+                            isProcessing = false,
+                            selectedFile = primaryFile,
+                            isSelectedFileSample = if (accepted.isNotEmpty() && state.selectedFile == null) false else state.isSelectedFileSample,
+                            stagedBatchFiles = updatedBatch,
+                            bannerMessage = msg,
+                            isBannerError = accepted.isEmpty()
+                        )
+                    }
+                }.onFailure { err ->
+                    if (err is CancellationException) throw err
+                    _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            bannerMessage = err.message ?: context.getString(R.string.vm_err_could_not_open),
+                            isBannerError = true
+                        )
+                    }
+                }
+            } finally {
+                importInFlightCount.decrementAndGet()
+            }
+        }
+    }
+
+    fun importMultipleIncomingUris(context: Context, uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        if (uris.size == 1) {
+            importExternalUri(context, uris.first())
+            return
+        }
+        activeToolJob?.cancel()
+        activeToolJob = null
+        activeImportJob?.cancel()
+
+        importInFlightCount.incrementAndGet()
+        activeImportJob = viewModelScope.launch {
+            _uiState.update { it.copy(isProcessing = true, showFileSheet = false, bannerMessage = null, isBannerError = false) }
+            try {
+                val result = runCatching {
+                    withContext(Dispatchers.IO) {
+                        uris.take(MeldToolId.PACK_ZIP.maxBatchCount).map { uri ->
+                            copyContentUriToFileInfo(context, uri)
+                        }
+                    }
+                }
+                result.onSuccess { imported ->
+                    if (imported.isEmpty()) {
+                        _uiState.update { it.copy(isProcessing = false) }
+                        return@onSuccess
+                    }
+                    val targetTool = when {
+                        imported.all { it.extension.equals("pdf", ignoreCase = true) } -> MeldToolId.PDF_MERGE
+                        imported.all { MeldToolId.COLLAGE.acceptsExtension(it.extension) } -> MeldToolId.COLLAGE
+                        else -> MeldToolId.PACK_ZIP
+                    }
+                    val trimmedBatch = imported.take(targetTool.maxBatchCount)
+                    val first = trimmedBatch.first()
+                    _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            selectedFile = first,
+                            isSelectedFileSample = false,
+                            stagedBatchFiles = trimmedBatch,
+                            options = clampOptionsForFile(first, it.options),
+                            route = MeldScreenRoute.Task(targetTool),
+                            bannerMessage = context.getString(R.string.vm_batch_added_many, trimmedBatch.size),
+                            isBannerError = false
+                        )
+                    }
+                }.onFailure { err ->
+                    if (err is CancellationException) throw err
+                    _uiState.update {
+                        it.copy(
+                            isProcessing = false,
+                            bannerMessage = err.message ?: context.getString(R.string.vm_err_could_not_open),
+                            isBannerError = true
+                        )
+                    }
+                }
+            } finally {
+                importInFlightCount.decrementAndGet()
+            }
+        }
+    }
+
+    private suspend fun copyContentUriToFileInfo(context: Context, uri: Uri): SelectedFileInfo {
+        val scheme = uri.scheme?.lowercase()
+        require(scheme == "content") {
+            context.getString(R.string.vm_err_content_uri_only)
+        }
+        val selfAuthority = "${context.packageName}.fileprovider"
+        require(!uri.authority.equals(selfAuthority, ignoreCase = true)) {
+            context.getString(R.string.vm_err_internal_uri)
+        }
+
+        val resolver = context.contentResolver
+        var displayName = "document"
+        var declaredSize = -1L
+        resolver.query(uri, null, null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (cursor.moveToFirst()) {
+                if (nameIndex >= 0) {
+                    displayName = cursor.getString(nameIndex) ?: displayName
+                }
+                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) {
+                    declaredSize = cursor.getLong(sizeIndex)
+                }
+            }
+        }
+        if (declaredSize > MAX_IMPORT_BYTES) {
+            throw IllegalArgumentException(context.getString(R.string.vm_err_exceeds_limit))
+        }
+
+        val sanitized = displayName
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .trim('.')
+            .let { candidate ->
+                if (candidate.isBlank() || candidate == "." || candidate == "..") "document" else candidate
+            }
+
+        val candidateExt = if (sanitized.contains('.')) sanitized.substringAfterLast('.', "") else ""
+        val withExt = if (VALID_EXT_REGEX.matches(candidateExt)) {
+            sanitized
+        } else {
+            val mime = resolver.getType(uri)
+            val inferred = mime?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+            val baseOnly = sanitized.substringBeforeLast('.').ifBlank { "document" }
+            if (!inferred.isNullOrBlank()) "$baseOnly.$inferred" else sanitized
+        }
+
+        val importDir = File(context.cacheDir, "imports").apply { mkdirs() }
+        pruneOldCacheFiles(importDir, maxKeep = MAX_CACHED_FILES)
+
+        val destFile = File.createTempFile("imp_", "_$withExt", importDir)
+        val stream = resolver.openInputStream(uri)
+            ?: run {
+                destFile.delete()
+                throw IllegalStateException(context.getString(R.string.vm_err_cannot_read_stream))
+            }
+
+        var copyCompleted = false
+        try {
+            stream.use { input ->
+                FileOutputStream(destFile).use { output ->
+                    val buffer = ByteArray(16 * 1024)
+                    var totalBytes = 0L
+                    while (true) {
+                        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                        val read = input.read(buffer)
+                        if (read == -1) break
+                        totalBytes += read
+                        if (totalBytes > MAX_IMPORT_BYTES) {
+                            throw IllegalArgumentException(context.getString(R.string.vm_err_stream_exceeds_limit))
+                        }
+                        output.write(buffer, 0, read)
+                    }
+                    output.flush()
+                }
+            }
+            if (!destFile.exists() || destFile.length() == 0L) {
+                throw IllegalStateException(context.getString(R.string.vm_err_empty_file))
+            }
+            copyCompleted = true
+        } finally {
+            if (!copyCompleted) {
+                destFile.delete()
+            }
+        }
+        return buildFileInfo(destFile, friendlyDisplayName = withExt)
+    }
+
     fun executeTool(context: Context, tool: MeldToolId) {
         val current = _uiState.value
         if (current.isProcessing) return
@@ -410,16 +685,22 @@ class MeldViewModel : ViewModel() {
                         .replace(Regex("[^A-Za-z0-9_-]"), "_")
                         .take(24)
                         .ifBlank { "qr" }
-                    val baseName = if (tool == MeldToolId.SCAN_QR) {
-                        "qr_$qrSlug"
-                    } else {
-                        inputFile.nameWithoutExtension.ifBlank { "output" }
+                    val baseName = when {
+                        tool == MeldToolId.SCAN_QR -> "qr_$qrSlug"
+                        tool == MeldToolId.PDF_MERGE && current.stagedBatchFiles.isNotEmpty() ->
+                            "${current.stagedBatchFiles.first().file.nameWithoutExtension.ifBlank { "merged" }}_${current.stagedBatchFiles.size}files"
+                        tool == MeldToolId.COLLAGE && current.stagedBatchFiles.size > 1 ->
+                            "collage_${current.stagedBatchFiles.size}photos"
+                        tool == MeldToolId.PACK_ZIP && current.stagedBatchFiles.size > 1 ->
+                            "meld_bundle_${current.stagedBatchFiles.size}files"
+                        else -> inputFile.nameWithoutExtension.ifBlank { "output" }
                     }
                     val uniqueTag = System.currentTimeMillis() % 100000L
                     val outFile = File(
                         outDir,
                         "${baseName}_${tool.name.lowercase()}_${uniqueTag}.${tool.outputExtension}"
                     )
+                    var batchRecordedInputSize: Long? = null
 
                     val summary = when (tool) {
                         // Image Conversions
@@ -455,8 +736,13 @@ class MeldViewModel : ViewModel() {
                             )
                         }
                         MeldToolId.COLLAGE -> {
-                            val imgFile = ensureImageInput(context, inputFile)
-                            ImageEngine.createPhotoCollage(imgFile, outFile)
+                            val inputs = current.stagedBatchFiles
+                                .map { it.file }
+                                .filter { it.isFile && MeldToolId.COLLAGE.acceptsExtension(it.extension) }
+                                .take(MeldToolId.COLLAGE.maxBatchCount)
+                                .ifEmpty { listOf(ensureImageInput(context, inputFile)) }
+                            batchRecordedInputSize = inputs.sumOf { it.length() }
+                            ImageEngine.createPhotoCollage(inputs, outFile)
                         }
                         MeldToolId.STRIP_EXIF -> {
                             val imgFile = ensureImageInput(context, inputFile)
@@ -520,8 +806,15 @@ class MeldViewModel : ViewModel() {
                             )
                         }
                         MeldToolId.PDF_MERGE -> {
-                            val pdfFile = ensurePdfInput(context, inputFile)
-                            DocumentEngine.mergeOrDuplicatePdf(pdfFile, outFile)
+                            val pdfInputs = current.stagedBatchFiles
+                                .map { it.file }
+                                .filter { it.isFile && it.extension.equals("pdf", ignoreCase = true) }
+                                .take(MeldToolId.PDF_MERGE.maxBatchCount)
+                            require(pdfInputs.size >= 2) {
+                                context.getString(R.string.vm_err_merge_need_two)
+                            }
+                            batchRecordedInputSize = pdfInputs.sumOf { it.length() }
+                            DocumentEngine.mergePdfs(pdfInputs, outFile)
                         }
                         MeldToolId.STRIP_PDF_META -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
@@ -550,12 +843,20 @@ class MeldViewModel : ViewModel() {
                             MediaEngine.convertCsvToJson(csvFile, outFile)
                         }
                         MeldToolId.PACK_ZIP -> {
-                            val targetForZip = if (tool.acceptsExtension(inputFile.extension) && inputFile.isFile) {
-                                inputFile
-                            } else {
-                                autoProvideSampleForTool(context, tool)
-                            }
-                            MediaEngine.packToZip(targetForZip, outFile)
+                            val zipInputs = current.stagedBatchFiles
+                                .filter { it.file.isFile }
+                                .take(MeldToolId.PACK_ZIP.maxBatchCount)
+                                .map { MediaEngine.ZipInputEntry(it.file, it.displayName) }
+                                .ifEmpty {
+                                    val fallback = if (tool.acceptsExtension(inputFile.extension) && inputFile.isFile) {
+                                        inputFile
+                                    } else {
+                                        autoProvideSampleForTool(context, tool)
+                                    }
+                                    listOf(MediaEngine.ZipInputEntry(fallback, fallback.name))
+                                }
+                            batchRecordedInputSize = zipInputs.sumOf { it.file.length() }
+                            MediaEngine.packEntriesToZip(zipInputs, outFile)
                         }
 
                         // PPTX & Slides Studio
@@ -645,10 +946,11 @@ class MeldViewModel : ViewModel() {
 
                     ensureActive()
                     val elapsed = (System.currentTimeMillis() - startMs).coerceAtLeast(1L)
-                    val recordedInputSize = if (tool == MeldToolId.SCAN_QR) {
-                        opts.qrPayloadText.trim().ifBlank { "meld.app" }.length.toLong()
-                    } else {
-                        inputFile.length()
+                    val recordedInputSize = when {
+                        batchRecordedInputSize != null -> batchRecordedInputSize
+                        tool == MeldToolId.SCAN_QR ->
+                            opts.qrPayloadText.trim().ifBlank { "meld.app" }.length.toLong()
+                        else -> inputFile.length()
                     }
                     ConversionResult(
                         tool = tool,
@@ -749,9 +1051,11 @@ class MeldViewModel : ViewModel() {
     private fun pruneOldCacheFiles(dir: File, maxKeep: Int) {
         val files = dir.listFiles()?.filter { it.isFile }?.sortedByDescending { it.lastModified() } ?: return
         val activeInputPath = _uiState.value.selectedFile?.file?.absolutePath
+        val stagedPaths = _uiState.value.stagedBatchFiles.map { it.file.absolutePath }.toSet()
         val recentPaths = _uiState.value.recentResults.map { it.outputFile.absolutePath }.toSet()
         files.drop(maxKeep).forEach { candidate ->
-            if (candidate.absolutePath != activeInputPath && candidate.absolutePath !in recentPaths) {
+            val path = candidate.absolutePath
+            if (path != activeInputPath && path !in stagedPaths && path !in recentPaths) {
                 candidate.delete()
             }
         }

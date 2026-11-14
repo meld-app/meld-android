@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -39,8 +40,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.CircularProgressIndicator
@@ -85,9 +90,11 @@ import app.meld.android.ui.MeldAdaptiveLayout
 import app.meld.android.ui.MeldUiState
 import app.meld.android.ui.components.AnimatedHandoutDiagram
 import app.meld.android.ui.components.BeforeAfterComparisonCard
+import app.meld.android.ui.components.CollageGridAssembleStage
 import app.meld.android.ui.components.CompressPlatesStage
 import app.meld.android.ui.components.CompressionRatioPill
 import app.meld.android.ui.components.MeldAdaptiveChipRow
+import app.meld.android.ui.components.MergeBookletStage
 import app.meld.android.ui.components.QrMatrixStage
 import app.meld.android.ui.components.RedactSweepStage
 import app.meld.android.ui.components.RemoveBgCurtainStage
@@ -101,6 +108,7 @@ import app.meld.android.ui.components.TactileChipPill
 import app.meld.android.ui.components.TactileCircleIconButton
 import app.meld.android.ui.components.TactilePillButton
 import app.meld.android.ui.components.TactileRulerSlider
+import app.meld.android.ui.components.ZipPackStage
 import app.meld.android.ui.components.renderPdfPagePreview
 import app.meld.android.ui.theme.MeldDimens
 import app.meld.android.ui.theme.MeldMotion
@@ -119,6 +127,12 @@ fun MeldTaskScreen(
     onBack: () -> Unit,
     onRunTool: () -> Unit,
     onOpenChangeFile: () -> Unit = {},
+    onPickBatchFiles: () -> Unit = {},
+    onAddBatchSample: () -> Unit = {},
+    onAddBatchRecent: (ConversionResult) -> Unit = {},
+    onDuplicateBatchItem: (Int) -> Unit = {},
+    onMoveBatchItem: (Int, Int) -> Unit = { _, _ -> },
+    onRemoveBatchItem: (Int) -> Unit = {},
     onUpdateTargetKb: (Int) -> Unit,
     onUpdateResizePercent: (Int) -> Unit,
     onToggleStudioFrame: (Boolean) -> Unit,
@@ -132,8 +146,31 @@ fun MeldTaskScreen(
     val colors = meldColors
     val file = uiState.selectedFile
     val options = uiState.options
-    val usesSampleFallback = file != null && tool != MeldToolId.SCAN_QR && !tool.acceptsExtension(file.extension)
+    val batchFiles = uiState.stagedBatchFiles
+    val usesSampleFallback = !tool.supportsBatchQueue &&
+        file != null &&
+        tool != MeldToolId.SCAN_QR &&
+        !tool.acceptsExtension(file.extension)
     val fileSubtitle = when {
+        tool == MeldToolId.PDF_MERGE -> {
+            if (batchFiles.isEmpty()) stringResource(R.string.batch_empty_merge)
+            else {
+                val pagesTotal = batchFiles.sumOf { it.pageCount ?: 1 }
+                if (batchFiles.size == 1) {
+                    stringResource(R.string.batch_summary_merge_single, pagesTotal)
+                } else {
+                    stringResource(R.string.batch_summary_merge, batchFiles.size, pagesTotal)
+                }
+            }
+        }
+        tool == MeldToolId.COLLAGE -> batchSummaryForCollage(batchFiles.size)
+        tool == MeldToolId.PACK_ZIP -> {
+            if (batchFiles.isEmpty()) stringResource(R.string.batch_empty_zip)
+            else {
+                val totalSize = SelectedFileInfo.formatByteCount(batchFiles.sumOf { it.sizeBytes })
+                stringResource(R.string.batch_summary_zip, batchFiles.size, totalSize)
+            }
+        }
         tool == MeldToolId.SCAN_QR -> stringResource(R.string.qr_task_subtitle)
         file != null -> stringResource(
             R.string.file_info_inline,
@@ -243,6 +280,22 @@ fun MeldTaskScreen(
                             )
                         }
 
+                        MeldToolId.PDF_MERGE,
+                        MeldToolId.COLLAGE,
+                        MeldToolId.PACK_ZIP -> {
+                            BatchQueueTaskControls(
+                                tool = tool,
+                                stagedFiles = batchFiles,
+                                recentResults = uiState.recentResults,
+                                onPickFiles = onPickBatchFiles,
+                                onAddSample = onAddBatchSample,
+                                onAddRecent = onAddBatchRecent,
+                                onDuplicateItem = onDuplicateBatchItem,
+                                onMoveItem = onMoveBatchItem,
+                                onRemoveItem = onRemoveBatchItem
+                            )
+                        }
+
                         else -> {
                             GenericConversionTaskCard(
                                 tool = tool,
@@ -327,6 +380,21 @@ fun MeldTaskScreen(
         }
 
         // Fixed Bottom Tactile Coral Action Button with Hard Shadow & Press Bounce
+        val ctaLabel = when {
+            tool == MeldToolId.PDF_MERGE && batchFiles.size >= 2 ->
+                stringResource(R.string.batch_cta_merge_n, batchFiles.size)
+            tool == MeldToolId.PDF_MERGE ->
+                stringResource(R.string.batch_cta_merge_need_two)
+            tool == MeldToolId.COLLAGE && batchFiles.size > 1 ->
+                stringResource(R.string.batch_cta_collage_n, minOf(batchFiles.size, tool.maxBatchCount))
+            tool == MeldToolId.PACK_ZIP && batchFiles.size > 1 ->
+                stringResource(R.string.batch_cta_zip_n, batchFiles.size)
+            else -> stringResource(tool.ctaLabelRes)
+        }
+        val ctaEnabled = !uiState.isProcessing &&
+            (tool != MeldToolId.REDACT || options.redactionZones.isNotEmpty()) &&
+            (tool != MeldToolId.PDF_MERGE || batchFiles.size >= 2)
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -334,10 +402,11 @@ fun MeldTaskScreen(
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
             TactilePillButton(
-                text = stringResource(tool.ctaLabelRes),
+                text = ctaLabel,
                 icon = iconForTool(tool),
-                backgroundColor = colors.coral,
-                enabled = !uiState.isProcessing && (tool != MeldToolId.REDACT || options.redactionZones.isNotEmpty()),
+                backgroundColor = if (ctaEnabled) colors.coral else colors.warmSurface,
+                contentColor = if (ctaEnabled) colors.inkOnAccent else colors.textSecondary,
+                enabled = ctaEnabled,
                 onClick = onRunTool,
                 height = 56.dp,
                 modifier = Modifier.fillMaxWidth(),
@@ -1056,6 +1125,244 @@ private fun RedactTaskControls(
                         onUpdateZones(updated)
                     }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun batchSummaryForCollage(count: Int): String = when {
+    count <= 0 -> stringResource(R.string.batch_empty_collage)
+    count == 1 -> stringResource(R.string.batch_summary_collage_single)
+    count == 2 -> stringResource(R.string.batch_summary_collage_multi, count, "2×1")
+    count <= 4 -> stringResource(R.string.batch_summary_collage_multi, count, "2×2")
+    count <= 6 -> stringResource(R.string.batch_summary_collage_multi, count, "3×2")
+    else -> stringResource(R.string.batch_summary_collage_multi, minOf(count, 9), "3×3")
+}
+
+@Composable
+private fun BatchQueueTaskControls(
+    tool: MeldToolId,
+    stagedFiles: List<SelectedFileInfo>,
+    recentResults: List<ConversionResult>,
+    onPickFiles: () -> Unit,
+    onAddSample: () -> Unit,
+    onAddRecent: (ConversionResult) -> Unit,
+    onDuplicateItem: (Int) -> Unit,
+    onMoveItem: (Int, Int) -> Unit,
+    onRemoveItem: (Int) -> Unit
+) {
+    val colors = meldColors
+    val cardColor = when (tool) {
+        MeldToolId.PDF_MERGE -> colors.periwinkle
+        MeldToolId.COLLAGE -> colors.butter
+        else -> colors.lavender
+    }
+    val headerRes = when (tool) {
+        MeldToolId.PDF_MERGE -> R.string.batch_queue_header_merge
+        MeldToolId.COLLAGE -> R.string.batch_queue_header_collage
+        else -> R.string.batch_queue_header_zip
+    }
+    val pickLabelRes = when (tool) {
+        MeldToolId.PDF_MERGE -> R.string.batch_pick_pdfs
+        MeldToolId.COLLAGE -> R.string.batch_pick_photos
+        else -> R.string.batch_pick_files
+    }
+    val statusLine = when (tool) {
+        MeldToolId.PDF_MERGE -> when {
+            stagedFiles.isEmpty() -> stringResource(R.string.batch_empty_merge)
+            stagedFiles.size == 1 -> stringResource(R.string.batch_need_one_more_pdf)
+            else -> stringResource(
+                R.string.batch_summary_merge,
+                stagedFiles.size,
+                stagedFiles.sumOf { it.pageCount ?: 1 }
+            )
+        }
+        MeldToolId.COLLAGE -> batchSummaryForCollage(stagedFiles.size)
+        else -> if (stagedFiles.isEmpty()) {
+            stringResource(R.string.batch_empty_zip)
+        } else {
+            stringResource(
+                R.string.batch_summary_zip,
+                stagedFiles.size,
+                SelectedFileInfo.formatByteCount(stagedFiles.sumOf { it.sizeBytes })
+            )
+        }
+    }
+
+    val stagedPaths = remember(stagedFiles) { stagedFiles.map { it.file.absolutePath }.toSet() }
+    val compatibleRecent = remember(recentResults, stagedPaths, tool) {
+        recentResults
+            .filter { conv ->
+                conv.outputFile.isFile &&
+                    conv.outputFile.absolutePath !in stagedPaths &&
+                    when (tool) {
+                        MeldToolId.PDF_MERGE -> conv.outputFile.extension.equals("pdf", ignoreCase = true)
+                        MeldToolId.COLLAGE -> tool.acceptsExtension(conv.outputFile.extension)
+                        MeldToolId.PACK_ZIP -> true
+                        else -> false
+                    }
+            }
+            .distinctBy { it.outputFile.absolutePath }
+            .take(2)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        TactileCard(
+            backgroundColor = cardColor,
+            cornerRadius = MeldDimens.CardCorner,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                when (tool) {
+                    MeldToolId.PDF_MERGE -> MergeBookletStage()
+                    MeldToolId.COLLAGE -> CollageGridAssembleStage()
+                    else -> ZipPackStage()
+                }
+
+                Text(
+                    text = stringResource(headerRes),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.inkOnAccent.copy(alpha = 0.85f)
+                )
+
+                Text(
+                    text = statusLine,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.inkOnAccent
+                )
+
+                MeldAdaptiveChipRow(horizontalSpacing = 8.dp) {
+                    TactilePillButton(
+                        text = stringResource(pickLabelRes),
+                        icon = Icons.Default.FolderOpen,
+                        backgroundColor = colors.inkOnAccent,
+                        contentColor = colors.paperFill,
+                        onClick = onPickFiles,
+                        height = 42.dp
+                    )
+                    TactileChipPill(
+                        label = stringResource(R.string.batch_add_sample),
+                        selected = false,
+                        onClick = onAddSample
+                    )
+                    compatibleRecent.forEach { conv ->
+                        val shortName = conv.outputFile.nameWithoutExtension.take(14)
+                        TactileChipPill(
+                            label = stringResource(R.string.batch_add_recent_prefix, shortName),
+                            selected = false,
+                            onClick = { onAddRecent(conv) }
+                        )
+                    }
+                }
+            }
+        }
+
+        stagedFiles.forEachIndexed { index, item ->
+            TactileCard(
+                backgroundColor = colors.surface,
+                cornerRadius = 18.dp,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.defaultMinSize(minWidth = 28.dp, minHeight = 28.dp),
+                            shape = RoundedCornerShape(999.dp),
+                            color = colors.chipSelectedBg,
+                            border = BorderStroke(1.5.dp, colors.border)
+                        ) {
+                            Box(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${index + 1}",
+                                    style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = colors.chipSelectedContent
+                                )
+                            }
+                        }
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = item.cleanTitle,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = colors.textPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = item.localizedMetaLine(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = colors.warmSurface,
+                            border = BorderStroke(1.5.dp, colors.border)
+                        ) {
+                            Text(
+                                text = item.extension.uppercase().ifBlank { stringResource(R.string.stage_badge_file) },
+                                style = MaterialTheme.typography.labelMedium,
+                                color = colors.textPrimary,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TactileCircleIconButton(
+                            icon = Icons.Default.ContentCopy,
+                            contentDescription = stringResource(R.string.cd_duplicate_item),
+                            onClick = { onDuplicateItem(index) },
+                            enabled = stagedFiles.size < tool.maxBatchCount,
+                            size = 34.dp
+                        )
+                        TactileCircleIconButton(
+                            icon = Icons.Default.KeyboardArrowUp,
+                            contentDescription = stringResource(R.string.cd_move_up),
+                            onClick = { onMoveItem(index, -1) },
+                            enabled = index > 0,
+                            size = 34.dp
+                        )
+                        TactileCircleIconButton(
+                            icon = Icons.Default.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.cd_move_down),
+                            onClick = { onMoveItem(index, 1) },
+                            enabled = index < stagedFiles.lastIndex,
+                            size = 34.dp
+                        )
+                        TactileCircleIconButton(
+                            icon = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.cd_remove_item),
+                            onClick = { onRemoveItem(index) },
+                            size = 34.dp
+                        )
+                    }
+                }
             }
         }
     }

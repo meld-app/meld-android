@@ -456,25 +456,86 @@ object MediaEngine {
         return "Converted ${jsonResult.second} CSV data row(s) into structured JSON"
     }
 
+    data class ZipInputEntry(
+        val file: File,
+        val entryName: String = file.name
+    )
+
+    internal fun buildUniqueZipEntryNames(rawNames: List<String>): List<String> {
+        val usedLower = HashSet<String>(rawNames.size * 2)
+        return rawNames.mapIndexed { index, raw ->
+            val leaf = raw
+                .substringAfterLast('/')
+                .substringAfterLast('\\')
+                .replace(Regex("[\\u0000-\\u001F]"), "_")
+                .trim()
+                .let { candidate ->
+                    if (candidate.isBlank() || candidate == "." || candidate == "..") {
+                        "archived_file_${index + 1}"
+                    } else {
+                        candidate
+                    }
+                }
+
+            val dotIdx = leaf.lastIndexOf('.')
+            val hasExt = dotIdx > 0 && dotIdx < leaf.lastIndex
+            val base = if (hasExt) leaf.substring(0, dotIdx) else leaf
+            val ext = if (hasExt) leaf.substring(dotIdx) else ""
+
+            var candidate = leaf
+            var suffix = 2
+            while (!usedLower.add(candidate.lowercase())) {
+                candidate = "${base}_${suffix++}${ext}"
+            }
+            candidate
+        }
+    }
+
+    /**
+     * Compresses one or more regular files into a standard .zip archive with safe,
+     * deduplicated archive entry names.
+     */
+    fun packEntriesToZip(entries: List<ZipInputEntry>, outputFile: File): String {
+        require(entries.isNotEmpty()) { "Select at least 1 file to archive." }
+        entries.forEach { entry ->
+            require(entry.file.exists() && entry.file.isFile) {
+                "Cannot pack missing file: ${entry.entryName}"
+            }
+        }
+        val safeNames = buildUniqueZipEntryNames(entries.map { it.entryName })
+        var success = false
+        try {
+            ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile))).use { zos ->
+                entries.forEachIndexed { idx, entry ->
+                    zos.putNextEntry(ZipEntry(safeNames[idx]))
+                    FileInputStream(entry.file).use { fis ->
+                        fis.copyTo(zos, 32 * 1024)
+                    }
+                    zos.closeEntry()
+                }
+            }
+            success = true
+        } finally {
+            if (!success && outputFile.exists()) {
+                outputFile.delete()
+            }
+        }
+        val kb = outputFile.length() / 1024
+        return if (entries.size == 1) {
+            "Packed ${safeNames[0]} into ZIP archive (${kb} KB)"
+        } else {
+            "Packed ${entries.size} files into ZIP archive (${kb} KB)"
+        }
+    }
+
+    fun packFilesToZip(inputFiles: List<File>, outputFile: File): String =
+        packEntriesToZip(inputFiles.map { ZipInputEntry(it, it.name) }, outputFile)
+
     /**
      * Compresses an existing regular file into a standard .zip archive.
      */
-    fun packToZip(inputFile: File, outputFile: File): String {
-        require(inputFile.exists() && inputFile.isFile) {
-            "Cannot pack missing file: ${inputFile.name}"
-        }
-        val entryName = inputFile.name.takeIf { it.isNotBlank() && it != "." && it != ".." }
-            ?: "archived_file"
-        ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile))).use { zos ->
-            zos.putNextEntry(ZipEntry(entryName))
-            FileInputStream(inputFile).use { fis ->
-                fis.copyTo(zos, 32 * 1024)
-            }
-            zos.closeEntry()
-        }
-        val kb = outputFile.length() / 1024
-        return "Packed $entryName into ZIP archive (${kb} KB)"
-    }
+    fun packToZip(inputFile: File, outputFile: File): String =
+        packEntriesToZip(listOf(ZipInputEntry(inputFile, inputFile.name)), outputFile)
 
     internal fun extractAmplitudeEnvelopeFromFile(file: File, barCount: Int): FloatArray {
         val count = max(8, barCount)

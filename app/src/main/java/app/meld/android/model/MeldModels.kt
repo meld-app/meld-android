@@ -475,6 +475,16 @@ enum class MeldToolId(
         outputExtension = "pptx"
     );
 
+    val supportsBatchQueue: Boolean
+        get() = this == PDF_MERGE || this == COLLAGE || this == PACK_ZIP
+
+    val maxBatchCount: Int
+        get() = when (this) {
+            COLLAGE -> 9
+            PDF_MERGE, PACK_ZIP -> 12
+            else -> 1
+        }
+
     fun acceptsExtension(ext: String): Boolean {
         val clean = ext.lowercase().trimStart('.')
         return clean.isNotEmpty() && supportedExtensions.contains(clean)

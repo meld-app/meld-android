@@ -205,7 +205,8 @@ fun TactileCircleIconButton(
     backgroundColor: Color = meldColors.surface,
     iconTint: Color = meldColors.textPrimary,
     borderColor: Color = meldColors.border,
-    size: Dp = 44.dp
+    size: Dp = 44.dp,
+    enabled: Boolean = true
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -213,7 +214,7 @@ fun TactileCircleIconButton(
     val haptic = LocalHapticFeedback.current
 
     val scale by animateFloatAsState(
-        targetValue = if (!reduceMotion && isPressed) 0.92f else 1f,
+        targetValue = if (!reduceMotion && enabled && isPressed) 0.92f else 1f,
         animationSpec = tween(durationMillis = MeldMotion.PRESS_MS, easing = MeldMotion.EaseOut),
         label = "circlePressScale"
     )
@@ -225,6 +226,7 @@ fun TactileCircleIconButton(
             .size(touchSize)
             .clip(CircleShape)
             .clickable(
+                enabled = enabled,
                 interactionSource = interactionSource,
                 indication = null,
                 role = androidx.compose.ui.semantics.Role.Button,
@@ -232,7 +234,10 @@ fun TactileCircleIconButton(
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onClick()
                 }
-            ),
+            )
+            .graphicsLayer {
+                alpha = if (enabled) 1f else 0.36f
+            },
         contentAlignment = Alignment.Center
     ) {
         Surface(
@@ -1110,7 +1115,7 @@ private fun buildRichOutputPreview(context: Context, result: ConversionResult): 
             ext in setOf("json", "md", "txt", "html") ->
                 file.bufferedReader().use { readBoundedText(it, 240) }
             ext == "zip" -> ZipFile(file).use { zf ->
-                val entries = zf.entries().asSequence().take(4).joinToString("\n") { "• ${it.name}" }
+                val entries = zf.entries().asSequence().take(5).joinToString("\n") { "• ${it.name}" }
                 val count = zf.size()
                 val itemsLabel = context.resources.getQuantityString(R.plurals.preview_zip_items, count, count)
                 context.getString(R.string.preview_zip_header, itemsLabel, entries)
