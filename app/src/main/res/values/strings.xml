@@ -146,8 +146,18 @@
     <string name="add_studio_border_title">Add Dark Studio Border</string>
     <string name="add_studio_border_subtitle">Frames your image neatly with dimension stamp</string>
 
-    <string name="edge_feathering_label">EDGE FEATHERING</string>
-    <string name="edge_feathering_hint">Higher values strip slightly more backdrop halo into alpha</string>
+    <string name="edge_feathering_label">FLOOD-FILL TOLERANCE</string>
+    <string name="edge_feathering_hint">Strips connected outer backdrop while protecting matching interior details</string>
+
+    <string name="pdf_img_scope_label">EXPORT SCOPE</string>
+    <string name="pdf_img_all_pages_zip">All Pages (.zip)</string>
+    <string name="pdf_img_single_page">Single Page</string>
+    <string name="pdf_img_page_label">Page number (1–%1$d)</string>
+    <string name="pdf_img_summary_all">All %1$d pages · .zip bundle of %2$s images</string>
+    <string name="pdf_img_summary_single">Page %1$d of %2$d · single %3$s image</string>
+    <string name="pdf_img_single_doc_note">1-page PDF · exports directly as one crisp %1$s image</string>
+    <string name="pdf_img_cta_all">Export all %1$d %2$ss (.zip)</string>
+    <string name="pdf_img_cta_single">Export page %1$d %2$s</string>
 
     <string name="qr_payload_label">Link or text to encode</string>
 

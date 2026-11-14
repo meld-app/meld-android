@@ -133,6 +133,11 @@ class MainActivity : ComponentActivity() {
                     onUpdatePageRange = { start, end ->
                         viewModel.updateOptions { it.copy(pageRangeStart = start, pageRangeEnd = end) }
                     },
+                    onUpdatePdfImageScope = { allPages, pageNumber ->
+                        viewModel.updateOptions {
+                            it.copy(pdfImageAllPages = allPages, pdfImagePage = pageNumber)
+                        }
+                    },
                     onUpdateChromaTolerance = { tol ->
                         viewModel.updateOptions { it.copy(chromaTolerance = tol) }
                     },

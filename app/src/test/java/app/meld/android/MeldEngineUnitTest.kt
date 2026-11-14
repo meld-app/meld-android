@@ -464,4 +464,82 @@ class MeldEngineUnitTest {
         assertEquals(9, MeldToolId.COLLAGE.maxBatchCount)
         assertEquals(12, MeldToolId.PACK_ZIP.maxBatchCount)
     }
+
+    @Test
+    fun floodFillRemoveBg_stripsOuterBackdropAndProtectsEnclosedInteriorWhite() {
+        fun argb(a: Int, r: Int, g: Int, b: Int): Int =
+            ((a and 0xFF) shl 24) or ((r and 0xFF) shl 16) or ((g and 0xFF) shl 8) or (b and 0xFF)
+
+        val w = 7
+        val h = 7
+        val bgWhite = argb(255, 248, 248, 248)
+        val coralOutline = argb(255, 230, 80, 30)
+        val interiorHighlight = argb(255, 250, 250, 250)
+        val pixels = IntArray(w * h) { bgWhite }
+
+        for (y in 1..5) {
+            for (x in 1..5) {
+                val isContour = x == 1 || x == 5 || y == 1 || y == 5
+                pixels[y * w + x] = if (isContour) coralOutline else interiorHighlight
+            }
+        }
+
+        val stripped = ImageEngine.applyFloodFillBackgroundRemoval(pixels, w, h, tolerance = 42)
+        // Outer perimeter ring of 7x7 minus inner 5x5 = 49 - 25 = 24 background pixels
+        assertEquals(24, stripped)
+        assertEquals(0, (pixels[0] ushr 24) and 0xFF)
+        assertEquals(0, (pixels[6 * w + 6] ushr 24) and 0xFF)
+        // Foreground contour and interior white pixels inside the closed outline stay opaque
+        assertEquals(255, (pixels[1 * w + 1] ushr 24) and 0xFF)
+        assertEquals(255, (pixels[3 * w + 3] ushr 24) and 0xFF)
+        assertEquals(255, (pixels[2 * w + 4] ushr 24) and 0xFF)
+    }
+
+    @Test
+    fun floodFillRemoveBg_handlesSubtleGradientBackdropWithoutEatingDarkSubject() {
+        fun argb(a: Int, r: Int, g: Int, b: Int): Int =
+            ((a and 0xFF) shl 24) or ((r and 0xFF) shl 16) or ((g and 0xFF) shl 8) or (b and 0xFF)
+
+        val w = 7
+        val h = 7
+        val pixels = IntArray(w * h) { idx ->
+            val y = idx / w
+            val v = (246 - y * 4).coerceIn(0, 255)
+            argb(255, v, v, v)
+        }
+        val subjectColor = argb(255, 28, 34, 48)
+        for (y in 2..4) {
+            for (x in 2..4) {
+                pixels[y * w + x] = subjectColor
+            }
+        }
+
+        val stripped = ImageEngine.applyFloodFillBackgroundRemoval(pixels, w, h, tolerance = 35)
+        // All 40 surrounding gradient backdrop pixels are stripped; 9 center subject pixels stay opaque
+        assertEquals(40, stripped)
+        assertEquals(0, (pixels[6 * w] ushr 24) and 0xFF)
+        assertEquals(255, (pixels[3 * w + 3] ushr 24) and 0xFF)
+    }
+
+    @Test
+    fun buildPdfImagePageEntryName_padsPageNumbersAndNormalizesFormat() {
+        assertEquals(
+            "Lecture_Deck_page_01.png",
+            DocumentEngine.buildPdfImagePageEntryName("Lecture Deck", 0, 4, "png")
+        )
+        assertEquals(
+            "Lecture_Deck_page_04.jpg",
+            DocumentEngine.buildPdfImagePageEntryName("dir/Lecture Deck", 3, 4, "jpeg")
+        )
+        assertEquals(
+            "Annual_Report_page_005.jpg",
+            DocumentEngine.buildPdfImagePageEntryName("Annual Report", 4, 120, "jpg")
+        )
+    }
+
+    @Test
+    fun followUpTools_adaptsToZipOutputForMultiPagePdfImageExport() {
+        assertTrue(MeldToolId.PDF_TO_PNG.followUpTools("png").contains(MeldToolId.COMPRESS))
+        assertTrue(MeldToolId.PDF_TO_PNG.followUpTools("zip").isEmpty())
+    }
 }

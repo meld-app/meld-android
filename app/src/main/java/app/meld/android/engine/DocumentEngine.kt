@@ -13,6 +13,7 @@ import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import app.meld.android.model.RedactionRect
+import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -396,43 +397,134 @@ object DocumentEngine {
         return "Flattened & permanently redacted ${normalizedZones.size} zone(s) across $total page(s)"
     }
 
+    data class PdfImageExportResult(
+        val summary: String,
+        val exportedPageCount: Int,
+        val isZipArchive: Boolean
+    )
+
     /**
-     * Renders PDF page 1 to a bounded high-resolution PNG or JPG image.
+     * Returns the renderable page count of a PDF file.
      */
-    fun exportPdfToImage(inputFile: File, outputFile: File, format: String = "png"): String {
+    fun countPdfPages(inputFile: File): Int = withPdfRenderer(inputFile) { _, total -> total }
+
+    internal fun buildPdfImagePageEntryName(
+        baseName: String,
+        pageIndexZeroBased: Int,
+        totalPages: Int,
+        ext: String
+    ): String {
+        val cleanBase = baseName
+            .substringAfterLast('/')
+            .substringAfterLast('\\')
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .trim('.', '_', ' ')
+            .ifBlank { "page" }
+        val cleanExt = ext.lowercase().trimStart('.').let { if (it == "jpg" || it == "jpeg") "jpg" else "png" }
+        val width = totalPages.coerceAtLeast(1).toString().length.coerceAtLeast(2)
+        val numStr = (pageIndexZeroBased + 1).toString().padStart(width, '0')
+        return "${cleanBase}_page_${numStr}.${cleanExt}"
+    }
+
+    /**
+     * Renders either a chosen single PDF page (or 1-page PDF) directly to PNG/JPG, or renders
+     * every page of a multi-page PDF sequentially into a ZIP archive of PNG/JPG images.
+     */
+    fun exportPdfToImages(
+        inputFile: File,
+        outputFile: File,
+        format: String = "png",
+        allPages: Boolean = true,
+        singlePage1Based: Int = 1
+    ): PdfImageExportResult {
+        val isJpeg = format.equals("jpg", ignoreCase = true) || format.equals("jpeg", ignoreCase = true)
+        val compressFormat = if (isJpeg) Bitmap.CompressFormat.JPEG else Bitmap.CompressFormat.PNG
+        val imgExt = if (isJpeg) "jpg" else "png"
+        val quality = if (isJpeg) 92 else 100
+
         var pageCount = 0
-        var width = 0
-        var height = 0
+        var singleWidth = 0
+        var singleHeight = 0
+        var resolvedSinglePage = 1
+        var wroteZip = false
+        var success = false
 
-        withPdfRenderer(inputFile) { renderer, total ->
-            pageCount = total
-            renderer.openPage(0).use { page ->
-                val rawW = (max(1, page.width) * 2.0f).toInt()
-                val rawH = (max(1, page.height) * 2.0f).toInt()
-                val bounded = boundedDimensions(rawW, rawH, maxDim = MAX_PDF_BITMAP_DIM)
-                width = bounded.first
-                height = bounded.second
+        try {
+            withPdfRenderer(inputFile) { renderer, total ->
+                pageCount = total
+                if (total == 1 || !allPages) {
+                    val idx = (singlePage1Based - 1).coerceIn(0, total - 1)
+                    resolvedSinglePage = idx + 1
+                    renderer.openPage(idx).use { page ->
+                        val rawW = (max(1, page.width) * 2.0f).toInt()
+                        val rawH = (max(1, page.height) * 2.0f).toInt()
+                        val bounded = boundedDimensions(rawW, rawH, maxDim = MAX_PDF_BITMAP_DIM)
+                        singleWidth = bounded.first
+                        singleHeight = bounded.second
 
-                val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                try {
-                    val canvas = Canvas(bmp)
-                    canvas.drawColor(Color.WHITE)
-                    page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-
-                    val compressFormat = if (format.lowercase() == "jpg" || format.lowercase() == "jpeg") {
-                        Bitmap.CompressFormat.JPEG
-                    } else {
-                        Bitmap.CompressFormat.PNG
+                        val bmp = Bitmap.createBitmap(singleWidth, singleHeight, Bitmap.Config.ARGB_8888)
+                        try {
+                            val canvas = Canvas(bmp)
+                            canvas.drawColor(Color.WHITE)
+                            page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                            FileOutputStream(outputFile).use { bmp.compress(compressFormat, quality, it) }
+                        } finally {
+                            bmp.recycle()
+                        }
                     }
-                    FileOutputStream(outputFile).use { bmp.compress(compressFormat, 92, it) }
-                } finally {
-                    bmp.recycle()
+                    wroteZip = false
+                } else {
+                    val baseName = inputFile.nameWithoutExtension.ifBlank { "document" }
+                    ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile))).use { zos ->
+                        for (i in 0 until total) {
+                            renderer.openPage(i).use { page ->
+                                val rawW = (max(1, page.width) * 2.0f).toInt()
+                                val rawH = (max(1, page.height) * 2.0f).toInt()
+                                val (w, h) = boundedDimensions(rawW, rawH, maxDim = MAX_PDF_BITMAP_DIM)
+                                val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                                try {
+                                    val canvas = Canvas(bmp)
+                                    canvas.drawColor(Color.WHITE)
+                                    page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                    zos.putNextEntry(ZipEntry(buildPdfImagePageEntryName(baseName, i, total, imgExt)))
+                                    bmp.compress(compressFormat, quality, zos)
+                                    zos.closeEntry()
+                                } finally {
+                                    bmp.recycle()
+                                }
+                            }
+                        }
+                    }
+                    wroteZip = true
                 }
+            }
+            success = true
+        } finally {
+            if (!success) {
+                outputFile.delete()
             }
         }
 
-        return "Rendered Page 1 of $pageCount to ${format.uppercase()} (${width}x${height} HD)"
+        return if (wroteZip) {
+            PdfImageExportResult(
+                summary = "Exported all $pageCount pages as ${imgExt.uppercase()} images inside a .zip archive",
+                exportedPageCount = pageCount,
+                isZipArchive = true
+            )
+        } else {
+            PdfImageExportResult(
+                summary = "Rendered Page $resolvedSinglePage of $pageCount to ${imgExt.uppercase()} (${singleWidth}x${singleHeight} HD)",
+                exportedPageCount = 1,
+                isZipArchive = false
+            )
+        }
     }
+
+    /**
+     * Renders PDF page 1 to a bounded high-resolution PNG or JPG image.
+     */
+    fun exportPdfToImage(inputFile: File, outputFile: File, format: String = "png"): String =
+        exportPdfToImages(inputFile, outputFile, format, allPages = false, singlePage1Based = 1).summary
 
     /**
      * Compresses PDF pages down to target KB by scaling and quality control.

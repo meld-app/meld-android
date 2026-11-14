@@ -95,6 +95,7 @@ import app.meld.android.ui.components.CompressPlatesStage
 import app.meld.android.ui.components.CompressionRatioPill
 import app.meld.android.ui.components.MeldAdaptiveChipRow
 import app.meld.android.ui.components.MergeBookletStage
+import app.meld.android.ui.components.PolaroidFormatMorphStage
 import app.meld.android.ui.components.QrMatrixStage
 import app.meld.android.ui.components.RedactSweepStage
 import app.meld.android.ui.components.RemoveBgCurtainStage
@@ -140,6 +141,7 @@ fun MeldTaskScreen(
     onUpdateHandoutMode: (Int) -> Unit,
     onUpdateQrPayload: (String) -> Unit,
     onUpdatePageRange: (Int, Int) -> Unit,
+    onUpdatePdfImageScope: (Boolean, Int) -> Unit = { _, _ -> },
     onUpdateChromaTolerance: (Int) -> Unit,
     onUpdateRedactionZones: (List<RedactionRect>) -> Unit = {}
 ) {
@@ -239,6 +241,22 @@ fun MeldTaskScreen(
                                 startPage = options.pageRangeStart,
                                 endPage = options.pageRangeEnd,
                                 onUpdateRange = onUpdatePageRange
+                            )
+                        }
+
+                        MeldToolId.PDF_TO_PNG,
+                        MeldToolId.PDF_TO_JPG -> {
+                            val pdfPages = if (file != null && tool.acceptsExtension(file.extension)) {
+                                (file.pageCount ?: 1).coerceAtLeast(1)
+                            } else {
+                                4
+                            }
+                            PdfToImageTaskControls(
+                                tool = tool,
+                                totalPages = pdfPages,
+                                allPages = options.pdfImageAllPages,
+                                pageNumber = options.pdfImagePage,
+                                onUpdateScope = onUpdatePdfImageScope
                             )
                         }
 
@@ -380,6 +398,15 @@ fun MeldTaskScreen(
         }
 
         // Fixed Bottom Tactile Coral Action Button with Hard Shadow & Press Bounce
+        val effectivePdfPages = if (
+            (tool == MeldToolId.PDF_TO_PNG || tool == MeldToolId.PDF_TO_JPG) &&
+            file != null && tool.acceptsExtension(file.extension)
+        ) {
+            (file.pageCount ?: 1).coerceAtLeast(1)
+        } else {
+            4
+        }
+        val formatUpper = if (tool == MeldToolId.PDF_TO_JPG) "JPG" else "PNG"
         val ctaLabel = when {
             tool == MeldToolId.PDF_MERGE && batchFiles.size >= 2 ->
                 stringResource(R.string.batch_cta_merge_n, batchFiles.size)
@@ -389,6 +416,13 @@ fun MeldTaskScreen(
                 stringResource(R.string.batch_cta_collage_n, minOf(batchFiles.size, tool.maxBatchCount))
             tool == MeldToolId.PACK_ZIP && batchFiles.size > 1 ->
                 stringResource(R.string.batch_cta_zip_n, batchFiles.size)
+            (tool == MeldToolId.PDF_TO_PNG || tool == MeldToolId.PDF_TO_JPG) && effectivePdfPages > 1 -> {
+                if (options.pdfImageAllPages) {
+                    stringResource(R.string.pdf_img_cta_all, effectivePdfPages, formatUpper)
+                } else {
+                    stringResource(R.string.pdf_img_cta_single, options.pdfImagePage.coerceIn(1, effectivePdfPages), formatUpper)
+                }
+            }
             else -> stringResource(tool.ctaLabelRes)
         }
         val ctaEnabled = !uiState.isProcessing &&
@@ -1369,6 +1403,81 @@ private fun BatchQueueTaskControls(
 }
 
 @Composable
+private fun PdfToImageTaskControls(
+    tool: MeldToolId,
+    totalPages: Int,
+    allPages: Boolean,
+    pageNumber: Int,
+    onUpdateScope: (Boolean, Int) -> Unit
+) {
+    val colors = meldColors
+    val safeTotal = totalPages.coerceAtLeast(1)
+    val clampedPage = pageNumber.coerceIn(1, safeTotal)
+    val formatUpper = if (tool == MeldToolId.PDF_TO_JPG) "JPG" else "PNG"
+    val cardBg = if (tool == MeldToolId.PDF_TO_JPG) colors.peach else colors.lavender
+
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        TactileCard(
+            backgroundColor = cardBg,
+            cornerRadius = MeldDimens.CardCorner,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                PolaroidFormatMorphStage(
+                    sourceExt = "PDF",
+                    targetExt = formatUpper
+                )
+
+                Text(
+                    text = stringResource(R.string.pdf_img_scope_label),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.inkOnAccent.copy(alpha = 0.85f)
+                )
+
+                Text(
+                    text = when {
+                        safeTotal == 1 -> stringResource(R.string.pdf_img_single_doc_note, formatUpper)
+                        allPages -> stringResource(R.string.pdf_img_summary_all, safeTotal, formatUpper)
+                        else -> stringResource(R.string.pdf_img_summary_single, clampedPage, safeTotal, formatUpper)
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.inkOnAccent
+                )
+
+                if (safeTotal > 1) {
+                    MeldAdaptiveChipRow(horizontalSpacing = 8.dp) {
+                        TactileChipPill(
+                            label = stringResource(R.string.pdf_img_all_pages_zip),
+                            selected = allPages,
+                            onClick = { onUpdateScope(true, clampedPage) }
+                        )
+                        TactileChipPill(
+                            label = stringResource(R.string.pdf_img_single_page),
+                            selected = !allPages,
+                            onClick = { onUpdateScope(false, clampedPage) }
+                        )
+                    }
+                }
+            }
+        }
+
+        if (safeTotal > 1 && !allPages) {
+            PageStepperCard(
+                title = stringResource(R.string.pdf_img_page_label, safeTotal),
+                value = clampedPage,
+                onMinus = { onUpdateScope(false, max(1, clampedPage - 1)) },
+                onPlus = { onUpdateScope(false, minOf(safeTotal, clampedPage + 1)) },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
 private fun GenericConversionTaskCard(
     tool: MeldToolId,
     file: SelectedFileInfo?
@@ -1494,7 +1603,9 @@ fun MeldResultScreen(
 ) {
     val colors = meldColors
     val largeFont = MeldAdaptiveLayout.isLargeFontScale(LocalDensity.current.fontScale)
-    val followUps = remember(result.tool) { result.tool.followUpTools() }
+    val followUps = remember(result.tool, result.outputFile) {
+        result.tool.followUpTools(result.outputFile.extension.lowercase())
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
         LazyColumn(

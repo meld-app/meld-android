@@ -490,12 +490,14 @@ enum class MeldToolId(
         return clean.isNotEmpty() && supportedExtensions.contains(clean)
     }
 
-    fun followUpTools(): List<MeldToolId> = when (outputExtension) {
-        "pdf" -> listOf(COMPRESS_PDF, PDF_EXTRACT, LOCK_STAMP).filter { it != this }
-        "pptx" -> listOf(PPTX_TO_PDF, PPTX_HANDOUT, PPTX_TO_MD).filter { it != this }
-        "png", "jpg", "jpeg", "webp" -> listOf(COMPRESS, RESIZE_IMAGE, IMG_TO_PDF).filter { it != this }
-        else -> listOf(PACK_ZIP).filter { it != this }
-    }
+    fun followUpTools(actualExtension: String = outputExtension): List<MeldToolId> =
+        when (actualExtension.lowercase().trimStart('.')) {
+            "pdf" -> listOf(COMPRESS_PDF, PDF_EXTRACT, LOCK_STAMP).filter { it != this }
+            "pptx" -> listOf(PPTX_TO_PDF, PPTX_HANDOUT, PPTX_TO_MD).filter { it != this }
+            "png", "jpg", "jpeg", "webp" -> listOf(COMPRESS, RESIZE_IMAGE, IMG_TO_PDF).filter { it != this }
+            "zip" -> emptyList()
+            else -> listOf(PACK_ZIP).filter { it != this }
+        }
 }
 
 data class RedactionRect(
@@ -515,6 +517,8 @@ data class ToolOptions(
     val qrPayloadText: String = "https://github.com/meld-app",
     val pageRangeStart: Int = 1,
     val pageRangeEnd: Int = 2,
+    val pdfImageAllPages: Boolean = true,
+    val pdfImagePage: Int = 1,
     val chromaTolerance: Int = 42,
     val redactionZones: List<RedactionRect> = listOf(
         RedactionRect(0.10f, 0.24f, 0.90f, 0.34f)

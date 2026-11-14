@@ -700,6 +700,7 @@ class MeldViewModel : ViewModel() {
                         outDir,
                         "${baseName}_${tool.name.lowercase()}_${uniqueTag}.${tool.outputExtension}"
                     )
+                    var actualOutFile = outFile
                     var batchRecordedInputSize: Long? = null
 
                     val summary = when (tool) {
@@ -754,13 +755,26 @@ class MeldViewModel : ViewModel() {
                         }
 
                         // PDF Conversions
-                        MeldToolId.PDF_TO_PNG -> {
-                            val pdfFile = ensurePdfInput(context, inputFile)
-                            DocumentEngine.exportPdfToImage(pdfFile, outFile, "png")
-                        }
+                        MeldToolId.PDF_TO_PNG,
                         MeldToolId.PDF_TO_JPG -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
-                            DocumentEngine.exportPdfToImage(pdfFile, outFile, "jpg")
+                            val pageCount = DocumentEngine.countPdfPages(pdfFile)
+                            val exportAll = pageCount > 1 && opts.pdfImageAllPages
+                            val format = if (tool == MeldToolId.PDF_TO_JPG) "jpg" else "png"
+                            val safeBase = pdfFile.nameWithoutExtension.ifBlank { "pages" }
+                            val targetName = when {
+                                exportAll -> "${safeBase}_${pageCount}pages_${tool.name.lowercase()}_${uniqueTag}.zip"
+                                pageCount > 1 -> "${safeBase}_p${opts.pdfImagePage.coerceIn(1, pageCount)}_${tool.name.lowercase()}_${uniqueTag}.$format"
+                                else -> outFile.name
+                            }
+                            actualOutFile = File(outDir, targetName)
+                            DocumentEngine.exportPdfToImages(
+                                inputFile = pdfFile,
+                                outputFile = actualOutFile,
+                                format = format,
+                                allPages = exportAll,
+                                singlePage1Based = opts.pdfImagePage
+                            ).summary
                         }
                         MeldToolId.PDF_TO_MD -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
@@ -954,9 +968,9 @@ class MeldViewModel : ViewModel() {
                     }
                     ConversionResult(
                         tool = tool,
-                        outputFile = outFile,
+                        outputFile = actualOutFile,
                         inputSizeBytes = recordedInputSize,
-                        outputSizeBytes = outFile.length(),
+                        outputSizeBytes = actualOutFile.length(),
                         summary = context.getString(R.string.vm_result_summary_with_duration, summary, elapsed),
                         durationMs = elapsed
                     )
@@ -1065,6 +1079,7 @@ class MeldViewModel : ViewModel() {
         val pages = (info.pageCount ?: 4).coerceAtLeast(1)
         val start = current.pageRangeStart.coerceIn(1, pages)
         val end = current.pageRangeEnd.coerceIn(start, pages)
+        val clampedPdfImagePage = current.pdfImagePage.coerceIn(1, pages)
         val fileKb = (info.sizeBytes / 1024L).toInt().coerceAtLeast(10)
         val sensibleTargetKb = if (current.targetKb >= fileKb && fileKb >= 16) {
             (fileKb * 0.6f).toInt().coerceIn(10, fileKb - 2)
@@ -1074,6 +1089,7 @@ class MeldViewModel : ViewModel() {
         return current.copy(
             pageRangeStart = start,
             pageRangeEnd = end,
+            pdfImagePage = clampedPdfImagePage,
             targetKb = sensibleTargetKb
         )
     }

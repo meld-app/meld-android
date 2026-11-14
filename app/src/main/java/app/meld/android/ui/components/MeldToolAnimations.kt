@@ -1457,7 +1457,7 @@ internal fun MergeBookletStage() {
 
 /** 11. PDF_TO_PNG / PDF_TO_JPG / IMG_TO_*: Camera flash morph -> sunlit Polaroid + angled format sticker. */
 @Composable
-private fun PolaroidFormatMorphStage(
+internal fun PolaroidFormatMorphStage(
     sourceExt: String,
     targetExt: String
 ) {
