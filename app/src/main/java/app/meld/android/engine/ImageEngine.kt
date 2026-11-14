@@ -465,8 +465,172 @@ object ImageEngine {
     }
 
     /**
-     * Isolates foreground subject from background by sampling border chroma clusters
-     * and applying smooth alpha feathering into a 32-bit ARGB_8888 PNG.
+     * Pure pixel-buffer edge-seeded BFS flood-fill background removal with soft contour feathering.
+     * Strips backdrop connected to the image perimeter while preserving enclosed subject interiors
+     * whose color happens to match the background.
+     *
+     * Returns total number of fully transparent pixels in [pixels].
+     */
+    internal fun applyFloodFillBackgroundRemoval(
+        pixels: IntArray,
+        width: Int,
+        height: Int,
+        tolerance: Int = 42
+    ): Int {
+        if (width <= 0 || height <= 0 || pixels.size != width * height) return 0
+
+        val opaqueBorderIndices = ArrayList<Int>(min(256, 2 * (width + height)))
+        for (x in 0 until width) {
+            if (((pixels[x] ushr 24) and 0xFF) > 20) opaqueBorderIndices.add(x)
+            if (height > 1) {
+                val bottomIdx = (height - 1) * width + x
+                if (((pixels[bottomIdx] ushr 24) and 0xFF) > 20) opaqueBorderIndices.add(bottomIdx)
+            }
+        }
+        for (y in 1 until (height - 1)) {
+            val leftIdx = y * width
+            if (((pixels[leftIdx] ushr 24) and 0xFF) > 20) opaqueBorderIndices.add(leftIdx)
+            if (width > 1) {
+                val rightIdx = y * width + (width - 1)
+                if (((pixels[rightIdx] ushr 24) and 0xFF) > 20) opaqueBorderIndices.add(rightIdx)
+            }
+        }
+
+        val (bgR, bgG, bgB) = if (opaqueBorderIndices.isEmpty()) {
+            Triple(255, 255, 255)
+        } else {
+            val step = max(1, opaqueBorderIndices.size / 128)
+            val rs = ArrayList<Int>(128)
+            val gs = ArrayList<Int>(128)
+            val bs = ArrayList<Int>(128)
+            var idx = 0
+            while (idx < opaqueBorderIndices.size) {
+                val c = pixels[opaqueBorderIndices[idx]]
+                rs.add((c ushr 16) and 0xFF)
+                gs.add((c ushr 8) and 0xFF)
+                bs.add(c and 0xFF)
+                idx += step
+            }
+            rs.sort()
+            gs.sort()
+            bs.sort()
+            Triple(rs[rs.size / 2], gs[gs.size / 2], bs[bs.size / 2])
+        }
+
+        val hardThreshold = tolerance.coerceIn(12, 120).toDouble()
+        val maxGradientDrift = hardThreshold * 1.65
+        val localStepLimit = max(10.0, hardThreshold * 0.40)
+        val softThreshold = hardThreshold * 1.55
+
+        val isBackground = BooleanArray(pixels.size)
+        val queue = IntArray(pixels.size)
+        var head = 0
+        var tail = 0
+
+        fun trySeedBorder(idx: Int) {
+            if (isBackground[idx]) return
+            val c = pixels[idx]
+            val alpha = (c ushr 24) and 0xFF
+            if (alpha == 0) {
+                isBackground[idx] = true
+                queue[tail++] = idx
+                return
+            }
+            val r = (c ushr 16) and 0xFF
+            val g = (c ushr 8) and 0xFF
+            val b = c and 0xFF
+            if (colorDistance(r, g, b, bgR, bgG, bgB) <= hardThreshold) {
+                isBackground[idx] = true
+                queue[tail++] = idx
+            }
+        }
+
+        for (x in 0 until width) {
+            trySeedBorder(x)
+            if (height > 1) trySeedBorder((height - 1) * width + x)
+        }
+        for (y in 1 until (height - 1)) {
+            trySeedBorder(y * width)
+            if (width > 1) trySeedBorder(y * width + (width - 1))
+        }
+
+        fun tryExpandNeighbor(nextIdx: Int, pr: Int, pg: Int, pb: Int, pOpaque: Boolean) {
+            if (isBackground[nextIdx]) return
+            val nc = pixels[nextIdx]
+            val na = (nc ushr 24) and 0xFF
+            if (na == 0) {
+                isBackground[nextIdx] = true
+                queue[tail++] = nextIdx
+                return
+            }
+            val nr = (nc ushr 16) and 0xFF
+            val ng = (nc ushr 8) and 0xFF
+            val nb = nc and 0xFF
+            val distRef = colorDistance(nr, ng, nb, bgR, bgG, bgB)
+            val matches = distRef <= hardThreshold ||
+                (pOpaque && distRef <= maxGradientDrift && colorDistance(nr, ng, nb, pr, pg, pb) <= localStepLimit)
+            if (matches) {
+                isBackground[nextIdx] = true
+                queue[tail++] = nextIdx
+            }
+        }
+
+        while (head < tail) {
+            val curr = queue[head++]
+            val pc = pixels[curr]
+            val pOpaque = ((pc ushr 24) and 0xFF) > 20
+            val pr = (pc ushr 16) and 0xFF
+            val pg = (pc ushr 8) and 0xFF
+            val pb = pc and 0xFF
+            val x = curr % width
+            val y = curr / width
+
+            if (x > 0) tryExpandNeighbor(curr - 1, pr, pg, pb, pOpaque)
+            if (x + 1 < width) tryExpandNeighbor(curr + 1, pr, pg, pb, pOpaque)
+            if (y > 0) tryExpandNeighbor(curr - width, pr, pg, pb, pOpaque)
+            if (y + 1 < height) tryExpandNeighbor(curr + width, pr, pg, pb, pOpaque)
+        }
+
+        var transparentCount = 0
+        val featherLow = hardThreshold * 0.55
+        val featherSpan = max(1.0, softThreshold - featherLow)
+
+        for (i in pixels.indices) {
+            if (isBackground[i]) {
+                pixels[i] = 0
+                transparentCount++
+                continue
+            }
+            val c = pixels[i]
+            val existingAlpha = (c ushr 24) and 0xFF
+            if (existingAlpha == 0) {
+                transparentCount++
+                continue
+            }
+            val x = i % width
+            val y = i / width
+            val touchesBg = (x > 0 && isBackground[i - 1]) ||
+                (x + 1 < width && isBackground[i + 1]) ||
+                (y > 0 && isBackground[i - width]) ||
+                (y + 1 < height && isBackground[i + width])
+            if (touchesBg) {
+                val r = (c ushr 16) and 0xFF
+                val g = (c ushr 8) and 0xFF
+                val b = c and 0xFF
+                val dist = colorDistance(r, g, b, bgR, bgG, bgB)
+                if (dist < softThreshold) {
+                    val ratio = ((dist - featherLow) / featherSpan).coerceIn(0.18, 1.0)
+                    val newAlpha = min(existingAlpha, (ratio * existingAlpha).toInt())
+                    pixels[i] = (newAlpha shl 24) or (c and 0x00FFFFFF)
+                }
+            }
+        }
+        return transparentCount
+    }
+
+    /**
+     * Isolates foreground subject from perimeter background using edge-seeded flood-fill
+     * and soft contour alpha feathering into a 32-bit ARGB_8888 PNG.
      */
     fun removeBackground(inputFile: File, outputFile: File, tolerance: Int = 42): String {
         val source = decodeNormalizedBitmap(inputFile, maxDimension = 1600)
@@ -482,47 +646,7 @@ object ImageEngine {
         try {
             val pixels = IntArray(width * height)
             outBitmap.getPixels(pixels, 0, width, 0, 0, width, height)
-
-            val corners = listOf(
-                pixels[0],
-                pixels[width - 1],
-                pixels[(height - 1) * width],
-                pixels[(height - 1) * width + (width - 1)]
-            ).filter { Color.alpha(it) > 20 }.ifEmpty { listOf(pixels[0]) }
-
-            val bgR = corners.map { Color.red(it) }.average().toInt()
-            val bgG = corners.map { Color.green(it) }.average().toInt()
-            val bgB = corners.map { Color.blue(it) }.average().toInt()
-
-            val hardThreshold = tolerance.coerceIn(12, 120).toDouble()
-            val softThreshold = hardThreshold * 1.45
-
-            var transparentCount = 0
-            for (i in pixels.indices) {
-                val c = pixels[i]
-                val existingAlpha = Color.alpha(c)
-                if (existingAlpha == 0) {
-                    transparentCount++
-                    continue
-                }
-                val r = Color.red(c)
-                val g = Color.green(c)
-                val b = Color.blue(c)
-
-                val dist = colorDistance(r, g, b, bgR, bgG, bgB)
-                when {
-                    dist <= hardThreshold -> {
-                        pixels[i] = Color.argb(0, r, g, b)
-                        transparentCount++
-                    }
-                    dist < softThreshold -> {
-                        val ratio = ((dist - hardThreshold) / (softThreshold - hardThreshold)).coerceIn(0.0, 1.0)
-                        val alpha = min(existingAlpha, (ratio * 255).toInt())
-                        pixels[i] = Color.argb(alpha, r, g, b)
-                    }
-                }
-            }
-
+            val transparentCount = applyFloodFillBackgroundRemoval(pixels, width, height, tolerance)
             outBitmap.setPixels(pixels, 0, width, 0, 0, width, height)
             FileOutputStream(outputFile).use { stream ->
                 outBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
@@ -532,7 +656,7 @@ object ImageEngine {
             outBitmap.recycle()
         }
 
-        return "Isolated foreground subject ($pct% background stripped to alpha PNG)"
+        return "Isolated foreground subject via edge flood-fill ($pct% backdrop stripped to alpha PNG)"
     }
 
     /**
