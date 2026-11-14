@@ -358,4 +358,110 @@ class MeldEngineUnitTest {
         }
         assertEquals(MeldToolId.VISUALIZE.supportedExtensions, MeldToolId.SPEED_2X.supportedExtensions)
     }
+
+    @Test
+    fun buildUniqueZipEntryNames_sanitizesPathsAndDeduplicatesCaseInsensitively() {
+        val unique = MediaEngine.buildUniqueZipEntryNames(
+            listOf(
+                "folder/sub/report.pdf",
+                "other\\REPORT.PDF",
+                "..",
+                ".",
+                "notes\u0001.txt",
+                "notes.txt",
+                "NOTES.txt"
+            )
+        )
+        assertEquals(
+            listOf(
+                "report.pdf",
+                "REPORT_2.PDF",
+                "archived_file_3",
+                "archived_file_4",
+                "notes_.txt",
+                "notes.txt",
+                "NOTES_2.txt"
+            ),
+            unique
+        )
+    }
+
+    @Test
+    fun packFilesAndEntriesToZip_writesAllEntriesAndRejectsMissingInput() {
+        val tempDir = Files.createTempDirectory("meld_test_multi_zip").toFile()
+        try {
+            val docA = File(tempDir, "notes.txt").apply { writeText("alpha") }
+            val subDir = File(tempDir, "nested").apply { mkdirs() }
+            val docB = File(subDir, "notes.txt").apply { writeText("beta") }
+            val outZip = File(tempDir, "bundle.zip")
+
+            MediaEngine.packEntriesToZip(
+                listOf(
+                    MediaEngine.ZipInputEntry(docA, "notes.txt"),
+                    MediaEngine.ZipInputEntry(docB, "notes.txt")
+                ),
+                outZip
+            )
+
+            assertTrue(outZip.exists())
+            java.util.zip.ZipFile(outZip).use { zip ->
+                val names = zip.entries().toList().map { it.name }
+                assertEquals(listOf("notes.txt", "notes_2.txt"), names)
+                assertEquals("alpha", zip.getInputStream(zip.getEntry("notes.txt")).bufferedReader().readText())
+                assertEquals("beta", zip.getInputStream(zip.getEntry("notes_2.txt")).bufferedReader().readText())
+            }
+
+            val packFilesZip = File(tempDir, "multi.zip")
+            MediaEngine.packFilesToZip(listOf(docA, docB), packFilesZip)
+            java.util.zip.ZipFile(packFilesZip).use { zip ->
+                assertEquals(2, zip.size())
+            }
+
+            val missing = File(tempDir, "missing.txt")
+            val abortedZip = File(tempDir, "aborted.zip")
+            var threw = false
+            try {
+                MediaEngine.packFilesToZip(listOf(docA, missing), abortedZip)
+            } catch (_: IllegalArgumentException) {
+                threw = true
+            }
+            assertTrue(threw)
+            assertFalse(abortedZip.exists())
+        } finally {
+            tempDir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun collageGridLayoutAndCenterCropBounds_coverExpectedCounts() {
+        assertEquals(2 to 2, ImageEngine.collageGridLayout(1))
+        assertEquals(2 to 1, ImageEngine.collageGridLayout(2))
+        assertEquals(2 to 2, ImageEngine.collageGridLayout(3))
+        assertEquals(2 to 2, ImageEngine.collageGridLayout(4))
+        assertEquals(3 to 2, ImageEngine.collageGridLayout(5))
+        assertEquals(3 to 2, ImageEngine.collageGridLayout(6))
+        assertEquals(3 to 3, ImageEngine.collageGridLayout(7))
+        assertEquals(3 to 3, ImageEngine.collageGridLayout(9))
+
+        val wideCrop = ImageEngine.computeCenterCropBounds(srcWidth = 1600, srcHeight = 900)
+        assertEquals(ImageEngine.CropBounds(left = 350, top = 0, right = 1250, bottom = 900), wideCrop)
+
+        val tallCrop = ImageEngine.computeCenterCropBounds(srcWidth = 900, srcHeight = 1600)
+        assertEquals(ImageEngine.CropBounds(left = 0, top = 350, right = 900, bottom = 1250), tallCrop)
+
+        val squareCrop = ImageEngine.computeCenterCropBounds(srcWidth = 800, srcHeight = 800)
+        assertEquals(ImageEngine.CropBounds(left = 0, top = 0, right = 800, bottom = 800), squareCrop)
+    }
+
+    @Test
+    fun batchQueueMetadata_matchesSupportedToolsAndLimits() {
+        assertTrue(MeldToolId.PDF_MERGE.supportsBatchQueue)
+        assertTrue(MeldToolId.COLLAGE.supportsBatchQueue)
+        assertTrue(MeldToolId.PACK_ZIP.supportsBatchQueue)
+        assertFalse(MeldToolId.IMG_TO_PNG.supportsBatchQueue)
+
+        assertEquals(12, MeldToolId.PDF_MERGE.maxBatchCount)
+        assertEquals(9, MeldToolId.COLLAGE.maxBatchCount)
+        assertEquals(12, MeldToolId.PACK_ZIP.maxBatchCount)
+    }
 }

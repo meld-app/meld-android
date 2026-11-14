@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.ImageDecoder
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
@@ -286,40 +287,132 @@ object ImageEngine {
         return "Resized to ${newW}x${newH} (${scalePercent}% scale${if (addFrame) " + Studio Frame" else ""})"
     }
 
-    /**
-     * Creates a 2x2 photo collage sheet from the staged image.
-     */
-    fun createPhotoCollage(inputFile: File, outputFile: File): String {
-        val original = decodeNormalizedBitmap(inputFile)
-        val cellW = 540
-        val cellH = 540
-        val pad = 24
-        val totalW = cellW * 2 + pad * 3
-        val totalH = cellH * 2 + pad * 3 + 60
+    internal data class CropBounds(val left: Int, val top: Int, val right: Int, val bottom: Int)
 
-        val thumb = try {
-            Bitmap.createScaledBitmap(original, cellW, cellH, true)
-        } finally {
-            original.recycle()
+    internal fun collageGridLayout(photoCount: Int): Pair<Int, Int> {
+        val clamped = photoCount.coerceIn(1, 9)
+        return when {
+            clamped <= 1 -> 2 to 2
+            clamped == 2 -> 2 to 1
+            clamped <= 4 -> 2 to 2
+            clamped <= 6 -> 3 to 2
+            else -> 3 to 3
         }
+    }
+
+    internal fun computeCenterCropBounds(
+        srcWidth: Int,
+        srcHeight: Int,
+        targetAspect: Float = 1f
+    ): CropBounds {
+        val sw = max(1, srcWidth)
+        val sh = max(1, srcHeight)
+        val srcAspect = sw.toFloat() / sh.toFloat()
+        return if (srcAspect > targetAspect) {
+            val croppedW = max(1, (sh * targetAspect).roundToInt().coerceAtMost(sw))
+            val left = (sw - croppedW) / 2
+            CropBounds(left, 0, left + croppedW, sh)
+        } else {
+            val croppedH = max(1, (sw / targetAspect).roundToInt().coerceAtMost(sh))
+            val top = (sh - croppedH) / 2
+            CropBounds(0, top, sw, top + croppedH)
+        }
+    }
+
+    /**
+     * Creates a multi-photo studio grid collage (2x1, 2x2, 3x2, or 3x3) from 1-9 images,
+     * center-cropping each photo into square studio cells without stretching.
+     */
+    fun createPhotoCollage(inputFiles: List<File>, outputFile: File): String {
+        val batch = inputFiles.take(9)
+        require(batch.isNotEmpty()) { "Select at least 1 image for collage." }
+        batch.forEach { file ->
+            require(file.exists() && file.isFile) { "Cannot read image: ${file.name}" }
+        }
+
+        val (cols, rows) = collageGridLayout(batch.size)
+        val cellSize = if (cols >= 3) 420 else 540
+        val pad = 24
+        val footerH = 60
+        val totalW = cellSize * cols + pad * (cols + 1)
+        val totalH = cellSize * rows + pad * (rows + 1) + footerH
 
         val collage = Bitmap.createBitmap(totalW, totalH, Bitmap.Config.ARGB_8888)
         try {
             val canvas = Canvas(collage)
             canvas.drawColor(Color.rgb(13, 14, 18))
 
+            val drawPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
             val borderPaint = Paint().apply {
                 color = Color.rgb(43, 48, 66)
                 style = Paint.Style.STROKE
                 strokeWidth = 2f
             }
+            val emptyFillPaint = Paint().apply {
+                color = Color.rgb(21, 24, 33)
+                style = Paint.Style.FILL
+            }
+            val emptyBadgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.rgb(66, 72, 92)
+                textSize = 24f
+                typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
+                textAlign = Paint.Align.CENTER
+            }
 
-            for (r in 0..1) {
-                for (c in 0..1) {
-                    val left = pad + c * (cellW + pad)
-                    val top = pad + r * (cellH + pad)
-                    canvas.drawBitmap(thumb, left.toFloat(), top.toFloat(), null)
-                    canvas.drawRect(RectF(left.toFloat(), top.toFloat(), (left + cellW).toFloat(), (top + cellH).toFloat()), borderPaint)
+            if (batch.size == 1) {
+                val original = decodeNormalizedBitmap(batch[0], maxDimension = cellSize * 2)
+                try {
+                    val crop = computeCenterCropBounds(original.width, original.height)
+                    val srcRect = Rect(crop.left, crop.top, crop.right, crop.bottom)
+                    for (r in 0 until rows) {
+                        for (c in 0 until cols) {
+                            val left = pad + c * (cellSize + pad)
+                            val top = pad + r * (cellSize + pad)
+                            val dstRect = RectF(
+                                left.toFloat(),
+                                top.toFloat(),
+                                (left + cellSize).toFloat(),
+                                (top + cellSize).toFloat()
+                            )
+                            canvas.drawBitmap(original, srcRect, dstRect, drawPaint)
+                            canvas.drawRect(dstRect, borderPaint)
+                        }
+                    }
+                } finally {
+                    original.recycle()
+                }
+            } else {
+                val totalSlots = cols * rows
+                for (slotIdx in 0 until totalSlots) {
+                    val r = slotIdx / cols
+                    val c = slotIdx % cols
+                    val left = pad + c * (cellSize + pad)
+                    val top = pad + r * (cellSize + pad)
+                    val dstRect = RectF(
+                        left.toFloat(),
+                        top.toFloat(),
+                        (left + cellSize).toFloat(),
+                        (top + cellSize).toFloat()
+                    )
+                    if (slotIdx < batch.size) {
+                        val photo = decodeNormalizedBitmap(batch[slotIdx], maxDimension = cellSize * 2)
+                        try {
+                            val crop = computeCenterCropBounds(photo.width, photo.height)
+                            val srcRect = Rect(crop.left, crop.top, crop.right, crop.bottom)
+                            canvas.drawBitmap(photo, srcRect, dstRect, drawPaint)
+                        } finally {
+                            photo.recycle()
+                        }
+                    } else {
+                        canvas.drawRect(dstRect, emptyFillPaint)
+                        canvas.drawText(
+                            "MELD STUDIO",
+                            dstRect.centerX(),
+                            dstRect.centerY() + 8f,
+                            emptyBadgePaint
+                        )
+                    }
+                    canvas.drawRect(dstRect, borderPaint)
                 }
             }
 
@@ -329,16 +422,30 @@ object ImageEngine {
                 typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
                 textAlign = Paint.Align.CENTER
             }
-            canvas.drawText("MELD 2x2 CONTACT SHEET • ${inputFile.name}", totalW / 2f, totalH - 24f, captionPaint)
+            val captionText = if (batch.size == 1) {
+                "MELD 2x2 CONTACT SHEET • ${batch[0].name}"
+            } else {
+                "MELD ${cols}x${rows} STUDIO COLLAGE • ${batch.size} PHOTOS"
+            }
+            canvas.drawText(captionText, totalW / 2f, totalH - 24f, captionPaint)
 
             FileOutputStream(outputFile).use { collage.compress(Bitmap.CompressFormat.PNG, 100, it) }
         } finally {
-            thumb.recycle()
             collage.recycle()
         }
 
-        return "Generated 2x2 photo collage contact sheet (${totalW}x${totalH} px)"
+        return if (batch.size == 1) {
+            "Generated 2x2 photo collage contact sheet (${totalW}x${totalH} px)"
+        } else {
+            "Arranged ${batch.size} photos in ${cols}x${rows} collage (${totalW}x${totalH} px)"
+        }
     }
+
+    /**
+     * Backward-compatible single-photo 2x2 collage overload.
+     */
+    fun createPhotoCollage(inputFile: File, outputFile: File): String =
+        createPhotoCollage(listOf(inputFile), outputFile)
 
     /**
      * Wipes all EXIF/GPS metadata by decoding pure pixel raster and re-encoding.

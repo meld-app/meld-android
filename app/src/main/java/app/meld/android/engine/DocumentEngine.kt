@@ -613,18 +613,27 @@ object DocumentEngine {
     }
 
     /**
-     * Merges or duplicates pages into a combined booklet/deck.
+     * Merges 2+ PDF files in order into a unified multi-page PDF document,
+     * preserving each page's aspect ratio within safe raster bounds.
      */
-    fun mergeOrDuplicatePdf(inputFile: File, outputFile: File): String {
+    fun mergePdfs(inputFiles: List<File>, outputFile: File): String {
+        require(inputFiles.size >= 2) {
+            "Select at least 2 PDF files to merge."
+        }
+        inputFiles.forEach { file ->
+            require(file.exists() && file.isFile) {
+                "Cannot merge missing PDF: ${file.name}"
+            }
+        }
+
         val outDoc = PdfDocument()
-        var originalPages = 0
+        var outIdx = 1
+        var success = false
 
         try {
-            withPdfRenderer(inputFile) { renderer, total ->
-                originalPages = total
-                var outIdx = 1
-                for (repeat in 0..1) {
-                    for (i in 0 until originalPages) {
+            for (inputFile in inputFiles) {
+                withPdfRenderer(inputFile) { renderer, total ->
+                    for (i in 0 until total) {
                         val bmp = renderer.openPage(i).use { page ->
                             val (w, h) = boundedDimensions(page.width, page.height)
                             val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
@@ -644,13 +653,23 @@ object DocumentEngine {
                 }
             }
             FileOutputStream(outputFile).use { outDoc.writeTo(it) }
+            success = true
         } finally {
             runCatching { outDoc.close() }
+            if (!success && outputFile.exists()) {
+                outputFile.delete()
+            }
         }
 
-        val totalPages = originalPages * 2
-        return "Created $totalPages-page booklet deck from $originalPages source page(s)"
+        val totalPages = outIdx - 1
+        return "Merged ${inputFiles.size} PDFs into $totalPages page(s)"
     }
+
+    /**
+     * Backward-compatible single-PDF helper that builds a 2x booklet copy.
+     */
+    fun mergeOrDuplicatePdf(inputFile: File, outputFile: File): String =
+        mergePdfs(listOf(inputFile, inputFile), outputFile)
 
     /**
      * Converts PDF structure to clean, formatted Markdown document (.md).

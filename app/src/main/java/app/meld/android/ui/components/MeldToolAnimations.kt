@@ -1386,7 +1386,7 @@ private fun SanitizeScanStage(isExif: Boolean) {
  * and the bound booklet kicks into `-4° / 1.09x`.
  */
 @Composable
-private fun MergeBookletStage() {
+internal fun MergeBookletStage() {
     val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(3200, replay)
@@ -1721,7 +1721,7 @@ private fun SheetToCodeTerminalStage(
 
 /** 15. COLLAGE: Four scattered tilted Polaroids spring-snap into a tight 2x2 contact grid. */
 @Composable
-private fun CollageGridAssembleStage() {
+internal fun CollageGridAssembleStage() {
     val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(3200, replay)
@@ -1999,7 +1999,7 @@ private fun TableTransformStage(
 
 /** 19. PACK_ZIP: File pills ease smoothly into Lavender archive as zipper teeth clasp top-to-bottom. */
 @Composable
-private fun ZipPackStage() {
+internal fun ZipPackStage() {
     val colors = meldColors
     var replay by remember { mutableIntStateOf(0) }
     val phase = rememberLoopPhase(2800, replay)

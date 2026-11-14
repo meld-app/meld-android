@@ -57,6 +57,17 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                val multiFilePickerLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.OpenMultipleDocuments()
+                ) { uris: List<Uri> ->
+                    if (uris.isNotEmpty()) {
+                        val activeTool = (uiState.route as? app.meld.android.ui.MeldScreenRoute.Task)?.tool
+                        if (activeTool != null && activeTool.supportsBatchQueue) {
+                            viewModel.appendExternalUrisToBatch(this@MainActivity, activeTool, uris)
+                        }
+                    }
+                }
+
                 MeldAppRoot(
                     uiState = uiState,
                     onSelectTab = viewModel::selectDockTab,
@@ -69,6 +80,25 @@ class MainActivity : ComponentActivity() {
                         viewModel.setFileSheetVisible(false)
                         filePickerLauncher.launch(arrayOf("*/*"))
                     },
+                    onPickBatchFiles = { tool ->
+                        val mimeTypes = when (tool) {
+                            app.meld.android.model.MeldToolId.PDF_MERGE -> arrayOf("application/pdf")
+                            app.meld.android.model.MeldToolId.COLLAGE -> arrayOf("image/*")
+                            else -> arrayOf("*/*")
+                        }
+                        multiFilePickerLauncher.launch(mimeTypes)
+                    },
+                    onAddBatchSample = { tool ->
+                        viewModel.appendSampleToBatch(this@MainActivity, tool)
+                    },
+                    onAddBatchRecent = { tool, conv ->
+                        viewModel.appendRecentResultToBatch(this@MainActivity, tool, conv)
+                    },
+                    onDuplicateBatchItem = { tool, index ->
+                        viewModel.duplicateBatchItem(this@MainActivity, tool, index)
+                    },
+                    onMoveBatchItem = viewModel::moveBatchItem,
+                    onRemoveBatchItem = viewModel::removeBatchItem,
                     onLoadSample = { preset ->
                         viewModel.loadSamplePreset(this@MainActivity, preset)
                     },
@@ -127,12 +157,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIncomingIntent(incoming: Intent?) {
-        if (incoming?.action == Intent.ACTION_SEND) {
-            val sharedUri = IntentCompat.getParcelableExtra(incoming, Intent.EXTRA_STREAM, Uri::class.java)
-            // Mark consumed so configuration changes will not re-import stale intents
-            incoming.action = null
-            if (sharedUri != null) {
-                viewModel.importExternalUri(this, sharedUri)
+        when (incoming?.action) {
+            Intent.ACTION_SEND -> {
+                val sharedUri = IntentCompat.getParcelableExtra(incoming, Intent.EXTRA_STREAM, Uri::class.java)
+                // Mark consumed so configuration changes will not re-import stale intents
+                incoming.action = null
+                if (sharedUri != null) {
+                    viewModel.importExternalUri(this, sharedUri)
+                }
+            }
+            Intent.ACTION_SEND_MULTIPLE -> {
+                val sharedUris = IntentCompat.getParcelableArrayListExtra(incoming, Intent.EXTRA_STREAM, Uri::class.java)
+                incoming.action = null
+                if (!sharedUris.isNullOrEmpty()) {
+                    viewModel.importMultipleIncomingUris(this, sharedUris)
+                }
             }
         }
     }
