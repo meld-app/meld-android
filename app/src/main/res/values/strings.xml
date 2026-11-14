@@ -36,6 +36,7 @@
 
     <string name="category_all">All</string>
     <string name="category_pdfs">PDFs</string>
+    <string name="category_slides">Slides</string>
     <string name="category_images">Images</string>
     <string name="category_audio">Audio</string>
     <string name="category_tables_zip">Tables &amp; Zip</string>
@@ -43,6 +44,8 @@
     <!-- Built-in Sample Presets & File Metadata -->
     <string name="sample_pdf_label">Lecture Deck.pdf</string>
     <string name="sample_pdf_badge">4 pages</string>
+    <string name="sample_pptx_label">MELD Deck.pptx</string>
+    <string name="sample_pptx_badge">3 slides</string>
     <string name="sample_image_label">Studio Subject.png</string>
     <string name="sample_image_badge">1080×1080</string>
     <string name="sample_audio_label">Studio Synth.wav</string>
@@ -54,6 +57,10 @@
         <item quantity="one">%1$d page</item>
         <item quantity="other">%1$d pages</item>
     </plurals>
+    <plurals name="file_slide_count">
+        <item quantity="one">%1$d slide</item>
+        <item quantity="other">%1$d slides</item>
+    </plurals>
     <string name="file_meta_pages_size">%1$s · %2$s</string>
     <string name="file_meta_ext_size">%1$s · %2$s</string>
 
@@ -61,7 +68,7 @@
     <string name="all_tools_heading">All tools.</string>
     <string name="working_on_inline">Working on %1$s</string>
     <string name="sample_file_fallback">sample file</string>
-    <string name="search_tools_placeholder">Find PDF, PNG, Word, Markdown, Remove BG…</string>
+    <string name="search_tools_placeholder">Find PPTX, PDF, PNG, Word, Markdown, Sanitize…</string>
     <string name="cd_clear_search">Clear search</string>
     <string name="no_matching_tools_title">No matching tools</string>
     <string name="no_matching_tools_subtitle">Try another keyword or clear your filters.</string>
@@ -92,7 +99,7 @@
     <!-- Change File Bottom Sheet -->
     <string name="sheet_pick_file_title">Pick a file to work on</string>
     <string name="sheet_browse_title">Browse phone storage</string>
-    <string name="sheet_browse_subtitle">Pick any PDF, image, audio, or CSV</string>
+    <string name="sheet_browse_subtitle">Pick any PDF, PPTX, image, audio, or CSV</string>
     <string name="sheet_try_sample_label">Or try a built-in studio sample:</string>
 
     <!-- Task & Result Screens -->
@@ -168,6 +175,7 @@
     <string name="audio_stereo">Stereo</string>
     <string name="audio_mono">Mono</string>
     <string name="preview_docx_header">OpenXML Word (.docx)\n%1$s</string>
+    <string name="preview_pptx_header">PowerPoint Deck (.pptx)\n%1$d slides · Slide structure intact</string>
     <string name="preview_fallback_header">%1$s\n%2$s</string>
 
     <string name="stage_hint_offline">Runs completely offline on your phone · Tap stage to replay.</string>
@@ -192,6 +200,12 @@
     <string name="vm_err_running_tool">Something went wrong while running %1$s.</string>
     <string name="vm_saved_to">Saved to %1$s</string>
     <string name="vm_saved_locally_share">Saved locally — tap Share to export</string>
+    <string name="vm_pptx_pdf_embedded">Exported %1$d slides (%2$dx%3$d pt) with %4$d embedded font(s); source untouched</string>
+    <string name="vm_pptx_pdf_mapped">Exported %1$d slides (%2$dx%3$d pt) · Font families mapped cleanly; source untouched</string>
+    <string name="vm_pptx_image_rendered">Rendered slide 1 of %1$d to %2$s without altering deck</string>
+    <string name="vm_pptx_handout_built">Built %1$d-up handout from %2$d slides cleanly</string>
+    <string name="vm_pptx_text_extracted">Extracted %1$d slides (%2$d tables, %3$d notes)</string>
+    <string name="vm_pptx_sanitized">Sanitized %1$d slides (%2$d XML/media untouched, %3$d notes removed)</string>
 
     <!-- Tool Catalog: Titles, Badges, Subtitles, CTAs, Result Headlines -->
     <string name="tool_img_to_jpg_title">To JPG</string>
@@ -379,4 +393,47 @@
     <string name="tool_pack_zip_subtitle">Pack your working file into a neat .zip archive</string>
     <string name="tool_pack_zip_cta">Create ZIP</string>
     <string name="tool_pack_zip_result">Archive packed.</string>
+
+    <!-- PPTX & Slides Studio -->
+    <string name="tool_pptx_to_pdf_title">PPTX to PDF</string>
+    <string name="tool_pptx_to_pdf_badge">Exact PDF</string>
+    <string name="tool_pptx_to_pdf_subtitle">Preserve slide size, layout &amp; embedded or mapped fonts</string>
+    <string name="tool_pptx_to_pdf_cta">Export slides PDF</string>
+    <string name="tool_pptx_to_pdf_result">Slide deck PDF ready.</string>
+
+    <string name="tool_pptx_to_png_title">Slide to PNG</string>
+    <string name="tool_pptx_to_png_badge">Slide PNG</string>
+    <string name="tool_pptx_to_png_subtitle">Render cover slide as a crisp high-res PNG without modifying deck</string>
+    <string name="tool_pptx_to_png_cta">Export slide PNG</string>
+    <string name="tool_pptx_to_png_result">Slide PNG ready.</string>
+
+    <string name="tool_pptx_to_jpg_title">Slide to JPG</string>
+    <string name="tool_pptx_to_jpg_badge">Slide JPG</string>
+    <string name="tool_pptx_to_jpg_subtitle">Save cover slide as a shareable high-res JPEG image</string>
+    <string name="tool_pptx_to_jpg_cta">Export slide JPG</string>
+    <string name="tool_pptx_to_jpg_result">Slide JPEG ready.</string>
+
+    <string name="tool_pptx_to_md_title">PPTX to Markdown</string>
+    <string name="tool_pptx_to_md_badge">Slide MD</string>
+    <string name="tool_pptx_to_md_subtitle">Extract headings, bullets, GFM tables &amp; speaker notes</string>
+    <string name="tool_pptx_to_md_cta">Extract slide Markdown</string>
+    <string name="tool_pptx_to_md_result">Slide Markdown ready.</string>
+
+    <string name="tool_pptx_to_txt_title">PPTX to Text</string>
+    <string name="tool_pptx_to_txt_badge">Slide TXT</string>
+    <string name="tool_pptx_to_txt_subtitle">Pull structured plain text &amp; speaker notes from every slide</string>
+    <string name="tool_pptx_to_txt_cta">Extract slide text</string>
+    <string name="tool_pptx_to_txt_result">Slide text ready.</string>
+
+    <string name="tool_pptx_handout_title">Slide Handout</string>
+    <string name="tool_pptx_handout_badge">Handout</string>
+    <string name="tool_pptx_handout_subtitle">Arrange 2, 3 (with note lines), or 4 slides per sheet</string>
+    <string name="tool_pptx_handout_cta">Build slide handout</string>
+    <string name="tool_pptx_handout_result">Slide handout ready.</string>
+
+    <string name="tool_pptx_sanitize_title">Sanitize PPTX</string>
+    <string name="tool_pptx_sanitize_badge">Clean PPTX</string>
+    <string name="tool_pptx_sanitize_subtitle">Strip author metadata &amp; speaker notes; keep slides byte-intact</string>
+    <string name="tool_pptx_sanitize_cta">Sanitize presentation</string>
+    <string name="tool_pptx_sanitize_result">Deck sanitized.</string>
 </resources>

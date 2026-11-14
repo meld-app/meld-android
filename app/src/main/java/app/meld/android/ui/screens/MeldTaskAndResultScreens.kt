@@ -189,7 +189,7 @@ fun MeldTaskScreen(
                             )
                         }
 
-                        MeldToolId.HANDOUT -> {
+                        MeldToolId.HANDOUT, MeldToolId.PPTX_HANDOUT -> {
                             HandoutTaskControls(
                                 pagesPerSheet = options.handoutPagesPerSheet,
                                 onUpdateHandoutMode = onUpdateHandoutMode

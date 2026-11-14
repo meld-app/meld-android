@@ -423,7 +423,7 @@ object SampleFileFactory {
                     <p:txBody>
                       <a:bodyPr anchor="t"/>
                       <a:p><a:r><a:rPr lang="en-US" sz="4400" b="1"><a:solidFill><a:schemeClr val="dk1"/></a:solidFill><a:latin typeface="+mj-lt"/></a:rPr><a:t>MELD Offline Slide Engine</a:t></a:r></a:p>
-                      <a:p><a:pPr spcBef="1800"><a:r><a:rPr lang="en-US" sz="2000"><a:solidFill><a:srgbClr val="4A4843"/></a:solidFill><a:latin typeface="+mn-lt"/></a:rPr><a:t>Zero-cloud OOXML parsing, exact 16:9 geometry &amp; font preservation</a:t></a:r></a:pPr></a:p>
+                      <a:p><a:pPr><a:spcBef><a:spcPts val="1400"/></a:spcBef></a:pPr><a:r><a:rPr lang="en-US" sz="2000"><a:solidFill><a:srgbClr val="4A4843"/></a:solidFill><a:latin typeface="+mn-lt"/></a:rPr><a:t>Zero-cloud OOXML parsing, exact 16:9 geometry &amp; font preservation</a:t></a:r></a:p>
                     </p:txBody>
                   </p:sp>
                   <p:sp>
@@ -492,12 +492,12 @@ object SampleFileFactory {
                     <p:txBody>
                       <a:bodyPr lIns="274320" tIns="228600" rIns="228600" bIns="228600"/>
                       <a:p>
-                        <a:pPr lvl="0" marL="274320" indent="-182880" spcAft="1200"><a:buChar char="•"/></a:pPr>
+                        <a:pPr lvl="0" marL="274320" indent="-182880"><a:spcAft><a:spcPts val="1200"/></a:spcAft><a:buChar char="•"/></a:pPr>
                         <a:r><a:rPr lang="en-US" sz="1800" b="1"><a:solidFill><a:schemeClr val="accent1"/></a:solidFill><a:latin typeface="+mn-lt"/></a:rPr><a:t>Read-Only Source: </a:t></a:r>
                         <a:r><a:rPr lang="en-US" sz="1800"><a:solidFill><a:schemeClr val="dk1"/></a:solidFill><a:latin typeface="+mn-lt"/></a:rPr><a:t>Input .pptx structure stays untouched.</a:t></a:r>
                       </a:p>
                       <a:p>
-                        <a:pPr lvl="0" marL="274320" indent="-182880" spcAft="1200"><a:buChar char="•"/></a:pPr>
+                        <a:pPr lvl="0" marL="274320" indent="-182880"><a:spcAft><a:spcPts val="1200"/></a:spcAft><a:buChar char="•"/></a:pPr>
                         <a:r><a:rPr lang="en-US" sz="1800" i="1"><a:solidFill><a:schemeClr val="dk1"/></a:solidFill><a:latin typeface="Georgia"/></a:rPr><a:t>Font Pipeline: </a:t></a:r>
                         <a:r><a:rPr lang="en-US" sz="1800"><a:solidFill><a:schemeClr val="dk1"/></a:solidFill><a:latin typeface="+mn-lt"/></a:rPr><a:t>Embedded .odttf/.ttf + crisp family mapping.</a:t></a:r>
                       </a:p>

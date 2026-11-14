@@ -22,10 +22,12 @@ class MeldEngineUnitTest {
 
     @Test
     fun toolCatalog_hasFullMacParitySuite() {
-        assertTrue(MeldToolId.entries.size >= 29)
+        assertTrue(MeldToolId.entries.size >= 38)
         assertTrue(MeldToolId.entries.any { it.mode == MeldMode.CONVERT && it.category == MeldCategory.IMAGE_STUDIO })
         assertTrue(MeldToolId.entries.any { it.mode == MeldMode.CONVERT && it.category == MeldCategory.PDF_DOCS })
         assertTrue(MeldToolId.entries.any { it.mode == MeldMode.TOOLS && it.category == MeldCategory.PDF_DOCS })
+        assertTrue(MeldToolId.entries.any { it.mode == MeldMode.CONVERT && it.category == MeldCategory.SLIDES })
+        assertTrue(MeldToolId.entries.any { it.mode == MeldMode.TOOLS && it.category == MeldCategory.SLIDES })
 
         assertTrue(MeldToolId.IMG_TO_WEBP.acceptsExtension("png"))
         assertTrue(MeldToolId.IMG_TO_PDF.acceptsExtension("jpg"))
@@ -33,6 +35,20 @@ class MeldEngineUnitTest {
         assertTrue(MeldToolId.PDF_TO_HTML.acceptsExtension("pdf"))
         assertTrue(MeldToolId.COMPRESS_PDF.acceptsExtension("pdf"))
         assertTrue(MeldToolId.SPEED_2X.acceptsExtension("wav"))
+        assertTrue(MeldToolId.PPTX_TO_PDF.acceptsExtension("pptx"))
+        assertTrue(MeldToolId.PPTX_SANITIZE.acceptsExtension(".PPTX"))
+        assertTrue(MeldToolId.PACK_ZIP.acceptsExtension("pptx"))
+        assertTrue(MeldToolId.PPTX_SANITIZE.followUpTools().contains(MeldToolId.PPTX_TO_PDF))
+
+        val pptxInfo = SelectedFileInfo(
+            file = File("MELD_Deck_3Slides.pptx"),
+            displayName = "MELD_Deck_3Slides.pptx",
+            extension = "pptx",
+            sizeBytes = 4096L,
+            slideCount = 3
+        )
+        assertEquals("Deck", pptxInfo.cleanTitle)
+        assertTrue(pptxInfo.formattedMetaLine.startsWith("3 slides"))
     }
 
     @Test

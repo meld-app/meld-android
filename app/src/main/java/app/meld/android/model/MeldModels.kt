@@ -16,6 +16,7 @@ enum class MeldMode(@StringRes val labelRes: Int) {
 enum class MeldCategory(@StringRes val labelRes: Int) {
     ALL(R.string.category_all),
     PDF_DOCS(R.string.category_pdfs),
+    SLIDES(R.string.category_slides),
     IMAGE_STUDIO(R.string.category_images),
     AUDIO_VIDEO(R.string.category_audio),
     DATA_TABLES(R.string.category_tables_zip)
@@ -389,8 +390,89 @@ enum class MeldToolId(
         resultHeadlineRes = R.string.tool_pack_zip_result,
         mode = MeldMode.TOOLS,
         category = MeldCategory.DATA_TABLES,
-        supportedExtensions = setOf("pdf", "png", "jpg", "jpeg", "webp", "csv", "txt", "wav", "json", "md"),
+        supportedExtensions = setOf("pdf", "pptx", "png", "jpg", "jpeg", "webp", "csv", "txt", "wav", "json", "md"),
         outputExtension = "zip"
+    ),
+
+    // ========================
+    // PPTX & SLIDES STUDIO
+    // ========================
+    PPTX_TO_PDF(
+        titleRes = R.string.tool_pptx_to_pdf_title,
+        badgeRes = R.string.tool_pptx_to_pdf_badge,
+        subtitleRes = R.string.tool_pptx_to_pdf_subtitle,
+        ctaLabelRes = R.string.tool_pptx_to_pdf_cta,
+        resultHeadlineRes = R.string.tool_pptx_to_pdf_result,
+        mode = MeldMode.CONVERT,
+        category = MeldCategory.SLIDES,
+        supportedExtensions = setOf("pptx"),
+        outputExtension = "pdf"
+    ),
+    PPTX_TO_PNG(
+        titleRes = R.string.tool_pptx_to_png_title,
+        badgeRes = R.string.tool_pptx_to_png_badge,
+        subtitleRes = R.string.tool_pptx_to_png_subtitle,
+        ctaLabelRes = R.string.tool_pptx_to_png_cta,
+        resultHeadlineRes = R.string.tool_pptx_to_png_result,
+        mode = MeldMode.CONVERT,
+        category = MeldCategory.SLIDES,
+        supportedExtensions = setOf("pptx"),
+        outputExtension = "png"
+    ),
+    PPTX_TO_JPG(
+        titleRes = R.string.tool_pptx_to_jpg_title,
+        badgeRes = R.string.tool_pptx_to_jpg_badge,
+        subtitleRes = R.string.tool_pptx_to_jpg_subtitle,
+        ctaLabelRes = R.string.tool_pptx_to_jpg_cta,
+        resultHeadlineRes = R.string.tool_pptx_to_jpg_result,
+        mode = MeldMode.CONVERT,
+        category = MeldCategory.SLIDES,
+        supportedExtensions = setOf("pptx"),
+        outputExtension = "jpg"
+    ),
+    PPTX_TO_MD(
+        titleRes = R.string.tool_pptx_to_md_title,
+        badgeRes = R.string.tool_pptx_to_md_badge,
+        subtitleRes = R.string.tool_pptx_to_md_subtitle,
+        ctaLabelRes = R.string.tool_pptx_to_md_cta,
+        resultHeadlineRes = R.string.tool_pptx_to_md_result,
+        mode = MeldMode.CONVERT,
+        category = MeldCategory.SLIDES,
+        supportedExtensions = setOf("pptx"),
+        outputExtension = "md"
+    ),
+    PPTX_TO_TXT(
+        titleRes = R.string.tool_pptx_to_txt_title,
+        badgeRes = R.string.tool_pptx_to_txt_badge,
+        subtitleRes = R.string.tool_pptx_to_txt_subtitle,
+        ctaLabelRes = R.string.tool_pptx_to_txt_cta,
+        resultHeadlineRes = R.string.tool_pptx_to_txt_result,
+        mode = MeldMode.CONVERT,
+        category = MeldCategory.SLIDES,
+        supportedExtensions = setOf("pptx"),
+        outputExtension = "txt"
+    ),
+    PPTX_HANDOUT(
+        titleRes = R.string.tool_pptx_handout_title,
+        badgeRes = R.string.tool_pptx_handout_badge,
+        subtitleRes = R.string.tool_pptx_handout_subtitle,
+        ctaLabelRes = R.string.tool_pptx_handout_cta,
+        resultHeadlineRes = R.string.tool_pptx_handout_result,
+        mode = MeldMode.TOOLS,
+        category = MeldCategory.SLIDES,
+        supportedExtensions = setOf("pptx"),
+        outputExtension = "pdf"
+    ),
+    PPTX_SANITIZE(
+        titleRes = R.string.tool_pptx_sanitize_title,
+        badgeRes = R.string.tool_pptx_sanitize_badge,
+        subtitleRes = R.string.tool_pptx_sanitize_subtitle,
+        ctaLabelRes = R.string.tool_pptx_sanitize_cta,
+        resultHeadlineRes = R.string.tool_pptx_sanitize_result,
+        mode = MeldMode.TOOLS,
+        category = MeldCategory.SLIDES,
+        supportedExtensions = setOf("pptx"),
+        outputExtension = "pptx"
     );
 
     fun acceptsExtension(ext: String): Boolean {
@@ -400,6 +482,7 @@ enum class MeldToolId(
 
     fun followUpTools(): List<MeldToolId> = when (outputExtension) {
         "pdf" -> listOf(COMPRESS_PDF, PDF_EXTRACT, LOCK_STAMP).filter { it != this }
+        "pptx" -> listOf(PPTX_TO_PDF, PPTX_HANDOUT, PPTX_TO_MD).filter { it != this }
         "png", "jpg", "jpeg", "webp" -> listOf(COMPRESS, RESIZE_IMAGE, IMG_TO_PDF).filter { it != this }
         else -> listOf(PACK_ZIP).filter { it != this }
     }
@@ -433,13 +516,15 @@ data class SelectedFileInfo(
     val displayName: String,
     val extension: String,
     val sizeBytes: Long,
-    val pageCount: Int? = null
+    val pageCount: Int? = null,
+    val slideCount: Int? = null
 ) {
     val cleanTitle: String
         get() = displayName
             .substringBeforeLast('.')
             .removePrefix("MELD_")
             .removeSuffix("_4Pages")
+            .removeSuffix("_3Slides")
             .replace('_', ' ')
             .ifBlank { displayName }
 
@@ -447,18 +532,25 @@ data class SelectedFileInfo(
         get() = formatByteCount(sizeBytes)
 
     @Composable
-    fun localizedMetaLine(): String = if (pageCount != null && pageCount > 0) {
-        val pagesLabel = pluralStringResource(R.plurals.file_page_count, pageCount, pageCount)
-        stringResource(R.string.file_meta_pages_size, pagesLabel, formattedSize)
-    } else {
-        stringResource(R.string.file_meta_ext_size, extension.uppercase(), formattedSize)
+    fun localizedMetaLine(): String = when {
+        slideCount != null && slideCount > 0 -> {
+            val slidesLabel = pluralStringResource(R.plurals.file_slide_count, slideCount, slideCount)
+            stringResource(R.string.file_meta_pages_size, slidesLabel, formattedSize)
+        }
+        pageCount != null && pageCount > 0 -> {
+            val pagesLabel = pluralStringResource(R.plurals.file_page_count, pageCount, pageCount)
+            stringResource(R.string.file_meta_pages_size, pagesLabel, formattedSize)
+        }
+        else -> stringResource(R.string.file_meta_ext_size, extension.uppercase(), formattedSize)
     }
 
     val formattedMetaLine: String
-        get() = if (pageCount != null && pageCount > 0) {
-            "$pageCount page${if (pageCount == 1) "" else "s"} · $formattedSize"
-        } else {
-            "${extension.uppercase()} · $formattedSize"
+        get() = when {
+            slideCount != null && slideCount > 0 ->
+                "$slideCount slide${if (slideCount == 1) "" else "s"} · $formattedSize"
+            pageCount != null && pageCount > 0 ->
+                "$pageCount page${if (pageCount == 1) "" else "s"} · $formattedSize"
+            else -> "${extension.uppercase()} · $formattedSize"
         }
 
     companion object {
