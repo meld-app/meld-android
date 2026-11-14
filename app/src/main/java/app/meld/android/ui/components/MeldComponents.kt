@@ -94,6 +94,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.meld.android.R
+import app.meld.android.engine.PptxEngine
+import app.meld.android.engine.pptx.PptxCanvasRenderer
+import app.meld.android.engine.pptx.PptxFontResolver
+import app.meld.android.engine.pptx.PptxOoxmlParser
 import app.meld.android.model.ConversionResult
 import app.meld.android.ui.MeldAdaptiveLayout
 import app.meld.android.ui.theme.MeldDimens
@@ -482,30 +486,71 @@ fun WorkingDocumentIllustration(
         val l2 = lineFractions.getOrElse(2) { 1f }.coerceIn(0f, 1f)
         val l3 = lineFractions.getOrElse(3) { 1f }.coerceIn(0f, 1f)
         val l4 = lineFractions.getOrElse(4) { 1f }.coerceIn(0f, 1f)
+        val isSlideDeck = extension.equals("pptx", ignoreCase = true)
 
         if (l0 > 0.01f) {
             drawRoundRect(
-                color = colors.paperStroke,
+                color = if (isSlideDeck) colors.coral else colors.paperStroke,
                 topLeft = Offset(13.dp.toPx(), 16.dp.toPx()),
-                size = Size((w * 0.44f) * l0, 7.5.dp.toPx()),
+                size = Size((w * (if (isSlideDeck) 0.56f else 0.44f)) * l0, 7.5.dp.toPx()),
                 cornerRadius = CornerRadius(3.dp.toPx())
             )
         }
 
-        val lineColor = colors.paperLine
-        val fullLineW = w * 0.64f
-        val leftX = 13.dp.toPx()
-        val ys = listOf(31.dp.toPx(), 41.dp.toPx(), 51.dp.toPx(), 61.dp.toPx())
-        val widths = listOf(fullLineW * l1, fullLineW * l2, fullLineW * l3, (fullLineW * 0.78f) * l4)
-
-        for (idx in ys.indices) {
-            if (widths[idx] > 1f) {
+        if (isSlideDeck) {
+            // Subtle 16:9 slide frame inside the tilted paper sheet for .pptx files
+            val frameTop = 31.dp.toPx()
+            val frameH = 30.dp.toPx()
+            val frameW = (w * 0.64f) * l1
+            if (frameW > 4f) {
                 drawRoundRect(
-                    color = lineColor,
-                    topLeft = Offset(leftX, ys[idx]),
-                    size = Size(widths[idx], 4.2.dp.toPx()),
+                    color = colors.paperStroke,
+                    topLeft = Offset(13.dp.toPx(), frameTop),
+                    size = Size(frameW, frameH),
+                    cornerRadius = CornerRadius(4.dp.toPx()),
+                    style = Stroke(width = 1.6.dp.toPx())
+                )
+            }
+            if (l2 > 0.01f) {
+                drawRoundRect(
+                    color = colors.paperLine,
+                    topLeft = Offset(18.dp.toPx(), frameTop + 8.dp.toPx()),
+                    size = Size((w * 0.42f) * l2, 4.2.dp.toPx()),
                     cornerRadius = CornerRadius(2.dp.toPx())
                 )
+            }
+            if (l3 > 0.01f) {
+                drawRoundRect(
+                    color = colors.paperLine,
+                    topLeft = Offset(18.dp.toPx(), frameTop + 17.dp.toPx()),
+                    size = Size((w * 0.30f) * l3, 4.2.dp.toPx()),
+                    cornerRadius = CornerRadius(2.dp.toPx())
+                )
+            }
+            if (l4 > 0.01f) {
+                drawRoundRect(
+                    color = colors.paperLine,
+                    topLeft = Offset(13.dp.toPx(), 68.dp.toPx()),
+                    size = Size((w * 0.46f) * l4, 4.2.dp.toPx()),
+                    cornerRadius = CornerRadius(2.dp.toPx())
+                )
+            }
+        } else {
+            val lineColor = colors.paperLine
+            val fullLineW = w * 0.64f
+            val leftX = 13.dp.toPx()
+            val ys = listOf(31.dp.toPx(), 41.dp.toPx(), 51.dp.toPx(), 61.dp.toPx())
+            val widths = listOf(fullLineW * l1, fullLineW * l2, fullLineW * l3, (fullLineW * 0.78f) * l4)
+
+            for (idx in ys.indices) {
+                if (widths[idx] > 1f) {
+                    drawRoundRect(
+                        color = lineColor,
+                        topLeft = Offset(leftX, ys[idx]),
+                        size = Size(widths[idx], 4.2.dp.toPx()),
+                        cornerRadius = CornerRadius(2.dp.toPx())
+                    )
+                }
             }
         }
     }
@@ -725,6 +770,8 @@ fun ResultShowcaseCard(
                     decodeBoundedBitmap(result.outputFile, maxDim = 1080)
                 ext == "pdf" ->
                     renderPdfPagePreview(result.outputFile, maxDim = 1080)
+                ext == "pptx" ->
+                    renderPptxFirstSlidePreview(result.outputFile, maxDim = 1080)
                 else -> null
             }
         }
@@ -1094,6 +1141,10 @@ private fun buildRichOutputPreview(context: Context, result: ConversionResult): 
                 } else ""
                 context.getString(R.string.preview_docx_header, plain.take(180))
             }
+            ext == "pptx" -> {
+                val slides = PptxEngine.countSlides(file) ?: 0
+                context.getString(R.string.preview_pptx_header, slides)
+            }
             else -> context.getString(
                 R.string.preview_fallback_header,
                 context.getString(result.tool.titleRes),
@@ -1101,6 +1152,36 @@ private fun buildRichOutputPreview(context: Context, result: ConversionResult): 
             )
         }
     }.getOrElse { result.summary }
+}
+
+internal fun renderPptxFirstSlidePreview(pptxFile: File, maxDim: Int = 1080): Bitmap? {
+    return runCatching {
+        val presentation = PptxOoxmlParser.parse(pptxFile)
+        val slide = presentation.slides.firstOrNull() ?: return null
+        val largest = max(1f, max(slide.widthPt, slide.heightPt))
+        val scale = if (maxDim > 0) (maxDim.toFloat() / largest).coerceIn(0.5f, 3.0f) else 1f
+        val bmpW = max(1, (slide.widthPt * scale).roundToInt())
+        val bmpH = max(1, (slide.heightPt * scale).roundToInt())
+        val bmp = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
+        try {
+            ZipFile(pptxFile).use { zip ->
+                PptxFontResolver(
+                    pptxFile.parentFile ?: File("."),
+                    zip,
+                    presentation.embeddedFonts
+                ).use { resolver ->
+                    val canvas = android.graphics.Canvas(bmp)
+                    canvas.drawColor(android.graphics.Color.WHITE)
+                    canvas.scale(scale, scale)
+                    PptxCanvasRenderer.renderSlide(canvas, zip, slide, resolver)
+                }
+            }
+            bmp
+        } catch (t: Throwable) {
+            bmp.recycle()
+            throw t
+        }
+    }.getOrNull()
 }
 
 internal fun renderPdfPagePreview(pdfFile: File, maxDim: Int = 1080): Bitmap? {

@@ -156,6 +156,7 @@ class MainActivity : ComponentActivity() {
                 "md", "txt" -> "text/plain"
                 "html" -> "text/html"
                 "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                "pptx" -> "application/vnd.openxmlformats-officedocument.presentationml.presentation"
                 "wav" -> "audio/wav"
                 "zip" -> "application/zip"
                 else -> "*/*"

@@ -1166,23 +1166,24 @@ fun SpecializedToolShowcaseCard(
                 MeldToolId.VISUALIZE -> AudioWaveformStage()
                 MeldToolId.SPEED_2X -> SpeedRaceStage()
                 MeldToolId.REDACT -> RedactSweepStage()
-                MeldToolId.STRIP_PDF_META -> SanitizeScanStage(isExif = false)
+                MeldToolId.STRIP_PDF_META, MeldToolId.PPTX_SANITIZE -> SanitizeScanStage(isExif = false)
                 MeldToolId.STRIP_EXIF -> SanitizeScanStage(isExif = true)
                 MeldToolId.COLLAGE -> CollageGridAssembleStage()
                 MeldToolId.PDF_MERGE -> MergeBookletStage()
                 MeldToolId.PACK_ZIP -> ZipPackStage()
                 MeldToolId.PDF_TO_DOCX -> SheetFlipWordStage()
-                MeldToolId.PDF_TO_MD -> SheetToCodeTerminalStage(tag = "#", accentColor = colors.stageLimeCode)
+                MeldToolId.PDF_TO_MD, MeldToolId.PPTX_TO_MD -> SheetToCodeTerminalStage(tag = "#", accentColor = colors.stageLimeCode)
                 MeldToolId.PDF_TO_HTML -> SheetToCodeTerminalStage(tag = "</>", accentColor = colors.periwinkle)
-                MeldToolId.PDF_TO_TXT -> SheetToCodeTerminalStage(tag = "Aa", accentColor = colors.mint)
+                MeldToolId.PDF_TO_TXT, MeldToolId.PPTX_TO_TXT -> SheetToCodeTerminalStage(tag = "Aa", accentColor = colors.mint)
                 MeldToolId.PDF_TO_PNG, MeldToolId.PDF_TO_JPG,
+                MeldToolId.PPTX_TO_PNG, MeldToolId.PPTX_TO_JPG,
                 MeldToolId.IMG_TO_JPG, MeldToolId.IMG_TO_PNG,
                 MeldToolId.IMG_TO_WEBP, MeldToolId.IMG_TO_BMP,
                 MeldToolId.IMG_TO_TIFF -> PolaroidFormatMorphStage(
                     sourceExt = sourceExt,
                     targetExt = tool.outputExtension.uppercase()
                 )
-                MeldToolId.IMG_TO_PDF -> PhotoToPdfStackStage(sourceExt = sourceExt)
+                MeldToolId.IMG_TO_PDF, MeldToolId.PPTX_TO_PDF -> PhotoToPdfStackStage(sourceExt = sourceExt)
                 MeldToolId.SHEET_TO_PDF -> TableTransformStage(targetExt = "PDF", badgeColor = colors.coral)
                 MeldToolId.SHEET_TO_MD -> TableTransformStage(targetExt = "# MD", badgeColor = colors.stageLimeCode)
                 MeldToolId.TABLE_CONVERT -> TableTransformStage(targetExt = "{JSON}", badgeColor = colors.butter)

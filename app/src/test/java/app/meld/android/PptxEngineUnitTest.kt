@@ -58,6 +58,7 @@ class PptxEngineUnitTest {
             .joinToString("\n") { p -> p.runs.joinToString("") { it.text } }
         assertTrue(slide1Texts.contains("MELD 100% OFFLINE DECK"))
         assertTrue(slide1Texts.contains("SLIDE STUDIO"))
+        assertTrue(slide1Texts.contains("Zero-cloud OOXML parsing"))
 
         // Slide 1 hero badge group transform checks (container at x=60pt, y=72pt, w=180pt, h=48pt)
         val badgeShape = slide1.elements

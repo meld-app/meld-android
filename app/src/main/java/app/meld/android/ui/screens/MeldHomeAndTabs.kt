@@ -168,6 +168,8 @@ fun MeldStudioHomeScreen(
     val ext = uiState.selectedFile?.extension?.lowercase() ?: "pdf"
     val quickTriple: Triple<MeldToolId, MeldToolId, MeldToolId> = remember(ext) {
         when (ext) {
+            "pptx" ->
+                Triple(MeldToolId.PPTX_TO_PDF, MeldToolId.PPTX_HANDOUT, MeldToolId.PPTX_SANITIZE)
             in setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif") ->
                 Triple(MeldToolId.COMPRESS, MeldToolId.REMOVE_BG, MeldToolId.IMG_TO_PDF)
             in setOf("wav", "pcm", "mp3", "m4a", "aac", "mp4", "ogg") ->
@@ -1708,4 +1710,10 @@ fun iconForTool(tool: MeldToolId): ImageVector = when (tool) {
     MeldToolId.SHEET_TO_PDF -> Icons.Default.PictureAsPdf
     MeldToolId.SHEET_TO_MD, MeldToolId.TABLE_CONVERT -> Icons.Default.TableChart
     MeldToolId.PACK_ZIP -> Icons.Default.Archive
+    MeldToolId.PPTX_TO_PDF -> Icons.Default.PictureAsPdf
+    MeldToolId.PPTX_TO_PNG, MeldToolId.PPTX_TO_JPG -> Icons.Default.Image
+    MeldToolId.PPTX_TO_MD -> Icons.Default.Code
+    MeldToolId.PPTX_TO_TXT -> Icons.Default.EditNote
+    MeldToolId.PPTX_HANDOUT -> Icons.Default.GridView
+    MeldToolId.PPTX_SANITIZE -> Icons.Default.VisibilityOff
 }

@@ -2,6 +2,7 @@ package app.meld.android.ui
 
 import android.content.ContentValues
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Build
@@ -17,6 +18,7 @@ import app.meld.android.R
 import app.meld.android.engine.DocumentEngine
 import app.meld.android.engine.ImageEngine
 import app.meld.android.engine.MediaEngine
+import app.meld.android.engine.PptxEngine
 import app.meld.android.engine.SampleFileFactory
 import app.meld.android.model.ConversionResult
 import app.meld.android.model.MeldCategory
@@ -37,9 +39,11 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.roundToInt
 
 enum class SamplePreset(@StringRes val labelRes: Int, @StringRes val badgeRes: Int) {
     PDF_DECK(R.string.sample_pdf_label, R.string.sample_pdf_badge),
+    PPTX_DECK(R.string.sample_pptx_label, R.string.sample_pptx_badge),
     STUDIO_IMAGE(R.string.sample_image_label, R.string.sample_image_badge),
     SYNTH_AUDIO(R.string.sample_audio_label, R.string.sample_audio_badge),
     BENCHMARK_CSV(R.string.sample_csv_label, R.string.sample_csv_badge)
@@ -232,6 +236,7 @@ class MeldViewModel : ViewModel() {
                     val sampleDir = File(context.cacheDir, "samples").apply { mkdirs() }
                     val file = when (preset) {
                         SamplePreset.PDF_DECK -> SampleFileFactory.createSamplePdf(sampleDir)
+                        SamplePreset.PPTX_DECK -> SampleFileFactory.createSamplePptx(sampleDir)
                         SamplePreset.STUDIO_IMAGE -> SampleFileFactory.createSampleImage(sampleDir)
                         SamplePreset.SYNTH_AUDIO -> SampleFileFactory.createSampleAudioWav(sampleDir)
                         SamplePreset.BENCHMARK_CSV -> SampleFileFactory.createSampleCsv(sampleDir)
@@ -552,6 +557,90 @@ class MeldViewModel : ViewModel() {
                             }
                             MediaEngine.packToZip(targetForZip, outFile)
                         }
+
+                        // PPTX & Slides Studio
+                        MeldToolId.PPTX_TO_PDF -> {
+                            val pptxFile = ensurePptxInput(context, inputFile)
+                            val res = PptxEngine.convertPptxToPdf(
+                                pptxFile,
+                                outFile,
+                                fontCacheDir = context.cacheDir
+                            )
+                            if (res.embeddedFontsUsed > 0) {
+                                context.getString(
+                                    R.string.vm_pptx_pdf_embedded,
+                                    res.slideCount,
+                                    res.slideWidthPt.roundToInt(),
+                                    res.slideHeightPt.roundToInt(),
+                                    res.embeddedFontsUsed
+                                )
+                            } else {
+                                context.getString(
+                                    R.string.vm_pptx_pdf_mapped,
+                                    res.slideCount,
+                                    res.slideWidthPt.roundToInt(),
+                                    res.slideHeightPt.roundToInt()
+                                )
+                            }
+                        }
+                        MeldToolId.PPTX_TO_PNG, MeldToolId.PPTX_TO_JPG -> {
+                            val pptxFile = ensurePptxInput(context, inputFile)
+                            val fmt = if (tool == MeldToolId.PPTX_TO_JPG) {
+                                Bitmap.CompressFormat.JPEG
+                            } else {
+                                Bitmap.CompressFormat.PNG
+                            }
+                            val res = PptxEngine.renderPptxSlideToImage(
+                                pptxFile,
+                                outFile,
+                                slideNumber1Based = 1,
+                                format = fmt,
+                                fontCacheDir = context.cacheDir
+                            )
+                            context.getString(
+                                R.string.vm_pptx_image_rendered,
+                                res.slideCount,
+                                tool.outputExtension.uppercase()
+                            )
+                        }
+                        MeldToolId.PPTX_TO_MD, MeldToolId.PPTX_TO_TXT -> {
+                            val pptxFile = ensurePptxInput(context, inputFile)
+                            val res = if (tool == MeldToolId.PPTX_TO_MD) {
+                                PptxEngine.convertPptxToMarkdown(pptxFile, outFile)
+                            } else {
+                                PptxEngine.extractPptxPlainText(pptxFile, outFile)
+                            }
+                            context.getString(
+                                R.string.vm_pptx_text_extracted,
+                                res.slideCount,
+                                res.tableCount,
+                                res.noteCount
+                            )
+                        }
+                        MeldToolId.PPTX_HANDOUT -> {
+                            val pptxFile = ensurePptxInput(context, inputFile)
+                            val res = PptxEngine.buildPptxHandoutPdf(
+                                pptxFile,
+                                outFile,
+                                slidesPerPage = opts.handoutPagesPerSheet,
+                                fontCacheDir = context.cacheDir
+                            )
+                            context.getString(
+                                R.string.vm_pptx_handout_built,
+                                opts.handoutPagesPerSheet,
+                                res.slideCount
+                            )
+                        }
+                        MeldToolId.PPTX_SANITIZE -> {
+                            val pptxFile = ensurePptxInput(context, inputFile)
+                            val res = PptxEngine.sanitizePptx(pptxFile, outFile)
+                            context.getString(
+                                R.string.vm_pptx_sanitized,
+                                res.slideCount,
+                                res.preservedEntries,
+                                res.strippedNotesCount
+                            )
+                        }
                     }
 
                     ensureActive()
@@ -689,12 +778,14 @@ class MeldViewModel : ViewModel() {
         val nameToUse = friendlyDisplayName ?: file.name
         val ext = file.extension.lowercase()
         val pages = if (ext == "pdf") countPdfPages(file) else null
+        val slides = if (ext == "pptx") PptxEngine.countSlides(file) else null
         return SelectedFileInfo(
             file = file,
             displayName = nameToUse,
             extension = ext,
             sizeBytes = file.length(),
-            pageCount = pages
+            pageCount = pages,
+            slideCount = slides
         )
     }
 
@@ -711,6 +802,7 @@ class MeldViewModel : ViewModel() {
         return when (tool.category) {
             MeldCategory.IMAGE_STUDIO -> SampleFileFactory.createSampleImage(sampleDir)
             MeldCategory.PDF_DOCS -> SampleFileFactory.createSamplePdf(sampleDir)
+            MeldCategory.SLIDES -> SampleFileFactory.createSamplePptx(sampleDir)
             MeldCategory.AUDIO_VIDEO -> SampleFileFactory.createSampleAudioWav(sampleDir)
             MeldCategory.DATA_TABLES -> {
                 if (tool == MeldToolId.PACK_ZIP) {
@@ -737,6 +829,14 @@ class MeldViewModel : ViewModel() {
             file
         } else {
             SampleFileFactory.createSamplePdf(File(context.cacheDir, "samples").apply { mkdirs() })
+        }
+    }
+
+    private fun ensurePptxInput(context: Context, file: File): File {
+        return if (file.extension.lowercase() == "pptx" && file.isFile) {
+            file
+        } else {
+            SampleFileFactory.createSamplePptx(File(context.cacheDir, "samples").apply { mkdirs() })
         }
     }
 
