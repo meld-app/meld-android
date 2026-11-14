@@ -36,29 +36,41 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Run Unit Tests & Assemble APKs
+      - name: Run Unit Tests & Assemble Debug APK
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleDebug assembleRelease
+          ./gradlew testDebugUnitTest assembleDebug
 
-      - name: Package APK Artifact
+      - name: Assemble & Package Release APK
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          mkdir -p dist
-          if [ -n "$KEYSTORE_B64" ] && [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "$KEYSTORE_B64" | base64 --decode > /tmp/meld-release.jks
-            export ANDROID_KEYSTORE_PATH=/tmp/meld-release.jks
-            ./gradlew assembleRelease --no-daemon
-            cp app/build/outputs/apk/release/app-release.apk dist/MELD-v2.1.0-beta.1-Android.apk
-            rm -f /tmp/meld-release.jks
-          else
-            cp app/build/outputs/apk/release/app-release-unsigned.apk dist/MELD-v2.1.0-beta.1-Android-unsigned.apk
+          trap 'rm -f /tmp/meld-release.jks' EXIT
+          VERSION_NAME=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)
+          if [ -z "$VERSION_NAME" ]; then
+            echo "Failed to resolve versionName from app/build.gradle.kts" >&2
+            exit 1
           fi
-          sha256sum dist/*.apk > dist/MELD-v2.1.0-beta.1-Android.apk.sha256
+
+          rm -rf dist
+          mkdir -p dist
+
+          if [ -n "$KEYSTORE_B64" ] && [ "${{ github.event_name }}" != "pull_request" ]; then
+            (umask 077 && echo "$KEYSTORE_B64" | base64 --decode > /tmp/meld-release.jks)
+            export ANDROID_KEYSTORE_PATH=/tmp/meld-release.jks
+            ./gradlew assembleRelease
+            APK_NAME="MELD-v${VERSION_NAME}-Android.apk"
+            cp app/build/outputs/apk/release/app-release.apk "dist/${APK_NAME}"
+          else
+            ./gradlew assembleRelease
+            APK_NAME="MELD-v${VERSION_NAME}-Android-unsigned.apk"
+            cp app/build/outputs/apk/release/app-release-unsigned.apk "dist/${APK_NAME}"
+          fi
+
+          (cd dist && sha256sum "$APK_NAME" > "${APK_NAME}.sha256")
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
