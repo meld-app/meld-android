@@ -508,6 +508,23 @@ data class RedactionRect(
     val label: String = ""
 )
 
+enum class ProgressUnit {
+    PAGE,
+    SLIDE,
+    PHOTO,
+    PDF_FILE,
+    ARCHIVE_FILE
+}
+
+data class ProcessingProgress(
+    val current: Int,
+    val total: Int,
+    val unit: ProgressUnit = ProgressUnit.PAGE
+) {
+    val fraction: Float
+        get() = if (total <= 0) 0f else (current.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+}
+
 data class ToolOptions(
     val targetKb: Int = 40,
     val resizePercent: Int = 75,

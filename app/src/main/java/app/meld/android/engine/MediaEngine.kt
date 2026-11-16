@@ -495,7 +495,11 @@ object MediaEngine {
      * Compresses one or more regular files into a standard .zip archive with safe,
      * deduplicated archive entry names.
      */
-    fun packEntriesToZip(entries: List<ZipInputEntry>, outputFile: File): String {
+    fun packEntriesToZip(
+        entries: List<ZipInputEntry>,
+        outputFile: File,
+        onProgress: ((Int, Int) -> Unit)? = null
+    ): String {
         require(entries.isNotEmpty()) { "Select at least 1 file to archive." }
         entries.forEach { entry ->
             require(entry.file.exists() && entry.file.isFile) {
@@ -507,6 +511,7 @@ object MediaEngine {
         try {
             ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile))).use { zos ->
                 entries.forEachIndexed { idx, entry ->
+                    onProgress?.invoke(idx + 1, entries.size)
                     zos.putNextEntry(ZipEntry(safeNames[idx]))
                     FileInputStream(entry.file).use { fis ->
                         fis.copyTo(zos, 32 * 1024)

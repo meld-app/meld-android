@@ -113,6 +113,11 @@
     <string name="incompatible_file_notice">Selected .%1$s isn\'t compatible — runs on studio sample or tap to pick another file.</string>
     <string name="change_short">Change</string>
     <string name="working_on_it">Working on it…</string>
+    <string name="working_progress_pages">Processing page %1$d of %2$d…</string>
+    <string name="working_progress_slides">Rendering slide %1$d of %2$d…</string>
+    <string name="working_progress_photos">Stitching photo %1$d of %2$d…</string>
+    <string name="working_progress_pdfs">Merging PDF %1$d of %2$d…</string>
+    <string name="working_progress_files">Packing %1$d of %2$d files…</string>
 
     <string name="aim_for_label">AIM FOR</string>
     <string name="unit_kb">KB</string>
