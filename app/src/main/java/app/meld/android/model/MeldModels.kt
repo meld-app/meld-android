@@ -519,6 +519,8 @@ data class ToolOptions(
     val pageRangeEnd: Int = 2,
     val pdfImageAllPages: Boolean = true,
     val pdfImagePage: Int = 1,
+    val pptxImageAllSlides: Boolean = true,
+    val pptxImageSlide: Int = 1,
     val chromaTolerance: Int = 42,
     val redactionZones: List<RedactionRect> = listOf(
         RedactionRect(0.10f, 0.24f, 0.90f, 0.34f)

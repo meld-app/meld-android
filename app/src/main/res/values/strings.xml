@@ -159,6 +159,16 @@
     <string name="pdf_img_cta_all">Export all %1$d %2$ss (.zip)</string>
     <string name="pdf_img_cta_single">Export page %1$d %2$s</string>
 
+    <string name="pptx_img_scope_label">SLIDE EXPORT SCOPE</string>
+    <string name="pptx_img_all_slides_zip">All Slides (.zip)</string>
+    <string name="pptx_img_single_slide">Single Slide</string>
+    <string name="pptx_img_slide_label">Slide number (1–%1$d)</string>
+    <string name="pptx_img_summary_all">All %1$d slides · .zip bundle of %2$s images</string>
+    <string name="pptx_img_summary_single">Slide %1$d of %2$d · single %3$s image</string>
+    <string name="pptx_img_single_deck_note">1-slide deck · exports directly as one crisp %1$s image</string>
+    <string name="pptx_img_cta_all">Export all %1$d %2$ss (.zip)</string>
+    <string name="pptx_img_cta_single">Export slide %1$d %2$s</string>
+
     <string name="qr_payload_label">Link or text to encode</string>
 
     <string name="redaction_targets_header">PAGE 1 REDACTION TARGETS (%1$d ACTIVE)</string>
@@ -213,6 +223,8 @@
     <string name="vm_pptx_pdf_embedded">Exported %1$d slides (%2$dx%3$d pt) with %4$d embedded font(s); source untouched</string>
     <string name="vm_pptx_pdf_mapped">Exported %1$d slides (%2$dx%3$d pt) · Font families mapped cleanly; source untouched</string>
     <string name="vm_pptx_image_rendered">Rendered slide 1 of %1$d to %2$s without altering deck</string>
+    <string name="vm_pptx_images_zip">Exported all %1$d slides as %2$s images inside a .zip archive without altering deck</string>
+    <string name="vm_pptx_single_slide_rendered">Rendered slide %1$d of %2$d to %3$s without altering deck</string>
     <string name="vm_pptx_handout_built">Built %1$d-up handout from %2$d slides cleanly</string>
     <string name="vm_pptx_text_extracted">Extracted %1$d slides (%2$d tables, %3$d notes)</string>
     <string name="vm_pptx_sanitized">Sanitized %1$d slides (%2$d XML/media untouched, %3$d notes removed)</string>
@@ -447,13 +459,13 @@
 
     <string name="tool_pptx_to_png_title">Slide to PNG</string>
     <string name="tool_pptx_to_png_badge">Slide PNG</string>
-    <string name="tool_pptx_to_png_subtitle">Render cover slide as a crisp high-res PNG without modifying deck</string>
+    <string name="tool_pptx_to_png_subtitle">Render every slide (.zip) or any chosen slide to crisp high-res PNG</string>
     <string name="tool_pptx_to_png_cta">Export slide PNG</string>
     <string name="tool_pptx_to_png_result">Slide PNG ready.</string>
 
     <string name="tool_pptx_to_jpg_title">Slide to JPG</string>
     <string name="tool_pptx_to_jpg_badge">Slide JPG</string>
-    <string name="tool_pptx_to_jpg_subtitle">Save cover slide as a shareable high-res JPEG image</string>
+    <string name="tool_pptx_to_jpg_subtitle">Save all slides (.zip) or any chosen slide as a high-res JPEG image</string>
     <string name="tool_pptx_to_jpg_cta">Export slide JPG</string>
     <string name="tool_pptx_to_jpg_result">Slide JPEG ready.</string>
 

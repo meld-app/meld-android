@@ -416,6 +416,28 @@ class PptxEngineUnitTest {
         )
     }
 
+    @Test
+    fun buildPptxSlideEntryName_padsSlideNumbersAndSanitizesPaths() {
+        assertEquals(
+            "Deck_3Slides_slide_01.png",
+            PptxEngine.buildPptxSlideEntryName("Deck 3Slides", 0, 3, "png")
+        )
+        assertEquals(
+            "Deck_3Slides_slide_03.jpg",
+            PptxEngine.buildPptxSlideEntryName("nested/Deck 3Slides", 2, 3, "jpeg")
+        )
+        assertEquals(
+            "Quarterly_slide_012.jpg",
+            PptxEngine.buildPptxSlideEntryName("Quarterly", 11, 120, "jpg")
+        )
+    }
+
+    @Test
+    fun pptxImageFollowUps_adaptToZipVsDirectImageOutput() {
+        assertTrue(app.meld.android.model.MeldToolId.PPTX_TO_PNG.followUpTools("png").contains(app.meld.android.model.MeldToolId.COMPRESS))
+        assertTrue(app.meld.android.model.MeldToolId.PPTX_TO_JPG.followUpTools("zip").isEmpty())
+    }
+
     private fun buildSyntheticSfnt(magic: ByteArray, size: Int): ByteArray {
         val bytes = ByteArray(size) { (it * 3 + 7).toByte() }
         System.arraycopy(magic, 0, bytes, 0, 4)

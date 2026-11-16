@@ -95,6 +95,7 @@ fun MeldAppRoot(
     onUpdateQrPayload: (String) -> Unit,
     onUpdatePageRange: (Int, Int) -> Unit,
     onUpdatePdfImageScope: (Boolean, Int) -> Unit = { _, _ -> },
+    onUpdatePptxImageScope: (Boolean, Int) -> Unit = { _, _ -> },
     onUpdateChromaTolerance: (Int) -> Unit,
     onUpdateRedactionZones: (List<app.meld.android.model.RedactionRect>) -> Unit = {},
     onToggleAutoDownloads: (Boolean) -> Unit
@@ -303,6 +304,7 @@ fun MeldAppRoot(
                                                     onUpdateQrPayload = onUpdateQrPayload,
                                                     onUpdatePageRange = onUpdatePageRange,
                                                     onUpdatePdfImageScope = onUpdatePdfImageScope,
+                                                    onUpdatePptxImageScope = onUpdatePptxImageScope,
                                                     onUpdateChromaTolerance = onUpdateChromaTolerance,
                                                     onUpdateRedactionZones = onUpdateRedactionZones
                                                 )

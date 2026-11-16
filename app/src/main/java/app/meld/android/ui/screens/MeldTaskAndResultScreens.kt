@@ -142,6 +142,7 @@ fun MeldTaskScreen(
     onUpdateQrPayload: (String) -> Unit,
     onUpdatePageRange: (Int, Int) -> Unit,
     onUpdatePdfImageScope: (Boolean, Int) -> Unit = { _, _ -> },
+    onUpdatePptxImageScope: (Boolean, Int) -> Unit = { _, _ -> },
     onUpdateChromaTolerance: (Int) -> Unit,
     onUpdateRedactionZones: (List<RedactionRect>) -> Unit = {}
 ) {
@@ -251,12 +252,28 @@ fun MeldTaskScreen(
                             } else {
                                 4
                             }
-                            PdfToImageTaskControls(
+                            PagedImageExportTaskControls(
                                 tool = tool,
-                                totalPages = pdfPages,
-                                allPages = options.pdfImageAllPages,
-                                pageNumber = options.pdfImagePage,
+                                totalUnits = pdfPages,
+                                exportAll = options.pdfImageAllPages,
+                                selectedUnit = options.pdfImagePage,
                                 onUpdateScope = onUpdatePdfImageScope
+                            )
+                        }
+
+                        MeldToolId.PPTX_TO_PNG,
+                        MeldToolId.PPTX_TO_JPG -> {
+                            val slideTotal = if (file != null && tool.acceptsExtension(file.extension)) {
+                                (file.slideCount ?: 1).coerceAtLeast(1)
+                            } else {
+                                3
+                            }
+                            PagedImageExportTaskControls(
+                                tool = tool,
+                                totalUnits = slideTotal,
+                                exportAll = options.pptxImageAllSlides,
+                                selectedUnit = options.pptxImageSlide,
+                                onUpdateScope = onUpdatePptxImageScope
                             )
                         }
 
@@ -398,15 +415,19 @@ fun MeldTaskScreen(
         }
 
         // Fixed Bottom Tactile Coral Action Button with Hard Shadow & Press Bounce
-        val effectivePdfPages = if (
-            (tool == MeldToolId.PDF_TO_PNG || tool == MeldToolId.PDF_TO_JPG) &&
-            file != null && tool.acceptsExtension(file.extension)
-        ) {
+        val isPdfImageTool = tool == MeldToolId.PDF_TO_PNG || tool == MeldToolId.PDF_TO_JPG
+        val isPptxImageTool = tool == MeldToolId.PPTX_TO_PNG || tool == MeldToolId.PPTX_TO_JPG
+        val effectivePdfPages = if (isPdfImageTool && file != null && tool.acceptsExtension(file.extension)) {
             (file.pageCount ?: 1).coerceAtLeast(1)
         } else {
             4
         }
-        val formatUpper = if (tool == MeldToolId.PDF_TO_JPG) "JPG" else "PNG"
+        val effectivePptxSlides = if (isPptxImageTool && file != null && tool.acceptsExtension(file.extension)) {
+            (file.slideCount ?: 1).coerceAtLeast(1)
+        } else {
+            3
+        }
+        val formatUpper = if (tool == MeldToolId.PDF_TO_JPG || tool == MeldToolId.PPTX_TO_JPG) "JPG" else "PNG"
         val ctaLabel = when {
             tool == MeldToolId.PDF_MERGE && batchFiles.size >= 2 ->
                 stringResource(R.string.batch_cta_merge_n, batchFiles.size)
@@ -416,11 +437,18 @@ fun MeldTaskScreen(
                 stringResource(R.string.batch_cta_collage_n, minOf(batchFiles.size, tool.maxBatchCount))
             tool == MeldToolId.PACK_ZIP && batchFiles.size > 1 ->
                 stringResource(R.string.batch_cta_zip_n, batchFiles.size)
-            (tool == MeldToolId.PDF_TO_PNG || tool == MeldToolId.PDF_TO_JPG) && effectivePdfPages > 1 -> {
+            isPdfImageTool && effectivePdfPages > 1 -> {
                 if (options.pdfImageAllPages) {
                     stringResource(R.string.pdf_img_cta_all, effectivePdfPages, formatUpper)
                 } else {
                     stringResource(R.string.pdf_img_cta_single, options.pdfImagePage.coerceIn(1, effectivePdfPages), formatUpper)
+                }
+            }
+            isPptxImageTool && effectivePptxSlides > 1 -> {
+                if (options.pptxImageAllSlides) {
+                    stringResource(R.string.pptx_img_cta_all, effectivePptxSlides, formatUpper)
+                } else {
+                    stringResource(R.string.pptx_img_cta_single, options.pptxImageSlide.coerceIn(1, effectivePptxSlides), formatUpper)
                 }
             }
             else -> stringResource(tool.ctaLabelRes)
@@ -1403,18 +1431,24 @@ private fun BatchQueueTaskControls(
 }
 
 @Composable
-private fun PdfToImageTaskControls(
+private fun PagedImageExportTaskControls(
     tool: MeldToolId,
-    totalPages: Int,
-    allPages: Boolean,
-    pageNumber: Int,
+    totalUnits: Int,
+    exportAll: Boolean,
+    selectedUnit: Int,
     onUpdateScope: (Boolean, Int) -> Unit
 ) {
     val colors = meldColors
-    val safeTotal = totalPages.coerceAtLeast(1)
-    val clampedPage = pageNumber.coerceIn(1, safeTotal)
-    val formatUpper = if (tool == MeldToolId.PDF_TO_JPG) "JPG" else "PNG"
-    val cardBg = if (tool == MeldToolId.PDF_TO_JPG) colors.peach else colors.lavender
+    val safeTotal = totalUnits.coerceAtLeast(1)
+    val clampedUnit = selectedUnit.coerceIn(1, safeTotal)
+    val isSlides = tool == MeldToolId.PPTX_TO_PNG || tool == MeldToolId.PPTX_TO_JPG
+    val formatUpper = if (tool == MeldToolId.PDF_TO_JPG || tool == MeldToolId.PPTX_TO_JPG) "JPG" else "PNG"
+    val sourceExt = if (isSlides) "PPTX" else "PDF"
+    val cardBg = when (tool) {
+        MeldToolId.PDF_TO_JPG, MeldToolId.PPTX_TO_JPG -> colors.peach
+        MeldToolId.PPTX_TO_PNG -> colors.butter
+        else -> colors.lavender
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         TactileCard(
@@ -1427,21 +1461,35 @@ private fun PdfToImageTaskControls(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 PolaroidFormatMorphStage(
-                    sourceExt = "PDF",
+                    sourceExt = sourceExt,
                     targetExt = formatUpper
                 )
 
                 Text(
-                    text = stringResource(R.string.pdf_img_scope_label),
+                    text = stringResource(
+                        if (isSlides) R.string.pptx_img_scope_label else R.string.pdf_img_scope_label
+                    ),
                     style = MaterialTheme.typography.labelSmall,
                     color = colors.inkOnAccent.copy(alpha = 0.85f)
                 )
 
                 Text(
                     text = when {
-                        safeTotal == 1 -> stringResource(R.string.pdf_img_single_doc_note, formatUpper)
-                        allPages -> stringResource(R.string.pdf_img_summary_all, safeTotal, formatUpper)
-                        else -> stringResource(R.string.pdf_img_summary_single, clampedPage, safeTotal, formatUpper)
+                        safeTotal == 1 -> stringResource(
+                            if (isSlides) R.string.pptx_img_single_deck_note else R.string.pdf_img_single_doc_note,
+                            formatUpper
+                        )
+                        exportAll -> stringResource(
+                            if (isSlides) R.string.pptx_img_summary_all else R.string.pdf_img_summary_all,
+                            safeTotal,
+                            formatUpper
+                        )
+                        else -> stringResource(
+                            if (isSlides) R.string.pptx_img_summary_single else R.string.pdf_img_summary_single,
+                            clampedUnit,
+                            safeTotal,
+                            formatUpper
+                        )
                     },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
@@ -1451,26 +1499,33 @@ private fun PdfToImageTaskControls(
                 if (safeTotal > 1) {
                     MeldAdaptiveChipRow(horizontalSpacing = 8.dp) {
                         TactileChipPill(
-                            label = stringResource(R.string.pdf_img_all_pages_zip),
-                            selected = allPages,
-                            onClick = { onUpdateScope(true, clampedPage) }
+                            label = stringResource(
+                                if (isSlides) R.string.pptx_img_all_slides_zip else R.string.pdf_img_all_pages_zip
+                            ),
+                            selected = exportAll,
+                            onClick = { onUpdateScope(true, clampedUnit) }
                         )
                         TactileChipPill(
-                            label = stringResource(R.string.pdf_img_single_page),
-                            selected = !allPages,
-                            onClick = { onUpdateScope(false, clampedPage) }
+                            label = stringResource(
+                                if (isSlides) R.string.pptx_img_single_slide else R.string.pdf_img_single_page
+                            ),
+                            selected = !exportAll,
+                            onClick = { onUpdateScope(false, clampedUnit) }
                         )
                     }
                 }
             }
         }
 
-        if (safeTotal > 1 && !allPages) {
+        if (safeTotal > 1 && !exportAll) {
             PageStepperCard(
-                title = stringResource(R.string.pdf_img_page_label, safeTotal),
-                value = clampedPage,
-                onMinus = { onUpdateScope(false, max(1, clampedPage - 1)) },
-                onPlus = { onUpdateScope(false, minOf(safeTotal, clampedPage + 1)) },
+                title = stringResource(
+                    if (isSlides) R.string.pptx_img_slide_label else R.string.pdf_img_page_label,
+                    safeTotal
+                ),
+                value = clampedUnit,
+                onMinus = { onUpdateScope(false, max(1, clampedUnit - 1)) },
+                onPlus = { onUpdateScope(false, minOf(safeTotal, clampedUnit + 1)) },
                 modifier = Modifier.fillMaxWidth()
             )
         }
