@@ -1,0 +1,499 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Identidad y marca -->
+    <string name="app_name">MELD</string>
+    <string name="brand_wordmark">meld</string>
+    <string name="app_tagline">TRANSFORMAR • CONVERTIR • ORGANIZAR</string>
+    <string name="works_offline">Funciona sin conexión</string>
+    <string name="privacy_banner_task">Permanece en tu teléfono. No se sube nada.</string>
+    <string name="share_chooser_title">Compartir resultado de MELD</string>
+
+    <!-- Saludo e inicio de Studio -->
+    <string name="greeting_morning">Buenos días.</string>
+    <string name="greeting_afternoon">Buenas tardes.</string>
+    <string name="greeting_evening">Buenas noches.</string>
+    <string name="home_subtitle_prompt">¿Qué quieres organizar hoy?</string>
+    <string name="working_on_label">ARCHIVO ACTUAL</string>
+    <string name="default_lecture_deck">Presentación de clase</string>
+    <string name="tap_change_file_hint">Toca Cambiar archivo para elegir uno</string>
+    <string name="change_file">Cambiar archivo</string>
+    <string name="quick_tools_heading">Herramientas rápidas</string>
+    <string name="all_tools_count">Todas (%1$d)</string>
+    <string name="more_for_file_heading">Más para este archivo</string>
+    <string name="recent_title_with_ext">%1$s · %2$s</string>
+    <string name="recent_result_meta">%1$s · hace un momento</string>
+    <string name="cd_share_result">Compartir resultado</string>
+
+    <!-- Barra de navegación -->
+    <string name="nav_studio">Estudio</string>
+    <string name="nav_tools">Herramientas</string>
+    <string name="nav_prefs">Ajustes</string>
+
+    <!-- Modos y categorías -->
+    <string name="mode_all">Todo</string>
+    <string name="mode_convert">Convertir</string>
+    <string name="mode_tools">Utilidades</string>
+
+    <string name="category_all">Todo</string>
+    <string name="category_pdfs">PDF</string>
+    <string name="category_slides">Diapositivas</string>
+    <string name="category_images">Imágenes</string>
+    <string name="category_audio">Audio</string>
+    <string name="category_tables_zip">Tablas y ZIP</string>
+
+    <!-- Muestras integradas y metadatos -->
+    <string name="sample_pdf_label">Clase_Muestra.pdf</string>
+    <string name="sample_pdf_badge">4 páginas</string>
+    <string name="sample_pptx_label">MELD_Deck.pptx</string>
+    <string name="sample_pptx_badge">3 diapositivas</string>
+    <string name="sample_image_label">Sujeto_Estudio.png</string>
+    <string name="sample_image_badge">1080×1080</string>
+    <string name="sample_audio_label">Sinte_Estudio.wav</string>
+    <string name="sample_audio_badge">PCM WAV</string>
+    <string name="sample_csv_label">Benchmark.csv</string>
+    <string name="sample_csv_badge">5 filas</string>
+
+    <plurals name="file_page_count">
+        <item quantity="one">%1$d página</item>
+        <item quantity="other">%1$d páginas</item>
+    </plurals>
+    <plurals name="file_slide_count">
+        <item quantity="one">%1$d diapositiva</item>
+        <item quantity="other">%1$d diapositivas</item>
+    </plurals>
+    <string name="file_meta_pages_size">%1$s · %2$s</string>
+    <string name="file_meta_ext_size">%1$s · %2$s</string>
+
+    <!-- Pestaña Todas las herramientas -->
+    <string name="all_tools_heading">Todas las herramientas.</string>
+    <string name="working_on_inline">Trabajando en %1$s</string>
+    <string name="sample_file_fallback">archivo de muestra</string>
+    <string name="search_tools_placeholder">Buscar PPTX, PDF, PNG, Word, Markdown, Limpiar…</string>
+    <string name="cd_clear_search">Borrar búsqueda</string>
+    <string name="no_matching_tools_title">Sin herramientas coincidentes</string>
+    <string name="no_matching_tools_subtitle">Prueba con otra palabra clave o borra los filtros.</string>
+    <string name="reset_filters">Restablecer filtros</string>
+
+    <!-- Pestaña Preferencias -->
+    <string name="prefs_heading">Preferencias.</string>
+    <string name="prefs_subtitle">Reglas locales y cómo MELD gestiona tus archivos</string>
+    <string name="prefs_section_privacy">PRIVACIDAD</string>
+    <string name="prefs_section_output">SALIDA</string>
+    <string name="prefs_section_experience">EXPERIENCIA</string>
+    <string name="prefs_section_about">ACERCA DE</string>
+    <string name="privacy_promise_title" formatted="false">Promesa 100% en el dispositivo</string>
+    <string name="privacy_promise_body">MELD no solicita permiso de internet. Tus documentos nunca salen a un servidor.</string>
+    <string name="auto_downloads_title">Guardar directo en Descargas/MELD</string>
+    <string name="auto_downloads_on_desc">Activado: cada resultado también se copia en Descargas/MELD.</string>
+    <string name="auto_downloads_off_desc">Desactivado: los archivos permanecen privados en MELD hasta que tocas Guardar.</string>
+    <string name="default_handout_layout_title">Diseño predeterminado de folleto de estudio</string>
+    <string name="handout_2_up">2 por hoja + notas</string>
+    <string name="handout_3_up_short">3 con notas</string>
+    <string name="handout_3_up_long">3 por hoja (estilo Mac)</string>
+    <string name="handout_4_up">Cuadrícula 4 por hoja</string>
+    <string name="replay_intro_title">Repetir animación inicial</string>
+    <string name="replay_intro_subtitle">Ver de nuevo el plegado y acoplamiento de MELD</string>
+    <string name="about_version_title">MELD para Android v%1$s</string>
+    <string name="about_version_subtitle">%1$d motores locales • Código abierto en github.com/meld-app</string>
+
+    <!-- Hoja para elegir archivo -->
+    <string name="sheet_pick_file_title">Elige un archivo para trabajar</string>
+    <string name="sheet_browse_title">Explorar almacenamiento del teléfono</string>
+    <string name="sheet_browse_subtitle">Elige cualquier PDF, PPTX, imagen, audio o CSV</string>
+    <string name="sheet_try_sample_label">O prueba una muestra integrada del estudio:</string>
+
+    <!-- Pantallas de tarea y resultado -->
+    <string name="cd_back">Atrás</string>
+    <string name="cd_close">Cerrar</string>
+    <string name="cd_decrease">Disminuir</string>
+    <string name="cd_increase">Aumentar</string>
+    <string name="qr_task_subtitle">Codifica texto o URLs sin conexión en una tarjeta QR ISO</string>
+    <string name="file_info_inline">%1$s · %2$s</string>
+    <string name="built_in_sample_ready">Muestra integrada lista</string>
+    <string name="incompatible_file_notice">.%1$s no es compatible — se usará la muestra o toca para cambiar archivo.</string>
+    <string name="change_short">Cambiar</string>
+    <string name="working_on_it">Procesando…</string>
+    <string name="working_progress_pages">Procesando página %1$d de %2$d…</string>
+    <string name="working_progress_slides">Renderizando diapositiva %1$d de %2$d…</string>
+    <string name="working_progress_photos">Uniendo foto %1$d de %2$d…</string>
+    <string name="working_progress_pdfs">Combinando PDF %1$d de %2$d…</string>
+    <string name="working_progress_files">Empaquetando %1$d de %2$d archivos…</string>
+
+    <string name="aim_for_label">OBJETIVO</string>
+    <string name="unit_kb">KB</string>
+    <string name="kb_value_format">%1$d KB</string>
+    <string name="custom_preset_label">Personalizado</string>
+    <string name="custom_kb_input_label">Límite personalizado (10–%1$d KB)</string>
+    <string name="before_now_label">Ahora</string>
+    <string name="after_target_label">Después</string>
+    <string name="negative_percent_value">-%1$d%%</string>
+
+    <string name="study_layout_label">DISEÑO DE ESTUDIO</string>
+    <string name="study_layout_2up_desc">2 diapositivas + líneas amplias de notas</string>
+    <string name="study_layout_3up_desc">3 diapositivas + líneas pautadas de clase</string>
+    <string name="study_layout_4up_desc">4 diapositivas en cuadrícula compacta 2x2</string>
+
+    <string name="extract_range_label">RANGO DE EXTRACCIÓN</string>
+    <string name="pages_range_format">Páginas %1$d a %2$d</string>
+    <string name="from_page_label">Desde página</string>
+    <string name="to_page_label">Hasta página</string>
+    <string name="page_tile_short">P%1$d</string>
+
+    <string name="watermark_input_label">Texto de marca de agua diagonal</string>
+    <string name="watermark_locked_fallback">BLOQUEADO</string>
+    <string name="watermark_preset_confidential">CONFIDENCIAL</string>
+    <string name="watermark_preset_verified">MELD VERIFICADO</string>
+    <string name="watermark_preset_draft">BORRADOR</string>
+    <string name="watermark_preset_internal">USO INTERNO</string>
+
+    <string name="scale_output_label">ESCALAR SALIDA AL</string>
+    <string name="percent_value">%1$d%%</string>
+    <string name="add_studio_border_title">Añadir marco oscuro de estudio</string>
+    <string name="add_studio_border_subtitle">Enmarca la imagen con sello de dimensiones</string>
+
+    <string name="edge_feathering_label">TOLERANCIA DE RELLENO</string>
+    <string name="edge_feathering_hint">Elimina el fondo conectado al borde protegiendo detalles internos</string>
+
+    <string name="pdf_img_scope_label">ALCANCE DE EXPORTACIÓN</string>
+    <string name="pdf_img_all_pages_zip">Todas las páginas (.zip)</string>
+    <string name="pdf_img_single_page">Página única</string>
+    <string name="pdf_img_page_label">Número de página (1–%1$d)</string>
+    <string name="pdf_img_summary_all">Las %1$d páginas · paquete .zip en %2$s</string>
+    <string name="pdf_img_summary_single">Página %1$d de %2$d · imagen %3$s única</string>
+    <string name="pdf_img_single_doc_note">PDF de 1 página · se exporta directo como imagen %1$s</string>
+    <string name="pdf_img_cta_all">Exportar %1$d %2$s (.zip)</string>
+    <string name="pdf_img_cta_single">Exportar página %1$d %2$s</string>
+
+    <string name="pptx_img_scope_label">ALCANCE DE DIAPOSITIVAS</string>
+    <string name="pptx_img_all_slides_zip">Todas las diapositivas (.zip)</string>
+    <string name="pptx_img_single_slide">Una diapositiva</string>
+    <string name="pptx_img_slide_label">Número de diapositiva (1–%1$d)</string>
+    <string name="pptx_img_summary_all">Las %1$d diapositivas · paquete .zip en %2$s</string>
+    <string name="pptx_img_summary_single">Diapositiva %1$d de %2$d · imagen %3$s única</string>
+    <string name="pptx_img_single_deck_note">Presentación de 1 diapositiva · se exporta directo como %1$s</string>
+    <string name="pptx_img_cta_all">Exportar %1$d %2$s (.zip)</string>
+    <string name="pptx_img_cta_single">Exportar diapositiva %1$d %2$s</string>
+
+    <string name="qr_payload_label">Enlace o texto a codificar</string>
+
+    <string name="redaction_targets_header">ZONAS DE CENSURA PÁGINA 1 (%1$d ACTIVAS)</string>
+    <string name="cd_redact_preview">Vista previa de censura en página 1 del PDF</string>
+    <string name="redact_zone_header_id">Cabecera / ID</string>
+    <string name="redact_zone_upper_strip">Franja superior</string>
+    <string name="redact_zone_mid_block">Bloque central</string>
+    <string name="redact_zone_footer_sig">Pie / Firma</string>
+    <string name="redact_zone_full_page">Página completa</string>
+
+    <string name="result_heading">Resultado</string>
+    <string name="cd_result_preview">Vista previa del resultado</string>
+    <string name="keep_going_label">Seguir editando</string>
+    <string name="action_save">Guardar</string>
+    <string name="action_share">Compartir</string>
+
+    <!-- Vistas previas enriquecidas y etapas de animación -->
+    <plurals name="preview_zip_items">
+        <item quantity="one">%1$d elemento</item>
+        <item quantity="other">%1$d elementos</item>
+    </plurals>
+    <string name="preview_zip_header">Archivo ZIP (%1$s)\n%2$s</string>
+    <string name="preview_wav_header">Audio PCM WAV\n%1$d Hz · %2$s · %3$s</string>
+    <string name="audio_stereo">Estéreo</string>
+    <string name="audio_mono">Mono</string>
+    <string name="preview_docx_header">Word OpenXML (.docx)\n%1$s</string>
+    <string name="preview_pptx_header">Presentación PowerPoint (.pptx)\n%1$d diapositivas · Estructura intacta</string>
+    <string name="preview_fallback_header">%1$s\n%2$s</string>
+
+    <string name="stage_hint_offline">Se ejecuta totalmente sin conexión · Toca para repetir.</string>
+    <string name="stage_badge_file">ARCHIVO</string>
+    <string name="stage_live_waveform">ONDA DE ESTUDIO EN VIVO</string>
+    <string name="stage_waveform_res">Renderizado de onda PNG 1920×600</string>
+    <string name="stage_double_tempo">FLUJO DE DOBLE VELOCIDAD 2.0x</string>
+
+    <!-- Mensajes de estado y error del ViewModel -->
+    <string name="vm_loaded_sample">Cargado %1$s</string>
+    <string name="vm_failed_create_sample">No se pudo crear la muestra</string>
+    <string name="vm_err_content_uri_only">Solo se pueden importar URIs content:// de forma segura.</string>
+    <string name="vm_err_internal_uri">No se puede importar una URI interna de FileProvider de MELD.</string>
+    <string name="vm_err_exceeds_limit">El archivo supera el límite seguro de 100 MB sin conexión.</string>
+    <string name="vm_err_cannot_read_stream">No se puede leer el permiso o flujo del archivo seleccionado</string>
+    <string name="vm_err_stream_exceeds_limit">El flujo importado supera el límite de seguridad de 100 MB.</string>
+    <string name="vm_err_empty_file">El archivo seleccionado parece estar vacío</string>
+    <string name="vm_ready_file">Listo: %1$s</string>
+    <string name="vm_err_could_not_open">No se pudo abrir el archivo seleccionado.</string>
+    <string name="vm_result_summary_with_duration">%1$s. Tardó %2$d ms.</string>
+    <string name="vm_auto_saved_to">Guardado automáticamente en %1$s</string>
+    <string name="vm_err_running_tool">Ocurrió un error al ejecutar %1$s.</string>
+    <string name="vm_saved_to">Guardado en %1$s</string>
+    <string name="vm_saved_locally_share">Guardado localmente — toca Compartir para exportar</string>
+    <string name="vm_pptx_pdf_embedded">Exportadas %1$d diapositivas (%2$dx%3$d pt) con %4$d fuente(s) incrustadas; origen intacto</string>
+    <string name="vm_pptx_pdf_mapped">Exportadas %1$d diapositivas (%2$dx%3$d pt) · Familias tipográficas asignadas; origen intacto</string>
+    <string name="vm_pptx_image_rendered">Diapositiva 1 de %1$d renderizada a %2$s sin alterar la presentación</string>
+    <string name="vm_pptx_images_zip">Exportadas las %1$d diapositivas como imágenes %2$s en un .zip sin alterar la presentación</string>
+    <string name="vm_pptx_single_slide_rendered">Diapositiva %1$d de %2$d renderizada a %3$s sin alterar la presentación</string>
+    <string name="vm_pptx_handout_built">Folleto %1$d por hoja creado con %2$d diapositivas</string>
+    <string name="vm_pptx_text_extracted">Extraídas %1$d diapositivas (%2$d tablas, %3$d notas)</string>
+    <string name="vm_pptx_sanitized">Limpiadas %1$d diapositivas (%2$d XML/medios intactos, %3$d notas eliminadas)</string>
+    <string name="vm_err_merge_need_two">Añade al menos 2 archivos PDF para combinarlos en uno solo.</string>
+    <string name="vm_batch_added_one">Añadido %1$s a la cola</string>
+    <string name="vm_batch_added_many">Añadidos %1$d archivos a la cola</string>
+    <string name="vm_batch_added_filtered">Añadidos %1$d archivo(s); omitidos %2$d elemento(s) incompatibles</string>
+    <string name="vm_batch_no_compatible">Los archivos seleccionados no coinciden con el formato de esta herramienta.</string>
+    <string name="vm_batch_limit_reached">Se alcanzó el límite de %1$d archivos en cola.</string>
+
+    <!-- Catálogo de herramientas -->
+    <string name="tool_img_to_jpg_title">A JPG</string>
+    <string name="tool_img_to_jpg_badge">JPG</string>
+    <string name="tool_img_to_jpg_subtitle">Guarda cualquier PNG, WebP, BMP o TIFF como JPEG compacto</string>
+    <string name="tool_img_to_jpg_cta">Convertir a JPG</string>
+    <string name="tool_img_to_jpg_result">JPEG listo.</string>
+
+    <string name="tool_img_to_png_title">A PNG</string>
+    <string name="tool_img_to_png_badge">PNG</string>
+    <string name="tool_img_to_png_subtitle">Convierte en un PNG de 32 bits nítido y sin pérdida</string>
+    <string name="tool_img_to_png_cta">Convertir a PNG</string>
+    <string name="tool_img_to_png_result">PNG listo.</string>
+
+    <string name="tool_img_to_webp_title">A WebP</string>
+    <string name="tool_img_to_webp_badge">WebP</string>
+    <string name="tool_img_to_webp_subtitle">Convierte una imagen en un archivo WebP moderno y ligero</string>
+    <string name="tool_img_to_webp_cta">Convertir a WebP</string>
+    <string name="tool_img_to_webp_result">WebP listo.</string>
+
+    <string name="tool_img_to_bmp_title">A BMP</string>
+    <string name="tool_img_to_bmp_badge">BMP</string>
+    <string name="tool_img_to_bmp_subtitle">Exporta mapa de bits de 24 bits sin compresión</string>
+    <string name="tool_img_to_bmp_cta">Convertir a BMP</string>
+    <string name="tool_img_to_bmp_result">Mapa de bits listo.</string>
+
+    <string name="tool_img_to_tiff_title">A TIFF</string>
+    <string name="tool_img_to_tiff_badge">TIFF</string>
+    <string name="tool_img_to_tiff_subtitle">Exporta TIFF RGB de archivo sin compresión</string>
+    <string name="tool_img_to_tiff_cta">Convertir a TIFF</string>
+    <string name="tool_img_to_tiff_result">TIFF listo.</string>
+
+    <string name="tool_img_to_pdf_title">Imagen a PDF</string>
+    <string name="tool_img_to_pdf_badge">PDF A4</string>
+    <string name="tool_img_to_pdf_subtitle">Centra una imagen limpiamente en una página A4 lista para imprimir</string>
+    <string name="tool_img_to_pdf_cta">Crear PDF</string>
+    <string name="tool_img_to_pdf_result">PDF listo.</string>
+
+    <string name="tool_remove_bg_title">Quitar fondo</string>
+    <string name="tool_remove_bg_badge">Alfa</string>
+    <string name="tool_remove_bg_subtitle">Aísla el sujeto sobre un PNG transparente</string>
+    <string name="tool_remove_bg_cta">Quitar fondo</string>
+    <string name="tool_remove_bg_result">Fondo eliminado.</string>
+
+    <string name="tool_compress_img_title">Comprimir imagen</string>
+    <string name="tool_compress_img_badge">KB objetivo</string>
+    <string name="tool_compress_img_subtitle">Reduce una imagen por debajo del límite de subida</string>
+    <string name="tool_compress_img_cta">Comprimir imagen</string>
+    <string name="tool_compress_img_result">Comprimida con éxito.</string>
+
+    <string name="tool_resize_image_title">Ajustar y enmarcar</string>
+    <string name="tool_resize_image_badge">Escala</string>
+    <string name="tool_resize_image_subtitle">Escala dimensiones y añade un marco de estudio opcional</string>
+    <string name="tool_resize_image_cta">Redimensionar</string>
+    <string name="tool_resize_image_result">Redimensionada.</string>
+
+    <string name="tool_collage_title">Collage de fotos</string>
+    <string name="tool_collage_badge">Cuadrícula</string>
+    <string name="tool_collage_subtitle">Combina 2–9 fotos en cuadrícula (o repite 1 foto en 2×2)</string>
+    <string name="tool_collage_cta">Crear collage</string>
+    <string name="tool_collage_result">Collage listo.</string>
+
+    <string name="tool_strip_exif_title">Borrar EXIF</string>
+    <string name="tool_strip_exif_badge">Privacidad</string>
+    <string name="tool_strip_exif_subtitle">Elimina ubicación GPS y datos de cámara antes de compartir</string>
+    <string name="tool_strip_exif_cta">Limpiar metadatos</string>
+    <string name="tool_strip_exif_result">Metadatos borrados.</string>
+
+    <string name="tool_scan_qr_title">Estudio QR</string>
+    <string name="tool_scan_qr_badge">Tarjeta QR</string>
+    <string name="tool_scan_qr_subtitle">Genera una tarjeta QR nítida sin conexión para cualquier enlace</string>
+    <string name="tool_scan_qr_cta">Crear tarjeta QR</string>
+    <string name="tool_scan_qr_result">Tarjeta QR lista.</string>
+
+    <string name="tool_pdf_to_png_title">PDF a PNG</string>
+    <string name="tool_pdf_to_png_badge">PNG HD</string>
+    <string name="tool_pdf_to_png_subtitle">Renderiza páginas PDF como imágenes sin pérdida</string>
+    <string name="tool_pdf_to_png_cta">Exportar PNG</string>
+    <string name="tool_pdf_to_png_result">Imagen lista.</string>
+
+    <string name="tool_pdf_to_jpg_title">PDF a JPG</string>
+    <string name="tool_pdf_to_jpg_badge">JPG HD</string>
+    <string name="tool_pdf_to_jpg_subtitle">Guarda páginas PDF como fotos JPEG fáciles de compartir</string>
+    <string name="tool_pdf_to_jpg_cta">Exportar JPG</string>
+    <string name="tool_pdf_to_jpg_result">JPEG listo.</string>
+
+    <string name="tool_pdf_to_md_title">PDF a Markdown</string>
+    <string name="tool_pdf_to_md_badge">MD</string>
+    <string name="tool_pdf_to_md_subtitle">Extrae la estructura del documento en apuntes Markdown claros</string>
+    <string name="tool_pdf_to_md_cta">Convertir a Markdown</string>
+    <string name="tool_pdf_to_md_result">Markdown listo.</string>
+
+    <string name="tool_pdf_to_html_title">PDF a HTML5</string>
+    <string name="tool_pdf_to_html_badge">Doc Web</string>
+    <string name="tool_pdf_to_html_subtitle">Crea una página lectora HTML5 autónoma sin conexión</string>
+    <string name="tool_pdf_to_html_cta">Exportar HTML5</string>
+    <string name="tool_pdf_to_html_result">Lector listo.</string>
+
+    <string name="tool_pdf_to_docx_title">PDF a Word</string>
+    <string name="tool_pdf_to_docx_badge">DOCX</string>
+    <string name="tool_pdf_to_docx_subtitle">Convierte un PDF en un archivo editable de Microsoft Word</string>
+    <string name="tool_pdf_to_docx_cta">Exportar a Word</string>
+    <string name="tool_pdf_to_docx_result">Archivo Word listo.</string>
+
+    <string name="tool_pdf_to_txt_title">PDF a texto</string>
+    <string name="tool_pdf_to_txt_badge">TXT</string>
+    <string name="tool_pdf_to_txt_subtitle">Extrae texto sin formato y resumen por página del PDF</string>
+    <string name="tool_pdf_to_txt_cta">Extraer texto</string>
+    <string name="tool_pdf_to_txt_result">Texto extraído.</string>
+
+    <string name="tool_compress_pdf_title">Comprimir PDF</string>
+    <string name="tool_compress_pdf_badge">KB objetivo</string>
+    <string name="tool_compress_pdf_subtitle">Ajusta un PDF por debajo de cualquier límite de subida</string>
+    <string name="tool_compress_pdf_cta">Comprimir PDF</string>
+    <string name="tool_compress_pdf_result">PDF comprimido.</string>
+
+    <string name="tool_handout_title">Folleto</string>
+    <string name="tool_handout_badge">2/3/4 pág.</string>
+    <string name="tool_handout_subtitle">Organiza diapositivas en hojas de notas de 2, 3 o 4 vistas</string>
+    <string name="tool_handout_cta">Crear folleto</string>
+    <string name="tool_handout_result">Folleto listo.</string>
+
+    <string name="tool_pdf_extract_title">Dividir PDF</string>
+    <string name="tool_pdf_extract_badge">Páginas</string>
+    <string name="tool_pdf_extract_subtitle">Conserva solo el rango de páginas que necesitas</string>
+    <string name="tool_pdf_extract_cta">Extraer páginas</string>
+    <string name="tool_pdf_extract_result">Páginas extraídas.</string>
+
+    <string name="tool_lock_stamp_title">Sellar PDF</string>
+    <string name="tool_lock_stamp_badge">Marca agua</string>
+    <string name="tool_lock_stamp_subtitle">Estampa una marca de agua diagonal de seguridad en cada página</string>
+    <string name="tool_lock_stamp_cta">Sellar PDF</string>
+    <string name="tool_lock_stamp_result">PDF sellado.</string>
+
+    <string name="tool_redact_title">Censurar</string>
+    <string name="tool_redact_badge">Sanitizar</string>
+    <string name="tool_redact_subtitle">Oculta zonas privadas y aplana las páginas de forma permanente</string>
+    <string name="tool_redact_cta">Censurar y aplanar</string>
+    <string name="tool_redact_result">PDF censurado.</string>
+
+    <string name="tool_pdf_merge_title">Unir PDFs</string>
+    <string name="tool_pdf_merge_badge">Combinar</string>
+    <string name="tool_pdf_merge_subtitle">Combina 2+ PDFs en orden personalizado en un documento</string>
+    <string name="tool_pdf_merge_cta">Unir PDFs</string>
+    <string name="tool_pdf_merge_result">PDFs unidos.</string>
+
+    <string name="tool_strip_pdf_meta_title">Limpiar PDF</string>
+    <string name="tool_strip_pdf_meta_badge">Sin meta</string>
+    <string name="tool_strip_pdf_meta_subtitle">Elimina autor, productor y propiedades XMP ocultas</string>
+    <string name="tool_strip_pdf_meta_cta">Borrar metadatos PDF</string>
+    <string name="tool_strip_pdf_meta_result">Metadatos borrados.</string>
+
+    <string name="tool_visualize_title">Onda PNG</string>
+    <string name="tool_visualize_badge">Forma onda</string>
+    <string name="tool_visualize_subtitle">Convierte audio en un banner de forma de onda en alta resolución</string>
+    <string name="tool_visualize_cta">Generar onda</string>
+    <string name="tool_visualize_result">Forma de onda lista.</string>
+
+    <string name="tool_speed_2x_title">Velocidad 2x</string>
+    <string name="tool_speed_2x_badge">2.0x</string>
+    <string name="tool_speed_2x_subtitle">Duplica la velocidad del audio localmente en formato WAV</string>
+    <string name="tool_speed_2x_cta">Acelerar 2x</string>
+    <string name="tool_speed_2x_result">Audio 2x listo.</string>
+
+    <string name="tool_sheet_to_pdf_title">Tabla a PDF</string>
+    <string name="tool_sheet_to_pdf_badge">PDF A4</string>
+    <string name="tool_sheet_to_pdf_subtitle">Renderiza datos CSV en un PDF tabular nítido para imprimir</string>
+    <string name="tool_sheet_to_pdf_cta">Exportar tabla PDF</string>
+    <string name="tool_sheet_to_pdf_result">Tabla PDF lista.</string>
+
+    <string name="tool_sheet_to_md_title">Tabla a MD</string>
+    <string name="tool_sheet_to_md_badge">Markdown</string>
+    <string name="tool_sheet_to_md_subtitle">Da formato a filas de hoja de cálculo como tabla Markdown</string>
+    <string name="tool_sheet_to_md_cta">Convertir a Markdown</string>
+    <string name="tool_sheet_to_md_result">Tabla Markdown lista.</string>
+
+    <string name="tool_table_convert_title">Tabla a JSON</string>
+    <string name="tool_table_convert_badge">JSON</string>
+    <string name="tool_table_convert_subtitle">Convierte filas de hoja de cálculo en JSON estructurado</string>
+    <string name="tool_table_convert_cta">Convertir a JSON</string>
+    <string name="tool_table_convert_result">JSON listo.</string>
+
+    <string name="tool_pack_zip_title">Archivo ZIP</string>
+    <string name="tool_pack_zip_badge">ZIP</string>
+    <string name="tool_pack_zip_subtitle">Agrupa uno o más archivos en un paquete .zip ordenado</string>
+    <string name="tool_pack_zip_cta">Crear ZIP</string>
+    <string name="tool_pack_zip_result">Archivo comprimido.</string>
+
+    <!-- Controles de cola por lotes -->
+    <string name="batch_queue_header_merge">COLA PARA UNIR PDF</string>
+    <string name="batch_queue_header_collage">COLA PARA COLLAGE</string>
+    <string name="batch_queue_header_zip">COLA DE ARCHIVO ZIP</string>
+    <string name="batch_summary_merge_single">1 PDF · %1$d páginas en total</string>
+    <string name="batch_summary_merge">%1$d PDFs · %2$d páginas en total</string>
+    <string name="batch_summary_collage_single">1 foto · hoja de contacto 2×2</string>
+    <string name="batch_summary_collage_multi">%1$d fotos · cuadrícula %2$s</string>
+    <string name="batch_summary_zip">%1$d archivo(s) · %2$s en total</string>
+    <string name="batch_empty_merge">Elige 2 o más PDFs del almacenamiento (o añade muestras/recientes) en el orden deseado.</string>
+    <string name="batch_need_one_more_pdf">Añade al menos 1 PDF más abajo para unir.</string>
+    <string name="batch_empty_collage">Añade 1–9 fotos para crear una cuadrícula 2×1, 2×2, 3×2 o 3×3.</string>
+    <string name="batch_empty_zip">Añade uno o más archivos de cualquier tipo para empaquetarlos en un .zip.</string>
+    <string name="batch_pick_pdfs">Elegir PDFs</string>
+    <string name="batch_pick_photos">Elegir fotos</string>
+    <string name="batch_pick_files">Elegir archivos</string>
+    <string name="batch_add_sample">+ Muestra</string>
+    <string name="batch_add_recent_prefix">+ %1$s</string>
+    <string name="batch_cta_merge_n">Unir %1$d PDFs</string>
+    <string name="batch_cta_merge_need_two">Elige 2+ PDFs para unir</string>
+    <string name="batch_cta_collage_n">Crear collage de %1$d fotos</string>
+    <string name="batch_cta_zip_n">Empaquetar %1$d archivos en ZIP</string>
+    <string name="cd_move_up">Subir</string>
+    <string name="cd_move_down">Bajar</string>
+    <string name="cd_remove_item">Quitar de la cola</string>
+    <string name="cd_duplicate_item">Duplicar en la cola</string>
+
+    <!-- Estudio PPTX y Diapositivas -->
+    <string name="tool_pptx_to_pdf_title">PPTX a PDF</string>
+    <string name="tool_pptx_to_pdf_badge">PDF fiel</string>
+    <string name="tool_pptx_to_pdf_subtitle">Conserva tamaño, diseño y fuentes incrustadas o asignadas</string>
+    <string name="tool_pptx_to_pdf_cta">Exportar PDF</string>
+    <string name="tool_pptx_to_pdf_result">PDF de presentación listo.</string>
+
+    <string name="tool_pptx_to_png_title">Diapositiva a PNG</string>
+    <string name="tool_pptx_to_png_badge">Slide PNG</string>
+    <string name="tool_pptx_to_png_subtitle">Renderiza todas (.zip) o una diapositiva en PNG de alta resolución</string>
+    <string name="tool_pptx_to_png_cta">Exportar PNG</string>
+    <string name="tool_pptx_to_png_result">PNG de diapositiva listo.</string>
+
+    <string name="tool_pptx_to_jpg_title">Diapositiva a JPG</string>
+    <string name="tool_pptx_to_jpg_badge">Slide JPG</string>
+    <string name="tool_pptx_to_jpg_subtitle">Guarda todas (.zip) o una diapositiva en imagen JPEG de alta calidad</string>
+    <string name="tool_pptx_to_jpg_cta">Exportar JPG</string>
+    <string name="tool_pptx_to_jpg_result">JPEG de diapositiva listo.</string>
+
+    <string name="tool_pptx_to_md_title">PPTX a Markdown</string>
+    <string name="tool_pptx_to_md_badge">Slide MD</string>
+    <string name="tool_pptx_to_md_subtitle">Extrae títulos, viñetas, tablas GFM y notas del orador</string>
+    <string name="tool_pptx_to_md_cta">Extraer Markdown</string>
+    <string name="tool_pptx_to_md_result">Markdown listo.</string>
+
+    <string name="tool_pptx_to_txt_title">PPTX a texto</string>
+    <string name="tool_pptx_to_txt_badge">Slide TXT</string>
+    <string name="tool_pptx_to_txt_subtitle">Extrae texto estructurado y notas de cada diapositiva</string>
+    <string name="tool_pptx_to_txt_cta">Extraer texto</string>
+    <string name="tool_pptx_to_txt_result">Texto listo.</string>
+
+    <string name="tool_pptx_handout_title">Folleto PPTX</string>
+    <string name="tool_pptx_handout_badge">Folleto</string>
+    <string name="tool_pptx_handout_subtitle">Organiza 2, 3 (con notas) o 4 diapositivas por página</string>
+    <string name="tool_pptx_handout_cta">Crear folleto</string>
+    <string name="tool_pptx_handout_result">Folleto listo.</string>
+
+    <string name="tool_pptx_sanitize_title">Limpiar PPTX</string>
+    <string name="tool_pptx_sanitize_badge">PPTX limpio</string>
+    <string name="tool_pptx_sanitize_subtitle">Elimina autor y notas del orador sin alterar diapositivas</string>
+    <string name="tool_pptx_sanitize_cta">Sanitizar deck</string>
+    <string name="tool_pptx_sanitize_result">Presentación sanitizada.</string>
+</resources>
