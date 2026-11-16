@@ -6,6 +6,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import app.meld.android.R
 import java.io.File
+import java.util.Locale
 
 enum class MeldMode(@StringRes val labelRes: Int) {
     ALL(R.string.mode_all),
@@ -590,9 +591,9 @@ data class SelectedFileInfo(
         fun formatByteCount(bytes: Long): String {
             if (bytes < 1024) return "$bytes B"
             val kb = bytes / 1024.0
-            if (kb < 1024) return String.format("%.1f KB", kb)
+            if (kb < 1024) return String.format(Locale.US, "%.1f KB", kb)
             val mb = kb / 1024.0
-            return String.format("%.2f MB", mb)
+            return String.format(Locale.US, "%.2f MB", mb)
         }
     }
 }

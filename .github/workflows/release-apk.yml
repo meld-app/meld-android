@@ -36,10 +36,10 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Run Unit Tests & Assemble Debug APK
+      - name: Run Lint, Unit Tests & Assemble Debug APK
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleDebug
+          ./gradlew lintDebug testDebugUnitTest assembleDebug
 
       - name: Assemble & Package Release APK
         env:

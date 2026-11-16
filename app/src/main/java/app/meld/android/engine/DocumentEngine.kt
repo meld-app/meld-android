@@ -834,7 +834,7 @@ object DocumentEngine {
         for (i in 0 until pageCount) {
             renderer.openPage(i).use { page ->
                 dims.add(page.width to page.height)
-                if (api35Texts != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM && api35Texts != null) {
                     val extracted = runCatching { extractApi35PageText(page) }.getOrDefault("")
                     api35Texts.add(extracted)
                 }

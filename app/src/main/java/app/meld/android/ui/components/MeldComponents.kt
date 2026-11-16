@@ -62,7 +62,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -111,6 +111,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.Locale
 import java.util.zip.ZipFile
 import kotlin.math.PI
 import kotlin.math.max
@@ -761,12 +762,13 @@ fun ResultShowcaseCard(
     val reduceMotion = rememberReduceMotion()
     val haptic = LocalHapticFeedback.current
 
-    val previewState by produceState<Pair<Boolean, Bitmap?>>(
-        initialValue = false to null,
+    var previewState by remember { mutableStateOf<Pair<Boolean, Bitmap?>>(false to null) }
+    LaunchedEffect(
         result.outputFile.absolutePath,
         result.outputSizeBytes,
         result.durationMs
     ) {
+        previewState = false to null
         val bmp = withContext(Dispatchers.IO) {
             val ext = result.outputFile.extension.lowercase()
             when {
@@ -780,7 +782,7 @@ fun ResultShowcaseCard(
                 else -> null
             }
         }
-        value = true to bmp
+        previewState = true to bmp
     }
     val (previewLoaded, previewBitmap) = previewState
 
@@ -966,13 +968,13 @@ fun ResultShowcaseCard(
                     }
                 } else if (state == 1) {
                     val previewContext = LocalContext.current
-                    val previewText by produceState(
-                        initialValue = result.summary,
+                    var previewText by remember { mutableStateOf(result.summary) }
+                    LaunchedEffect(
                         result.outputFile.absolutePath,
                         result.outputSizeBytes,
                         result.durationMs
                     ) {
-                        value = withContext(Dispatchers.IO) {
+                        previewText = withContext(Dispatchers.IO) {
                             buildRichOutputPreview(previewContext, result)
                         }
                     }
@@ -1133,7 +1135,7 @@ private fun buildRichOutputPreview(context: Context, result: ConversionResult): 
                     R.string.preview_wav_header,
                     sr,
                     chLabel,
-                    String.format("%.1fs", secs)
+                    String.format(Locale.US, "%.1fs", secs)
                 )
             }
             ext == "docx" -> ZipFile(file).use { zf ->

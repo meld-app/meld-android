@@ -444,7 +444,6 @@
     <string name="batch_pick_photos">Pick photos</string>
     <string name="batch_pick_files">Pick files</string>
     <string name="batch_add_sample">+ Sample</string>
-    <string name="batch_add_copy_chip">+ Copy</string>
     <string name="batch_add_recent_prefix">+ %1$s</string>
     <string name="batch_cta_merge_n">Merge %1$d PDFs</string>
     <string name="batch_cta_merge_need_two">Select 2+ PDFs to merge</string>

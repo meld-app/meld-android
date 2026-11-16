@@ -63,7 +63,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -1143,12 +1142,9 @@ private fun RedactTaskControls(
         )
     }
 
-    val pdfPreview by produceState<android.graphics.Bitmap?>(
-        initialValue = null,
-        file?.file?.absolutePath,
-        file?.sizeBytes
-    ) {
-        value = withContext(Dispatchers.IO) {
+    var pdfPreview by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    LaunchedEffect(file?.file?.absolutePath, file?.sizeBytes) {
+        pdfPreview = withContext(Dispatchers.IO) {
             if (file != null && file.extension.equals("pdf", ignoreCase = true) && file.file.isFile) {
                 renderPdfPagePreview(file.file, maxDim = 640)
             } else null
