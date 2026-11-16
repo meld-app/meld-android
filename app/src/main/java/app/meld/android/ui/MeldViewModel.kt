@@ -900,23 +900,47 @@ class MeldViewModel : ViewModel() {
                         }
                         MeldToolId.PPTX_TO_PNG, MeldToolId.PPTX_TO_JPG -> {
                             val pptxFile = ensurePptxInput(context, inputFile)
+                            val slideCount = PptxEngine.countSlides(pptxFile) ?: 1
+                            val exportAll = slideCount > 1 && opts.pptxImageAllSlides
                             val fmt = if (tool == MeldToolId.PPTX_TO_JPG) {
                                 Bitmap.CompressFormat.JPEG
                             } else {
                                 Bitmap.CompressFormat.PNG
                             }
-                            val res = PptxEngine.renderPptxSlideToImage(
-                                pptxFile,
-                                outFile,
-                                slideNumber1Based = 1,
+                            val formatExt = if (tool == MeldToolId.PPTX_TO_JPG) "jpg" else "png"
+                            val safeBase = pptxFile.nameWithoutExtension.ifBlank { "deck" }
+                            val targetName = when {
+                                exportAll -> "${safeBase}_${slideCount}slides_${tool.name.lowercase()}_${uniqueTag}.zip"
+                                slideCount > 1 -> "${safeBase}_s${opts.pptxImageSlide.coerceIn(1, slideCount)}_${tool.name.lowercase()}_${uniqueTag}.$formatExt"
+                                else -> outFile.name
+                            }
+                            actualOutFile = File(outDir, targetName)
+                            val res = PptxEngine.renderPptxSlidesToImages(
+                                inputFile = pptxFile,
+                                outputFile = actualOutFile,
                                 format = fmt,
+                                allSlides = exportAll,
+                                singleSlide1Based = opts.pptxImageSlide,
                                 fontCacheDir = context.cacheDir
                             )
-                            context.getString(
-                                R.string.vm_pptx_image_rendered,
-                                res.slideCount,
-                                tool.outputExtension.uppercase()
-                            )
+                            when {
+                                res.isZipArchive -> context.getString(
+                                    R.string.vm_pptx_images_zip,
+                                    res.slideCount,
+                                    formatExt.uppercase()
+                                )
+                                res.slideCount > 1 -> context.getString(
+                                    R.string.vm_pptx_single_slide_rendered,
+                                    res.resolvedSingleSlide,
+                                    res.slideCount,
+                                    formatExt.uppercase()
+                                )
+                                else -> context.getString(
+                                    R.string.vm_pptx_image_rendered,
+                                    res.slideCount,
+                                    formatExt.uppercase()
+                                )
+                            }
                         }
                         MeldToolId.PPTX_TO_MD, MeldToolId.PPTX_TO_TXT -> {
                             val pptxFile = ensurePptxInput(context, inputFile)
@@ -1077,9 +1101,11 @@ class MeldViewModel : ViewModel() {
 
     private fun clampOptionsForFile(info: SelectedFileInfo, current: ToolOptions): ToolOptions {
         val pages = (info.pageCount ?: 4).coerceAtLeast(1)
+        val slides = (info.slideCount ?: 3).coerceAtLeast(1)
         val start = current.pageRangeStart.coerceIn(1, pages)
         val end = current.pageRangeEnd.coerceIn(start, pages)
         val clampedPdfImagePage = current.pdfImagePage.coerceIn(1, pages)
+        val clampedPptxImageSlide = current.pptxImageSlide.coerceIn(1, slides)
         val fileKb = (info.sizeBytes / 1024L).toInt().coerceAtLeast(10)
         val sensibleTargetKb = if (current.targetKb >= fileKb && fileKb >= 16) {
             (fileKb * 0.6f).toInt().coerceIn(10, fileKb - 2)
@@ -1090,6 +1116,7 @@ class MeldViewModel : ViewModel() {
             pageRangeStart = start,
             pageRangeEnd = end,
             pdfImagePage = clampedPdfImagePage,
+            pptxImageSlide = clampedPptxImageSlide,
             targetKb = sensibleTargetKb
         )
     }

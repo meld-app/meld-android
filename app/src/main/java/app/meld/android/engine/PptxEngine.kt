@@ -49,6 +49,18 @@ object PptxEngine {
         val mappedFonts: Set<String>,
     )
 
+    data class PptxImageExportSummary(
+        val outputFile: File,
+        val slideCount: Int,
+        val exportedSlideCount: Int,
+        val resolvedSingleSlide: Int,
+        val isZipArchive: Boolean,
+        val slideWidthPt: Float,
+        val slideHeightPt: Float,
+        val embeddedFontsUsed: Int,
+        val mappedFonts: Set<String>,
+    )
+
     data class PptxTextExtractSummary(
         val outputFile: File,
         val slideCount: Int,
@@ -119,6 +131,142 @@ object PptxEngine {
         }
     }
 
+    internal fun buildPptxSlideEntryName(
+        baseName: String,
+        slideIndexZeroBased: Int,
+        totalSlides: Int,
+        ext: String
+    ): String {
+        val cleanBase = baseName
+            .substringAfterLast('/')
+            .substringAfterLast('\\')
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .trim('.', '_', ' ')
+            .ifBlank { "deck" }
+        val cleanExt = ext.lowercase().trimStart('.').let { if (it == "jpg" || it == "jpeg") "jpg" else "png" }
+        val width = totalSlides.coerceAtLeast(1).toString().length.coerceAtLeast(2)
+        val numStr = (slideIndexZeroBased + 1).toString().padStart(width, '0')
+        return "${cleanBase}_slide_${numStr}.${cleanExt}"
+    }
+
+    private fun renderSlideToBitmap(
+        zip: ZipFile,
+        slide: PptxOoxmlParser.PptxSlide,
+        fontResolver: PptxFontResolver
+    ): Bitmap {
+        val maxSlideDim = max(1f, max(slide.widthPt, slide.heightPt))
+        val scale = (MAX_RENDER_IMAGE_SIDE_PX / maxSlideDim).coerceIn(1.5f, 3.0f)
+        val bmpW = (slide.widthPt * scale).roundToInt().coerceIn(64, 4096)
+        val bmpH = (slide.heightPt * scale).roundToInt().coerceIn(64, 4096)
+
+        val bitmap = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
+        var succeeded = false
+        try {
+            val canvas = Canvas(bitmap)
+            canvas.drawColor(Color.WHITE)
+            canvas.save()
+            canvas.scale(scale, scale)
+            PptxCanvasRenderer.renderSlide(canvas, zip, slide, fontResolver)
+            canvas.restore()
+            succeeded = true
+            return bitmap
+        } finally {
+            if (!succeeded) {
+                bitmap.recycle()
+            }
+        }
+    }
+
+    /**
+     * Renders either a chosen single PPTX slide (or 1-slide deck) directly to PNG/JPG, or streams
+     * every slide sequentially into a ZIP archive of PNG/JPG images without modifying source `.pptx`.
+     */
+    fun renderPptxSlidesToImages(
+        inputFile: File,
+        outputFile: File,
+        format: Bitmap.CompressFormat = Bitmap.CompressFormat.PNG,
+        allSlides: Boolean = true,
+        singleSlide1Based: Int = 1,
+        quality: Int = 92,
+        fontCacheDir: File = outputFile.parentFile ?: inputFile.parentFile ?: File("."),
+    ): PptxImageExportSummary {
+        val presentation = PptxOoxmlParser.parse(inputFile)
+        if (presentation.slides.isEmpty()) {
+            throw IllegalArgumentException("Presentation contains no readable slides")
+        }
+        val total = presentation.slides.size
+        val isJpeg = format == Bitmap.CompressFormat.JPEG
+        val ext = if (isJpeg) "jpg" else "png"
+        val effectiveQuality = if (isJpeg) quality.coerceIn(50, 100) else 100
+        outputFile.parentFile?.mkdirs()
+
+        var success = false
+        try {
+            ZipFile(inputFile).use { zip ->
+                PptxFontResolver(fontCacheDir, zip, presentation.embeddedFonts).use { fontResolver ->
+                    if (total == 1 || !allSlides) {
+                        val slideIdx = (singleSlide1Based - 1).coerceIn(0, presentation.slides.lastIndex)
+                        val slide = presentation.slides[slideIdx]
+                        val bitmap = renderSlideToBitmap(zip, slide, fontResolver)
+                        try {
+                            FileOutputStream(outputFile).use { fos ->
+                                if (!bitmap.compress(format, effectiveQuality, fos)) {
+                                    throw IllegalStateException("Failed to encode slide image")
+                                }
+                            }
+                        } finally {
+                            bitmap.recycle()
+                        }
+                        success = true
+                        return PptxImageExportSummary(
+                            outputFile = outputFile,
+                            slideCount = total,
+                            exportedSlideCount = 1,
+                            resolvedSingleSlide = slideIdx + 1,
+                            isZipArchive = false,
+                            slideWidthPt = presentation.slideWidthPt,
+                            slideHeightPt = presentation.slideHeightPt,
+                            embeddedFontsUsed = fontResolver.embeddedFontsLoadedCount,
+                            mappedFonts = fontResolver.fallbackFontsUsed,
+                        )
+                    } else {
+                        val baseName = inputFile.nameWithoutExtension.ifBlank { "deck" }
+                        ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile))).use { zos ->
+                            presentation.slides.forEachIndexed { idx, slide ->
+                                val bitmap = renderSlideToBitmap(zip, slide, fontResolver)
+                                try {
+                                    zos.putNextEntry(ZipEntry(buildPptxSlideEntryName(baseName, idx, total, ext)))
+                                    if (!bitmap.compress(format, effectiveQuality, zos)) {
+                                        throw IllegalStateException("Failed to encode slide ${idx + 1} image")
+                                    }
+                                    zos.closeEntry()
+                                } finally {
+                                    bitmap.recycle()
+                                }
+                            }
+                        }
+                        success = true
+                        return PptxImageExportSummary(
+                            outputFile = outputFile,
+                            slideCount = total,
+                            exportedSlideCount = total,
+                            resolvedSingleSlide = 1,
+                            isZipArchive = true,
+                            slideWidthPt = presentation.slideWidthPt,
+                            slideHeightPt = presentation.slideHeightPt,
+                            embeddedFontsUsed = fontResolver.embeddedFontsLoadedCount,
+                            mappedFonts = fontResolver.fallbackFontsUsed,
+                        )
+                    }
+                }
+            }
+        } finally {
+            if (!success) {
+                outputFile.delete()
+            }
+        }
+    }
+
     fun renderPptxSlideToImage(
         inputFile: File,
         outputFile: File,
@@ -127,50 +275,23 @@ object PptxEngine {
         quality: Int = 92,
         fontCacheDir: File = outputFile.parentFile ?: inputFile.parentFile ?: File("."),
     ): PptxPdfRenderSummary {
-        val presentation = PptxOoxmlParser.parse(inputFile)
-        if (presentation.slides.isEmpty()) {
-            throw IllegalArgumentException("Presentation contains no readable slides")
-        }
-        val slideIdx = (slideNumber1Based - 1).coerceIn(0, presentation.slides.lastIndex)
-        val slide = presentation.slides[slideIdx]
-        outputFile.parentFile?.mkdirs()
-
-        val maxSlideDim = max(1f, max(slide.widthPt, slide.heightPt))
-        val scale = (MAX_RENDER_IMAGE_SIDE_PX / maxSlideDim).coerceIn(1.5f, 3.0f)
-        val bmpW = (slide.widthPt * scale).roundToInt().coerceIn(64, 4096)
-        val bmpH = (slide.heightPt * scale).roundToInt().coerceIn(64, 4096)
-
-        val bitmap = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
-        try {
-            ZipFile(inputFile).use { zip ->
-                PptxFontResolver(fontCacheDir, zip, presentation.embeddedFonts).use { fontResolver ->
-                    val canvas = Canvas(bitmap)
-                    canvas.drawColor(Color.WHITE)
-                    canvas.save()
-                    canvas.scale(scale, scale)
-                    PptxCanvasRenderer.renderSlide(canvas, zip, slide, fontResolver)
-                    canvas.restore()
-
-                    FileOutputStream(outputFile).use { fos ->
-                        val ok = bitmap.compress(format, quality.coerceIn(50, 100), fos)
-                        if (!ok) {
-                            throw IllegalStateException("Failed to encode slide image")
-                        }
-                    }
-
-                    return PptxPdfRenderSummary(
-                        outputFile = outputFile,
-                        slideCount = presentation.slides.size,
-                        slideWidthPt = slide.widthPt,
-                        slideHeightPt = slide.heightPt,
-                        embeddedFontsUsed = fontResolver.embeddedFontsLoadedCount,
-                        mappedFonts = fontResolver.fallbackFontsUsed,
-                    )
-                }
-            }
-        } finally {
-            bitmap.recycle()
-        }
+        val res = renderPptxSlidesToImages(
+            inputFile = inputFile,
+            outputFile = outputFile,
+            format = format,
+            allSlides = false,
+            singleSlide1Based = slideNumber1Based,
+            quality = quality,
+            fontCacheDir = fontCacheDir
+        )
+        return PptxPdfRenderSummary(
+            outputFile = res.outputFile,
+            slideCount = res.slideCount,
+            slideWidthPt = res.slideWidthPt,
+            slideHeightPt = res.slideHeightPt,
+            embeddedFontsUsed = res.embeddedFontsUsed,
+            mappedFonts = res.mappedFonts,
+        )
     }
 
     fun buildPptxHandoutPdf(

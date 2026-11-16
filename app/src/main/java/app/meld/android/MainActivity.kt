@@ -138,6 +138,11 @@ class MainActivity : ComponentActivity() {
                             it.copy(pdfImageAllPages = allPages, pdfImagePage = pageNumber)
                         }
                     },
+                    onUpdatePptxImageScope = { allSlides, slideNumber ->
+                        viewModel.updateOptions {
+                            it.copy(pptxImageAllSlides = allSlides, pptxImageSlide = slideNumber)
+                        }
+                    },
                     onUpdateChromaTolerance = { tol ->
                         viewModel.updateOptions { it.copy(chromaTolerance = tol) }
                     },
