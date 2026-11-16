@@ -542,4 +542,72 @@ class MeldEngineUnitTest {
         assertTrue(MeldToolId.PDF_TO_PNG.followUpTools("png").contains(MeldToolId.COMPRESS))
         assertTrue(MeldToolId.PDF_TO_PNG.followUpTools("zip").isEmpty())
     }
+
+    @Test
+    fun pdfTextExtractor_decodesFlateStreamsLiteralArraysAndToUnicodeCMap() {
+        fun deflate(bytes: ByteArray): ByteArray {
+            val comp = java.util.zip.Deflater()
+            comp.setInput(bytes)
+            comp.finish()
+            val out = java.io.ByteArrayOutputStream()
+            val buf = ByteArray(256)
+            while (!comp.finished()) {
+                val n = comp.deflate(buf)
+                out.write(buf, 0, n)
+            }
+            comp.end()
+            return out.toByteArray()
+        }
+
+        val page1Stream = "BT\n/F1 14 Tf\n72 720 Td\n(Hello MELD) Tj\n0 -20 Td\n[(Local ) -220 (Extraction)] TJ\nET\n"
+            .toByteArray(java.nio.charset.StandardCharsets.ISO_8859_1)
+
+        // Skia-style glyph IDs mapped via ToUnicode bfchar/bfrange (<01>='M', <02>='E', <03>='L', <04>='D', <05>=' ', <10..12>='0..2')
+        val cmap = """
+            /CIDInit /ProcSet findresource begin
+            12 dict begin
+            begincmap
+            1 begincodespacerange <00> <FF> endcodespacerange
+            5 beginbfchar
+            <01> <004D>
+            <02> <0045>
+            <03> <004C>
+            <04> <0044>
+            <05> <0020>
+            endbfchar
+            1 beginbfrange
+            <10> <12> <0030>
+            endbfrange
+            endcmap
+        """.trimIndent().toByteArray(java.nio.charset.StandardCharsets.ISO_8859_1)
+
+        val page2Flate = deflate(
+            "BT\n/F4 18 Tf\n1 0 0 -1 0 0 Tm\n72 -102 Td <01> Tj\n16 0 Td <02> Tj\n10 0 Td <03> Tj\n10 0 Td <04> Tj\n10 0 Td <05> Tj\n5 0 Td <12> Tj\nET\n"
+                .toByteArray(java.nio.charset.StandardCharsets.ISO_8859_1)
+        )
+
+        val pdf = java.io.ByteArrayOutputStream()
+        fun w(s: String) = pdf.write(s.toByteArray(java.nio.charset.StandardCharsets.ISO_8859_1))
+        w("%PDF-1.4\n")
+        w("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n")
+        w("2 0 obj\n<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>\nendobj\n")
+        w("3 0 obj\n<< /Type /Page /Parent 2 0 R /Contents 5 0 R >>\nendobj\n")
+        w("4 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F4 6 0 R >> >> /Contents 8 0 R >>\nendobj\n")
+        w("5 0 obj\n<< /Length ${page1Stream.size} >>\nstream\n")
+        pdf.write(page1Stream)
+        w("\nendstream\nendobj\n")
+        w("6 0 obj\n<< /Type /Font /Subtype /Type3 /ToUnicode 7 0 R >>\nendobj\n")
+        w("7 0 obj\n<< /Length ${cmap.size} >>\nstream\n")
+        pdf.write(cmap)
+        w("\nendstream\nendobj\n")
+        w("8 0 obj\n<< /Filter /FlateDecode /Length ${page2Flate.size} >>\nstream\n")
+        pdf.write(page2Flate)
+        w("\nendstream\nendobj\n%%EOF\n")
+
+        val pages = app.meld.android.engine.PdfTextExtractor.extractPagesFromBytes(pdf.toByteArray())
+        assertEquals(2, pages.size)
+        assertTrue(pages[0].contains("Hello MELD"))
+        assertTrue(pages[0].contains("Local Extraction"))
+        assertEquals("MELD 2", pages[1])
+    }
 }

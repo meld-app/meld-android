@@ -11,7 +11,10 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.graphics.pdf.PdfRenderer
+import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.util.Base64
+import androidx.annotation.RequiresApi
 import app.meld.android.model.RedactionRect
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
@@ -29,6 +32,7 @@ object DocumentEngine {
     private const val A4_WIDTH = 595
     private const val A4_HEIGHT = 842
     private const val MAX_PDF_BITMAP_DIM = 2048
+    private const val MAX_HTML_IMAGE_PAGES = 20
     private const val MAX_SHEET_BYTES = 10L * 1024L * 1024L
 
     private inline fun <T> withPdfRenderer(inputFile: File, block: (PdfRenderer, Int) -> T): T {
@@ -763,19 +767,94 @@ object DocumentEngine {
     fun mergeOrDuplicatePdf(inputFile: File, outputFile: File): String =
         mergePdfs(listOf(inputFile, inputFile), outputFile)
 
+    private data class PdfPageTextMeta(
+        val widthPt: Int,
+        val heightPt: Int,
+        val text: String
+    )
+
+    @RequiresApi(Build.VERSION_CODES.VANILLA_ICE_CREAM)
+    private fun extractApi35PageText(page: PdfRenderer.Page): String {
+        val contents = page.getTextContents()
+        return contents
+            .mapNotNull { it.text?.trim()?.takeIf { t -> t.isNotEmpty() } }
+            .joinToString("\n")
+    }
+
+    private fun extractPageTextsWithMeta(
+        inputFile: File,
+        renderer: PdfRenderer,
+        pageCount: Int
+    ): List<PdfPageTextMeta> {
+        val api35Texts = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            ArrayList<String>(pageCount)
+        } else null
+        val dims = ArrayList<Pair<Int, Int>>(pageCount)
+
+        for (i in 0 until pageCount) {
+            renderer.openPage(i).use { page ->
+                dims.add(page.width to page.height)
+                if (api35Texts != null) {
+                    val extracted = runCatching { extractApi35PageText(page) }.getOrDefault("")
+                    api35Texts.add(extracted)
+                }
+            }
+        }
+
+        val fallbackTexts = if (api35Texts == null || api35Texts.all { it.isBlank() }) {
+            PdfTextExtractor.extractPages(inputFile, expectedPageCount = pageCount)
+        } else emptyList()
+
+        return dims.mapIndexed { idx, (w, h) ->
+            val apiTxt = api35Texts?.getOrNull(idx).orEmpty()
+            val chosen = if (apiTxt.isNotBlank()) apiTxt else fallbackTexts.getOrNull(idx).orEmpty()
+            PdfPageTextMeta(widthPt = w, heightPt = h, text = chosen)
+        }
+    }
+
+    private fun renderPageAsBase64Jpeg(
+        renderer: PdfRenderer,
+        pageIndex: Int,
+        maxDim: Int = 840
+    ): String? {
+        return renderer.openPage(pageIndex).use { page ->
+            val (w, h) = boundedDimensions(
+                rawWidth = (max(1, page.width) * 1.5f).toInt(),
+                rawHeight = (max(1, page.height) * 1.5f).toInt(),
+                maxDim = maxDim
+            )
+            val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            try {
+                val canvas = Canvas(bmp)
+                canvas.drawColor(Color.WHITE)
+                page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                val baos = ByteArrayOutputStream()
+                if (!bmp.compress(Bitmap.CompressFormat.JPEG, 82, baos)) return@use null
+                Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+            } finally {
+                bmp.recycle()
+            }
+        }
+    }
+
     /**
-     * Converts PDF structure to clean, formatted Markdown document (.md).
+     * Converts PDF text & page structure into a clean Markdown document (.md).
      */
     fun convertPdfToMarkdown(inputFile: File, outputFile: File): String {
         var pageCount = 0
+        var pagesWithText = 0
         val sb = StringBuilder()
 
         withPdfRenderer(inputFile) { renderer, total ->
             pageCount = total
+            val pageMetas = extractPageTextsWithMeta(inputFile, renderer, total)
+            pagesWithText = pageMetas.count { it.text.isNotBlank() }
+
             val safeHeading = MediaEngine.escapeMarkdownText(inputFile.nameWithoutExtension)
             sb.append("# $safeHeading\n\n")
             sb.append("> **Extracted via MELD for Android** • 100% Local Processing\n\n")
             sb.append("- **Total Pages:** $pageCount\n")
+            sb.append("- **Pages with Text:** $pagesWithText\n")
             sb.append("- **Source Size:** ${inputFile.length() / 1024} KB\n\n")
             sb.append("## Table of Contents\n\n")
 
@@ -784,33 +863,41 @@ object DocumentEngine {
             }
             sb.append("\n---\n\n")
 
-            for (i in 0 until pageCount) {
-                renderer.openPage(i).use { page ->
-                    sb.append("### Page ${i + 1}\n\n")
-                    sb.append("**Dimensions:** ${page.width} x ${page.height} pt (A4 Print Scale)\n\n")
-                    sb.append("```\n")
-                    sb.append("[PAGE ${i + 1} CONTENT CONTAINER — RENDER VERIFIED]\n")
-                    sb.append("Status: Processed & Flattened by MELD Document Engine\n")
-                    sb.append("```\n\n")
+            pageMetas.forEachIndexed { idx, meta ->
+                sb.append("### Page ${idx + 1}\n\n")
+                sb.append("*Dimensions: ${meta.widthPt} × ${meta.heightPt} pt*\n\n")
+                if (meta.text.isNotBlank()) {
+                    meta.text.lines().forEach { line ->
+                        val escaped = MediaEngine.escapeMarkdownText(line)
+                        if (escaped.isNotBlank()) {
+                            sb.append(escaped).append("\n\n")
+                        }
+                    }
+                } else {
+                    sb.append("*No selectable text layer detected on this page (scanned or vector artwork).*\n\n")
                 }
             }
         }
 
         outputFile.writeText(sb.toString())
-        return "Converted $pageCount page(s) into structured Markdown (.md)"
+        return "Extracted Markdown across $pageCount page(s) ($pagesWithText with text)"
     }
 
     /**
-     * Converts PDF to a dark-mode standalone HTML5 reader.
+     * Converts PDF to a self-contained dark-mode HTML5 reader with extracted text and page previews.
      */
     fun convertPdfToHtml(inputFile: File, outputFile: File): String {
         var pageCount = 0
+        var renderedImages = 0
         val safeTitle = escapeXml(inputFile.nameWithoutExtension)
         val safeFileName = escapeXml(inputFile.name)
 
         val html = buildString {
             withPdfRenderer(inputFile) { renderer, total ->
                 pageCount = total
+                val pageMetas = extractPageTextsWithMeta(inputFile, renderer, total)
+                val pagesWithText = pageMetas.count { it.text.isNotBlank() }
+
                 append("""
                     <!DOCTYPE html>
                     <html lang="en">
@@ -819,59 +906,81 @@ object DocumentEngine {
                       <meta name="viewport" content="width=device-width, initial-scale=1.0">
                       <title>$safeTitle — MELD Reader</title>
                       <style>
-                        body { margin: 0; padding: 24px; background: #0D0E12; color: #F5F7FA; font-family: system-ui, -apple-system, sans-serif; }
-                        .header { max-width: 800px; margin: 0 auto 24px; padding: 20px; background: #151821; border: 1px solid #2B3042; border-radius: 14px; }
+                        body { margin: 0; padding: 24px; background: #0D0E12; color: #F5F7FA; font-family: system-ui, -apple-system, sans-serif; line-height: 1.55; }
+                        .header { max-width: 820px; margin: 0 auto 24px; padding: 20px; background: #151821; border: 1px solid #2B3042; border-radius: 14px; }
                         .tag { display: inline-block; background: #FF6A2B; color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; }
-                        .card { max-width: 800px; margin: 0 auto 16px; background: #1E2230; border: 1px solid #2B3042; border-radius: 12px; padding: 24px; }
+                        .card { max-width: 820px; margin: 0 auto 20px; background: #1E2230; border: 1px solid #2B3042; border-radius: 12px; padding: 20px; }
                         .badge { color: #FFB347; font-family: monospace; font-size: 12px; }
+                        .page-img { width: 100%; height: auto; border-radius: 8px; margin: 12px 0; border: 1px solid #2B3042; display: block; background: #fff; }
+                        .page-text { white-space: pre-wrap; color: #E2E6F0; font-size: 14px; background: #151821; padding: 14px; border-radius: 8px; border: 1px solid #252A3A; margin: 0; }
+                        .meta { color: #9BA3B5; font-size: 12px; margin-top: 8px; }
                       </style>
                     </head>
                     <body>
                       <div class="header">
-                        <span class="tag">MELD HTML5 EXPORT</span>
+                        <span class="tag">MELD HTML5 READER</span>
                         <h2>$safeFileName</h2>
-                        <p style="color:#9BA3B5; font-size:13px;">Total Pages: $pageCount • 100% Offline Local Extraction</p>
+                        <p style="color:#9BA3B5; font-size:13px;">Total Pages: $pageCount • Text Pages: $pagesWithText • 100% Offline Local Reader</p>
                       </div>
                 """.trimIndent())
 
-                for (i in 0 until pageCount) {
-                    renderer.openPage(i).use { page ->
-                        append("""
-                          <div class="card">
-                            <span class="badge">SECTION ${i + 1} OF $pageCount</span>
-                            <h3>Page ${i + 1} View</h3>
-                            <p style="color:#9BA3B5; font-size:12px;">Dimensions: ${page.width} x ${page.height} pt</p>
-                          </div>
-                        """.trimIndent())
+                pageMetas.forEachIndexed { i, meta ->
+                    append("""
+                      <div class="card">
+                        <span class="badge">PAGE ${i + 1} OF $pageCount</span>
+                    """.trimIndent())
+                    if (i < MAX_HTML_IMAGE_PAGES) {
+                        val b64 = renderPageAsBase64Jpeg(renderer, i)
+                        if (b64 != null) {
+                            renderedImages++
+                            append("""<img class="page-img" alt="Page ${i + 1}" src="data:image/jpeg;base64,$b64"/>""")
+                        }
                     }
+                    if (meta.text.isNotBlank()) {
+                        append("""<pre class="page-text">${escapeXml(meta.text)}</pre>""")
+                    } else {
+                        append("""<p class="meta">No embedded text layer detected on this page.</p>""")
+                    }
+                    append("""<p class="meta">Dimensions: ${meta.widthPt} × ${meta.heightPt} pt</p></div>""")
                 }
                 append("</body></html>")
             }
         }
 
         outputFile.writeText(html)
-        return "Exported $pageCount page(s) to standalone HTML5 web reader"
+        return "Exported $pageCount page(s) to standalone HTML5 reader ($renderedImages visual page card(s))"
     }
 
     /**
-     * Converts PDF to OpenXML Microsoft Word Document (.docx).
+     * Converts PDF pages and extracted text to an OpenXML Microsoft Word Document (.docx).
      */
     fun convertPdfToDocx(inputFile: File, outputFile: File): String {
         var pageCount = 0
+        var pagesWithText = 0
 
         val docXml = buildString {
             withPdfRenderer(inputFile) { renderer, total ->
                 pageCount = total
+                val pageMetas = extractPageTextsWithMeta(inputFile, renderer, total)
+                pagesWithText = pageMetas.count { it.text.isNotBlank() }
+
                 append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>""")
                 append("""<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">""")
                 append("<w:body>")
                 append("<w:p><w:pPr><w:pStyle w:val=\"Title\"/></w:pPr><w:r><w:t>${escapeXml(inputFile.nameWithoutExtension)}</w:t></w:r></w:p>")
-                append("<w:p><w:r><w:t>Converted by MELD for Android • Total Pages: $pageCount</w:t></w:r></w:p>")
+                append("<w:p><w:r><w:t>Converted locally by MELD for Android • Pages: $pageCount • Text Pages: $pagesWithText</w:t></w:r></w:p>")
 
-                for (i in 0 until pageCount) {
-                    renderer.openPage(i).use { page ->
-                        append("<w:p><w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr><w:r><w:t>Page ${i + 1}</w:t></w:r></w:p>")
-                        append("<w:p><w:r><w:t>Dimensions: ${page.width}x${page.height} pt — Text stream structured by MELD</w:t></w:r></w:p>")
+                pageMetas.forEachIndexed { idx, meta ->
+                    append("<w:p><w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr><w:r><w:t>Page ${idx + 1} (${meta.widthPt}×${meta.heightPt} pt)</w:t></w:r></w:p>")
+                    if (meta.text.isNotBlank()) {
+                        meta.text.lines().forEach { line ->
+                            val cleanLine = escapeXml(line)
+                            if (cleanLine.isNotEmpty()) {
+                                append("<w:p><w:r><w:t xml:space=\"preserve\">$cleanLine</w:t></w:r></w:p>")
+                            }
+                        }
+                    } else {
+                        append("<w:p><w:r><w:t>No selectable text layer detected on this page (scanned or vector artwork).</w:t></w:r></w:p>")
                     }
                 }
 
@@ -906,33 +1015,39 @@ object DocumentEngine {
             zos.closeEntry()
         }
 
-        return "Converted $pageCount page(s) into Microsoft Word (.docx)"
+        return "Converted $pageCount page(s) into Microsoft Word (.docx, $pagesWithText with text)"
     }
 
     /**
-     * Extracts plain text manifest & page layout info from PDF.
+     * Extracts plain text per page from the input PDF.
      */
     fun extractPdfPlainText(inputFile: File, outputFile: File): String {
         var pageCount = 0
+        var pagesWithText = 0
 
         val text = buildString {
             withPdfRenderer(inputFile) { renderer, total ->
                 pageCount = total
-                append("=== MELD PDF TEXT MANIFEST ===\n")
+                val pageMetas = extractPageTextsWithMeta(inputFile, renderer, total)
+                pagesWithText = pageMetas.count { it.text.isNotBlank() }
+
+                append("=== MELD PDF TEXT EXTRACTION ===\n")
                 append("Source: ${inputFile.name}\n")
-                append("Pages: $pageCount\n")
+                append("Pages: $pageCount (with text: $pagesWithText)\n")
                 append("Size: ${inputFile.length() / 1024} KB\n\n")
-                for (i in 0 until pageCount) {
-                    renderer.openPage(i).use { page ->
-                        append("--- PAGE ${i + 1} OF $pageCount [${page.width}x${page.height}] ---\n")
-                        append("Structured content extracted and verified offline.\n\n")
+                pageMetas.forEachIndexed { idx, meta ->
+                    append("--- PAGE ${idx + 1} OF $pageCount [${meta.widthPt}x${meta.heightPt}] ---\n")
+                    if (meta.text.isNotBlank()) {
+                        append(meta.text).append("\n\n")
+                    } else {
+                        append("(No selectable text layer detected on this page)\n\n")
                     }
                 }
             }
         }
 
         outputFile.writeText(text)
-        return "Extracted plain text summary from $pageCount page(s)"
+        return "Extracted text from $pagesWithText of $pageCount page(s)"
     }
 
     /**
