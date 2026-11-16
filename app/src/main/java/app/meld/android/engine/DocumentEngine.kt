@@ -65,7 +65,12 @@ object DocumentEngine {
      * Stamps a diagonal security watermark across every page of the input PDF
      * and flattens pages so watermark annotations cannot be stripped easily.
      */
-    fun stampWatermark(inputFile: File, outputFile: File, watermarkText: String): String {
+    fun stampWatermark(
+        inputFile: File,
+        outputFile: File,
+        watermarkText: String,
+        onProgress: ((Int, Int) -> Unit)? = null
+    ): String {
         val outDoc = PdfDocument()
         val labelText = watermarkText.trim().ifBlank { "CONFIDENTIAL" }.uppercase()
 
@@ -92,6 +97,7 @@ object DocumentEngine {
             withPdfRenderer(inputFile) { renderer, total ->
                 pageCount = total
                 for (i in 0 until total) {
+                    onProgress?.invoke(i + 1, total)
                     val (width, height) = renderer.openPage(i).use { page ->
                         val (w, h) = boundedDimensions(page.width, page.height, A4_WIDTH, A4_HEIGHT)
                         val pageInfo = PdfDocument.PageInfo.Builder(w, h, i + 1).create()
@@ -141,7 +147,12 @@ object DocumentEngine {
     /**
      * Creates a 2-up, 3-up (with ruled student notes lines), or 4-up grid handout PDF.
      */
-    fun buildHandoutPdf(inputFile: File, outputFile: File, pagesPerSheet: Int): String {
+    fun buildHandoutPdf(
+        inputFile: File,
+        outputFile: File,
+        pagesPerSheet: Int,
+        onProgress: ((Int, Int) -> Unit)? = null
+    ): String {
         val outDoc = PdfDocument()
 
         val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -177,6 +188,7 @@ object DocumentEngine {
                 sheetCount = ceil(totalSourcePages / perSheet.toDouble()).toInt().coerceAtLeast(1)
                 var sourceIndex = 0
                 for (sheetIdx in 0 until sheetCount) {
+                    onProgress?.invoke(sheetIdx + 1, sheetCount)
                     val pageInfo = PdfDocument.PageInfo.Builder(A4_WIDTH, A4_HEIGHT, sheetIdx + 1).create()
                     val outPage = outDoc.startPage(pageInfo)
                     val canvas = outPage.canvas
@@ -278,7 +290,13 @@ object DocumentEngine {
     /**
      * Extracts a specific page range into a new standalone PDF.
      */
-    fun extractPageRange(inputFile: File, outputFile: File, startPage1Based: Int, endPage1Based: Int): String {
+    fun extractPageRange(
+        inputFile: File,
+        outputFile: File,
+        startPage1Based: Int,
+        endPage1Based: Int,
+        onProgress: ((Int, Int) -> Unit)? = null
+    ): String {
         val outDoc = PdfDocument()
         var total = 0
         var startIdx = 0
@@ -291,7 +309,9 @@ object DocumentEngine {
                 endIdx = (endPage1Based - 1).coerceIn(startIdx, max(0, total - 1))
 
                 var outPageNum = 1
+                val sliceCount = (endIdx - startIdx + 1).coerceAtLeast(1)
                 for (i in startIdx..endIdx) {
+                    onProgress?.invoke(outPageNum, sliceCount)
                     renderer.openPage(i).use { page ->
                         val (width, height) = boundedDimensions(page.width, page.height, A4_WIDTH, A4_HEIGHT)
                         val pageInfo = PdfDocument.PageInfo.Builder(width, height, outPageNum++).create()
@@ -327,7 +347,8 @@ object DocumentEngine {
     fun redactAndFlattenPdf(
         inputFile: File,
         outputFile: File,
-        redactionZones: List<RedactionRect>
+        redactionZones: List<RedactionRect>,
+        onProgress: ((Int, Int) -> Unit)? = null
     ): String {
         require(redactionZones.isNotEmpty()) {
             "Select at least one redaction region before sanitizing."
@@ -359,6 +380,7 @@ object DocumentEngine {
             withPdfRenderer(inputFile) { renderer, pageCount ->
                 total = pageCount
                 for (i in 0 until total) {
+                    onProgress?.invoke(i + 1, total)
                     val bmp = renderer.openPage(i).use { page ->
                         val (width, height) = boundedDimensions(page.width, page.height, A4_WIDTH, A4_HEIGHT)
                         val pageBmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
@@ -439,7 +461,8 @@ object DocumentEngine {
         outputFile: File,
         format: String = "png",
         allPages: Boolean = true,
-        singlePage1Based: Int = 1
+        singlePage1Based: Int = 1,
+        onProgress: ((Int, Int) -> Unit)? = null
     ): PdfImageExportResult {
         val isJpeg = format.equals("jpg", ignoreCase = true) || format.equals("jpeg", ignoreCase = true)
         val compressFormat = if (isJpeg) Bitmap.CompressFormat.JPEG else Bitmap.CompressFormat.PNG
@@ -481,6 +504,7 @@ object DocumentEngine {
                     val baseName = inputFile.nameWithoutExtension.ifBlank { "document" }
                     ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile))).use { zos ->
                         for (i in 0 until total) {
+                            onProgress?.invoke(i + 1, total)
                             renderer.openPage(i).use { page ->
                                 val rawW = (max(1, page.width) * 2.0f).toInt()
                                 val rawH = (max(1, page.height) * 2.0f).toInt()
@@ -533,7 +557,12 @@ object DocumentEngine {
     /**
      * Compresses PDF pages down to target KB by scaling and quality control.
      */
-    fun compressPdf(inputFile: File, outputFile: File, targetKb: Int): String {
+    fun compressPdf(
+        inputFile: File,
+        outputFile: File,
+        targetKb: Int,
+        onProgress: ((Int, Int) -> Unit)? = null
+    ): String {
         val targetBytesTotal = max(10, targetKb) * 1024L
         var pageCount = 0
         var alreadyWithinTarget = false
@@ -567,6 +596,7 @@ object DocumentEngine {
                 val stream = ByteArrayOutputStream()
 
                 for (i in 0 until pageCount) {
+                    onProgress?.invoke(i + 1, pageCount)
                     val compressedBytes = renderer.openPage(i).use { page ->
                         val rawW = max(120, (max(1, page.width) * scaleFactor).toInt())
                         val rawH = max(160, (max(1, page.height) * scaleFactor).toInt())
@@ -633,7 +663,11 @@ object DocumentEngine {
      * Rebuilds PDF pages cleanly and blanks out Skia /Producer & date Info strings
      * in-place without shifting PDF xref byte offsets.
      */
-    fun stripPdfMetadata(inputFile: File, outputFile: File): String {
+    fun stripPdfMetadata(
+        inputFile: File,
+        outputFile: File,
+        onProgress: ((Int, Int) -> Unit)? = null
+    ): String {
         val outDoc = PdfDocument()
         var pageCount = 0
         val memOut = ByteArrayOutputStream()
@@ -642,6 +676,7 @@ object DocumentEngine {
             withPdfRenderer(inputFile) { renderer, total ->
                 pageCount = total
                 for (i in 0 until pageCount) {
+                    onProgress?.invoke(i + 1, pageCount)
                     val bmp = renderer.openPage(i).use { page ->
                         val (w, h) = boundedDimensions(page.width, page.height)
                         val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
@@ -712,7 +747,11 @@ object DocumentEngine {
      * Merges 2+ PDF files in order into a unified multi-page PDF document,
      * preserving each page's aspect ratio within safe raster bounds.
      */
-    fun mergePdfs(inputFiles: List<File>, outputFile: File): String {
+    fun mergePdfs(
+        inputFiles: List<File>,
+        outputFile: File,
+        onProgress: ((Int, Int) -> Unit)? = null
+    ): String {
         require(inputFiles.size >= 2) {
             "Select at least 2 PDF files to merge."
         }
@@ -727,7 +766,8 @@ object DocumentEngine {
         var success = false
 
         try {
-            for (inputFile in inputFiles) {
+            inputFiles.forEachIndexed { fileIdx, inputFile ->
+                onProgress?.invoke(fileIdx + 1, inputFiles.size)
                 withPdfRenderer(inputFile) { renderer, total ->
                     for (i in 0 until total) {
                         val bmp = renderer.openPage(i).use { page ->
@@ -886,7 +926,11 @@ object DocumentEngine {
     /**
      * Converts PDF to a self-contained dark-mode HTML5 reader with extracted text and page previews.
      */
-    fun convertPdfToHtml(inputFile: File, outputFile: File): String {
+    fun convertPdfToHtml(
+        inputFile: File,
+        outputFile: File,
+        onProgress: ((Int, Int) -> Unit)? = null
+    ): String {
         var pageCount = 0
         var renderedImages = 0
         val safeTitle = escapeXml(inputFile.nameWithoutExtension)
@@ -925,6 +969,7 @@ object DocumentEngine {
                 """.trimIndent())
 
                 pageMetas.forEachIndexed { i, meta ->
+                    onProgress?.invoke(i + 1, pageCount)
                     append("""
                       <div class="card">
                         <span class="badge">PAGE ${i + 1} OF $pageCount</span>

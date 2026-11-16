@@ -24,6 +24,8 @@ import app.meld.android.model.ConversionResult
 import app.meld.android.model.MeldCategory
 import app.meld.android.model.MeldMode
 import app.meld.android.model.MeldToolId
+import app.meld.android.model.ProcessingProgress
+import app.meld.android.model.ProgressUnit
 import app.meld.android.model.SelectedFileInfo
 import app.meld.android.model.ToolOptions
 import kotlinx.coroutines.CancellationException
@@ -71,6 +73,7 @@ data class MeldUiState(
     val isSelectedFileSample: Boolean = true,
     val options: ToolOptions = ToolOptions(),
     val isProcessing: Boolean = false,
+    val processingProgress: ProcessingProgress? = null,
     val showFileSheet: Boolean = false,
     val bannerMessage: String? = null,
     val isBannerError: Boolean = false,
@@ -143,6 +146,7 @@ class MeldViewModel : ViewModel() {
                 activeTab = tab,
                 route = MeldScreenRoute.Home,
                 isProcessing = false,
+                processingProgress = null,
                 bannerMessage = null,
                 isBannerError = false
             )
@@ -171,6 +175,7 @@ class MeldViewModel : ViewModel() {
             it.copy(
                 route = MeldScreenRoute.Home,
                 isProcessing = false,
+                processingProgress = null,
                 bannerMessage = null,
                 isBannerError = false
             )
@@ -672,7 +677,26 @@ class MeldViewModel : ViewModel() {
         val opts = current.options
 
         activeToolJob = viewModelScope.launch {
-            _uiState.update { it.copy(isProcessing = true, bannerMessage = null, isBannerError = false) }
+            _uiState.update {
+                it.copy(
+                    isProcessing = true,
+                    processingProgress = null,
+                    bannerMessage = null,
+                    isBannerError = false
+                )
+            }
+
+            val reportProgress: (ProgressUnit, Int, Int) -> Unit = { unit, done, total ->
+                val safeTotal = total.coerceAtLeast(1)
+                val safeDone = done.coerceIn(1, safeTotal)
+                _uiState.update { state ->
+                    if (state.isProcessing) {
+                        state.copy(processingProgress = ProcessingProgress(safeDone, safeTotal, unit))
+                    } else {
+                        state
+                    }
+                }
+            }
 
             val outcome = runCatching {
                 withContext(Dispatchers.IO) {
@@ -743,7 +767,9 @@ class MeldViewModel : ViewModel() {
                                 .take(MeldToolId.COLLAGE.maxBatchCount)
                                 .ifEmpty { listOf(ensureImageInput(context, inputFile)) }
                             batchRecordedInputSize = inputs.sumOf { it.length() }
-                            ImageEngine.createPhotoCollage(inputs, outFile)
+                            ImageEngine.createPhotoCollage(inputs, outFile) { cur, tot ->
+                                reportProgress(ProgressUnit.PHOTO, cur, tot)
+                            }
                         }
                         MeldToolId.STRIP_EXIF -> {
                             val imgFile = ensureImageInput(context, inputFile)
@@ -773,7 +799,8 @@ class MeldViewModel : ViewModel() {
                                 outputFile = actualOutFile,
                                 format = format,
                                 allPages = exportAll,
-                                singlePage1Based = opts.pdfImagePage
+                                singlePage1Based = opts.pdfImagePage,
+                                onProgress = { cur, tot -> reportProgress(ProgressUnit.PAGE, cur, tot) }
                             ).summary
                         }
                         MeldToolId.PDF_TO_MD -> {
@@ -782,7 +809,9 @@ class MeldViewModel : ViewModel() {
                         }
                         MeldToolId.PDF_TO_HTML -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
-                            DocumentEngine.convertPdfToHtml(pdfFile, outFile)
+                            DocumentEngine.convertPdfToHtml(pdfFile, outFile) { cur, tot ->
+                                reportProgress(ProgressUnit.PAGE, cur, tot)
+                            }
                         }
                         MeldToolId.PDF_TO_DOCX -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
@@ -796,19 +825,27 @@ class MeldViewModel : ViewModel() {
                         // PDF Tools
                         MeldToolId.COMPRESS_PDF -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
-                            DocumentEngine.compressPdf(pdfFile, outFile, opts.targetKb)
+                            DocumentEngine.compressPdf(pdfFile, outFile, opts.targetKb) { cur, tot ->
+                                reportProgress(ProgressUnit.PAGE, cur, tot)
+                            }
                         }
                         MeldToolId.HANDOUT -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
-                            DocumentEngine.buildHandoutPdf(pdfFile, outFile, opts.handoutPagesPerSheet)
+                            DocumentEngine.buildHandoutPdf(pdfFile, outFile, opts.handoutPagesPerSheet) { cur, tot ->
+                                reportProgress(ProgressUnit.PAGE, cur, tot)
+                            }
                         }
                         MeldToolId.LOCK_STAMP -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
-                            DocumentEngine.stampWatermark(pdfFile, outFile, opts.stampText)
+                            DocumentEngine.stampWatermark(pdfFile, outFile, opts.stampText) { cur, tot ->
+                                reportProgress(ProgressUnit.PAGE, cur, tot)
+                            }
                         }
                         MeldToolId.REDACT -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
-                            DocumentEngine.redactAndFlattenPdf(pdfFile, outFile, opts.redactionZones)
+                            DocumentEngine.redactAndFlattenPdf(pdfFile, outFile, opts.redactionZones) { cur, tot ->
+                                reportProgress(ProgressUnit.PAGE, cur, tot)
+                            }
                         }
                         MeldToolId.PDF_EXTRACT -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
@@ -817,7 +854,9 @@ class MeldViewModel : ViewModel() {
                                 outFile,
                                 opts.pageRangeStart,
                                 opts.pageRangeEnd
-                            )
+                            ) { cur, tot ->
+                                reportProgress(ProgressUnit.PAGE, cur, tot)
+                            }
                         }
                         MeldToolId.PDF_MERGE -> {
                             val pdfInputs = current.stagedBatchFiles
@@ -828,11 +867,15 @@ class MeldViewModel : ViewModel() {
                                 context.getString(R.string.vm_err_merge_need_two)
                             }
                             batchRecordedInputSize = pdfInputs.sumOf { it.length() }
-                            DocumentEngine.mergePdfs(pdfInputs, outFile)
+                            DocumentEngine.mergePdfs(pdfInputs, outFile) { cur, tot ->
+                                reportProgress(ProgressUnit.PDF_FILE, cur, tot)
+                            }
                         }
                         MeldToolId.STRIP_PDF_META -> {
                             val pdfFile = ensurePdfInput(context, inputFile)
-                            DocumentEngine.stripPdfMetadata(pdfFile, outFile)
+                            DocumentEngine.stripPdfMetadata(pdfFile, outFile) { cur, tot ->
+                                reportProgress(ProgressUnit.PAGE, cur, tot)
+                            }
                         }
 
                         // Audio, Tables & Archive
@@ -870,7 +913,9 @@ class MeldViewModel : ViewModel() {
                                     listOf(MediaEngine.ZipInputEntry(fallback, fallback.name))
                                 }
                             batchRecordedInputSize = zipInputs.sumOf { it.file.length() }
-                            MediaEngine.packEntriesToZip(zipInputs, outFile)
+                            MediaEngine.packEntriesToZip(zipInputs, outFile) { cur, tot ->
+                                reportProgress(ProgressUnit.ARCHIVE_FILE, cur, tot)
+                            }
                         }
 
                         // PPTX & Slides Studio
@@ -879,7 +924,8 @@ class MeldViewModel : ViewModel() {
                             val res = PptxEngine.convertPptxToPdf(
                                 pptxFile,
                                 outFile,
-                                fontCacheDir = context.cacheDir
+                                fontCacheDir = context.cacheDir,
+                                onProgress = { cur, tot -> reportProgress(ProgressUnit.SLIDE, cur, tot) }
                             )
                             if (res.embeddedFontsUsed > 0) {
                                 context.getString(
@@ -921,7 +967,8 @@ class MeldViewModel : ViewModel() {
                                 format = fmt,
                                 allSlides = exportAll,
                                 singleSlide1Based = opts.pptxImageSlide,
-                                fontCacheDir = context.cacheDir
+                                fontCacheDir = context.cacheDir,
+                                onProgress = { cur, tot -> reportProgress(ProgressUnit.SLIDE, cur, tot) }
                             )
                             when {
                                 res.isZipArchive -> context.getString(
@@ -962,7 +1009,8 @@ class MeldViewModel : ViewModel() {
                                 pptxFile,
                                 outFile,
                                 slidesPerPage = opts.handoutPagesPerSheet,
-                                fontCacheDir = context.cacheDir
+                                fontCacheDir = context.cacheDir,
+                                onProgress = { cur, tot -> reportProgress(ProgressUnit.PAGE, cur, tot) }
                             )
                             context.getString(
                                 R.string.vm_pptx_handout_built,
@@ -1004,7 +1052,7 @@ class MeldViewModel : ViewModel() {
             outcome.onSuccess { result ->
                 // Respect user navigation away / cancellation cleanly
                 if (_uiState.value.route !is MeldScreenRoute.Task) {
-                    _uiState.update { it.copy(isProcessing = false) }
+                    _uiState.update { it.copy(isProcessing = false, processingProgress = null) }
                     return@launch
                 }
                 val autoSavedPath = if (current.defaultSaveToDownloads) {
@@ -1013,6 +1061,7 @@ class MeldViewModel : ViewModel() {
                 _uiState.update { state ->
                     state.copy(
                         isProcessing = false,
+                        processingProgress = null,
                         route = MeldScreenRoute.Result(result),
                         recentResults = (listOf(result) + state.recentResults).take(12),
                         bannerMessage = autoSavedPath?.let { context.getString(R.string.vm_auto_saved_to, it) },
@@ -1021,12 +1070,13 @@ class MeldViewModel : ViewModel() {
                 }
             }.onFailure { err ->
                 if (err is CancellationException) {
-                    _uiState.update { it.copy(isProcessing = false) }
+                    _uiState.update { it.copy(isProcessing = false, processingProgress = null) }
                     return@launch
                 }
                 _uiState.update {
                     it.copy(
                         isProcessing = false,
+                        processingProgress = null,
                         bannerMessage = err.message ?: context.getString(
                             R.string.vm_err_running_tool,
                             context.getString(tool.titleRes)

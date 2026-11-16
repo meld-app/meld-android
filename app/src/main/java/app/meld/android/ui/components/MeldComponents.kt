@@ -422,7 +422,7 @@ fun TactilePillButton(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .padding(horizontal = 16.dp, vertical = 9.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     customContent()

@@ -610,4 +610,12 @@ class MeldEngineUnitTest {
         assertTrue(pages[0].contains("Local Extraction"))
         assertEquals("MELD 2", pages[1])
     }
+
+    @Test
+    fun processingProgress_clampsFractionSafelyAcrossBounds() {
+        assertEquals(0f, app.meld.android.model.ProcessingProgress(1, 0).fraction, 0.0001f)
+        assertEquals(0f, app.meld.android.model.ProcessingProgress(-2, 4).fraction, 0.0001f)
+        assertEquals(0.5f, app.meld.android.model.ProcessingProgress(2, 4).fraction, 0.0001f)
+        assertEquals(1f, app.meld.android.model.ProcessingProgress(7, 4).fraction, 0.0001f)
+    }
 }

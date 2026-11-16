@@ -86,6 +86,7 @@ object PptxEngine {
         inputFile: File,
         outputFile: File,
         fontCacheDir: File = outputFile.parentFile ?: inputFile.parentFile ?: File("."),
+        onProgress: ((Int, Int) -> Unit)? = null,
     ): PptxPdfRenderSummary {
         val presentation = PptxOoxmlParser.parse(inputFile)
         if (presentation.slides.isEmpty()) {
@@ -97,7 +98,9 @@ object PptxEngine {
         try {
             ZipFile(inputFile).use { zip ->
                 PptxFontResolver(fontCacheDir, zip, presentation.embeddedFonts).use { fontResolver ->
+                    val totalSlides = presentation.slides.size
                     for (slide in presentation.slides) {
+                        onProgress?.invoke(slide.index1Based, totalSlides)
                         val pageW = slide.widthPt.roundToInt().coerceIn(72, 4320)
                         val pageH = slide.heightPt.roundToInt().coerceIn(72, 4320)
                         val pageInfo = PdfDocument.PageInfo.Builder(pageW, pageH, slide.index1Based).create()
@@ -189,6 +192,7 @@ object PptxEngine {
         singleSlide1Based: Int = 1,
         quality: Int = 92,
         fontCacheDir: File = outputFile.parentFile ?: inputFile.parentFile ?: File("."),
+        onProgress: ((Int, Int) -> Unit)? = null,
     ): PptxImageExportSummary {
         val presentation = PptxOoxmlParser.parse(inputFile)
         if (presentation.slides.isEmpty()) {
@@ -233,6 +237,7 @@ object PptxEngine {
                         val baseName = inputFile.nameWithoutExtension.ifBlank { "deck" }
                         ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile))).use { zos ->
                             presentation.slides.forEachIndexed { idx, slide ->
+                                onProgress?.invoke(idx + 1, total)
                                 val bitmap = renderSlideToBitmap(zip, slide, fontResolver)
                                 try {
                                     zos.putNextEntry(ZipEntry(buildPptxSlideEntryName(baseName, idx, total, ext)))
@@ -299,6 +304,7 @@ object PptxEngine {
         outputFile: File,
         slidesPerPage: Int = 2,
         fontCacheDir: File = outputFile.parentFile ?: inputFile.parentFile ?: File("."),
+        onProgress: ((Int, Int) -> Unit)? = null,
     ): PptxPdfRenderSummary {
         val perPage = when (slidesPerPage) {
             3 -> 3
@@ -341,6 +347,7 @@ object PptxEngine {
                     val totalSheets = chunks.size
 
                     chunks.forEachIndexed { sheetIdx, chunk ->
+                        onProgress?.invoke(sheetIdx + 1, totalSheets)
                         val pageInfo = PdfDocument.PageInfo.Builder(sheetW, sheetH, sheetIdx + 1).create()
                         val page = pdf.startPage(pageInfo)
                         val canvas = page.canvas

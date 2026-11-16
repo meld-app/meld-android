@@ -323,7 +323,11 @@ object ImageEngine {
      * Creates a multi-photo studio grid collage (2x1, 2x2, 3x2, or 3x3) from 1-9 images,
      * center-cropping each photo into square studio cells without stretching.
      */
-    fun createPhotoCollage(inputFiles: List<File>, outputFile: File): String {
+    fun createPhotoCollage(
+        inputFiles: List<File>,
+        outputFile: File,
+        onProgress: ((Int, Int) -> Unit)? = null
+    ): String {
         val batch = inputFiles.take(9)
         require(batch.isNotEmpty()) { "Select at least 1 image for collage." }
         batch.forEach { file ->
@@ -395,6 +399,7 @@ object ImageEngine {
                         (top + cellSize).toFloat()
                     )
                     if (slotIdx < batch.size) {
+                        onProgress?.invoke(slotIdx + 1, batch.size)
                         val photo = decodeNormalizedBitmap(batch[slotIdx], maxDimension = cellSize * 2)
                         try {
                             val crop = computeCenterCropBounds(photo.width, photo.height)

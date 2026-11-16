@@ -7,6 +7,7 @@ import app.meld.android.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -67,6 +68,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -84,6 +86,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.meld.android.model.ConversionResult
 import app.meld.android.model.MeldToolId
+import app.meld.android.model.ProgressUnit
 import app.meld.android.model.RedactionRect
 import app.meld.android.model.SelectedFileInfo
 import app.meld.android.ui.MeldAdaptiveLayout
@@ -474,22 +477,64 @@ fun MeldTaskScreen(
                 modifier = Modifier.fillMaxWidth(),
                 customContent = if (uiState.isProcessing) {
                     {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
+                        val progress = uiState.processingProgress
+                        val statusText = when {
+                            progress == null || progress.total <= 1 -> stringResource(R.string.working_on_it)
+                            progress.unit == ProgressUnit.SLIDE ->
+                                stringResource(R.string.working_progress_slides, progress.current, progress.total)
+                            progress.unit == ProgressUnit.PHOTO ->
+                                stringResource(R.string.working_progress_photos, progress.current, progress.total)
+                            progress.unit == ProgressUnit.PDF_FILE ->
+                                stringResource(R.string.working_progress_pdfs, progress.current, progress.total)
+                            progress.unit == ProgressUnit.ARCHIVE_FILE ->
+                                stringResource(R.string.working_progress_files, progress.current, progress.total)
+                            else ->
+                                stringResource(R.string.working_progress_pages, progress.current, progress.total)
+                        }
+                        val animatedFraction by animateFloatAsState(
+                            targetValue = progress?.fraction ?: 0f,
+                            animationSpec = tween(durationMillis = 160, easing = MeldMotion.EaseOut),
+                            label = "taskProgressBar"
+                        )
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.4.dp,
-                                color = colors.inkOnAccent
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = stringResource(R.string.working_on_it),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.inkOnAccent
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    strokeWidth = 2.2.dp,
+                                    color = colors.textPrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = statusText,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = "tnum"),
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.textPrimary
+                                )
+                            }
+                            if (progress != null && progress.total > 1) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth(0.72f)
+                                        .height(3.dp)
+                                        .clip(RoundedCornerShape(1.5.dp))
+                                        .background(colors.textPrimary.copy(alpha = 0.22f))
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(animatedFraction)
+                                            .height(3.dp)
+                                            .clip(RoundedCornerShape(1.5.dp))
+                                            .background(colors.textPrimary)
+                                    )
+                                }
+                            }
                         }
                     }
                 } else null
