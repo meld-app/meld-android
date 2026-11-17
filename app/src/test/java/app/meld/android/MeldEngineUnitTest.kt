@@ -666,4 +666,10 @@ class MeldEngineUnitTest {
         assertEquals(added.quickTools, restored.quickTools)
         assertEquals(added.gridTools, restored.gridTools)
     }
+
+    @Test
+    fun imageToPdf_supportsBatchQueueUpToTwelvePhotos() {
+        assertTrue(MeldToolId.IMG_TO_PDF.supportsBatchQueue)
+        assertEquals(12, MeldToolId.IMG_TO_PDF.maxBatchCount)
+    }
 }

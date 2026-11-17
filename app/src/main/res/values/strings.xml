@@ -291,7 +291,7 @@
 
     <string name="tool_img_to_pdf_title">Image to PDF</string>
     <string name="tool_img_to_pdf_badge">A4 PDF</string>
-    <string name="tool_img_to_pdf_subtitle">Center an image cleanly onto a print-ready A4 page</string>
+    <string name="tool_img_to_pdf_subtitle">Center 1–12 images cleanly onto print-ready A4 PDF pages</string>
     <string name="tool_img_to_pdf_cta">Create PDF</string>
     <string name="tool_img_to_pdf_result">PDF ready.</string>
 
@@ -448,15 +448,19 @@
     <!-- Batch Queue Controls -->
     <string name="batch_queue_header_merge">PDF MERGE QUEUE</string>
     <string name="batch_queue_header_collage">PHOTO COLLAGE QUEUE</string>
+    <string name="batch_queue_header_img_pdf">IMAGE TO PDF QUEUE</string>
     <string name="batch_queue_header_zip">ARCHIVE QUEUE</string>
     <string name="batch_summary_merge_single">1 PDF · %1$d pages total</string>
     <string name="batch_summary_merge">%1$d PDFs · %2$d pages total</string>
     <string name="batch_summary_collage_single">1 photo · 2×2 studio repeat sheet</string>
     <string name="batch_summary_collage_multi">%1$d photos · %2$s studio grid</string>
+    <string name="batch_summary_img_pdf_single">1 photo · 1 centered A4 PDF page</string>
+    <string name="batch_summary_img_pdf_multi">%1$d photos · %1$d-page A4 PDF</string>
     <string name="batch_summary_zip">%1$d file(s) · %2$s total</string>
     <string name="batch_empty_merge">Pick 2 or more PDFs from storage (or add samples/recent files) in the order you want.</string>
     <string name="batch_need_one_more_pdf">Add at least 1 more PDF below to merge.</string>
     <string name="batch_empty_collage">Add 1–9 photos from storage to build a 2×1, 2×2, 3×2, or 3×3 grid.</string>
+    <string name="batch_empty_img_pdf">Add 1–12 photos to combine into a multi-page A4 PDF.</string>
     <string name="batch_empty_zip">Add one or more files of any type to bundle into one .zip archive.</string>
     <string name="batch_pick_pdfs">Pick PDFs</string>
     <string name="batch_pick_photos">Pick photos</string>
@@ -466,6 +470,7 @@
     <string name="batch_cta_merge_n">Merge %1$d PDFs</string>
     <string name="batch_cta_merge_need_two">Select 2+ PDFs to merge</string>
     <string name="batch_cta_collage_n">Build %1$d-photo collage</string>
+    <string name="batch_cta_img_to_pdf_n">Create %1$d-page PDF</string>
     <string name="batch_cta_zip_n">Pack %1$d files into ZIP</string>
     <string name="cd_move_up">Move up</string>
     <string name="cd_move_down">Move down</string>

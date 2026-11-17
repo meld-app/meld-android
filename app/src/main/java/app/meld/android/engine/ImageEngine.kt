@@ -168,53 +168,83 @@ object ImageEngine {
     }
 
     /**
-     * Centers image into a print-ready A4 vector PDF page.
+     * Combines 1–12 images sequentially onto print-ready A4 PDF pages.
      */
-    fun convertImageToPdf(inputFile: File, outputFile: File): String {
-        val bmp = decodeNormalizedBitmap(inputFile)
-        val bmpW: Int
-        val bmpH: Int
-        val doc = PdfDocument()
+    fun convertImagesToPdf(
+        inputFiles: List<File>,
+        outputFile: File,
+        onProgress: ((Int, Int) -> Unit)? = null
+    ): String {
+        val batch = inputFiles.filter { it.isFile }.take(12)
+        require(batch.isNotEmpty()) { "Select at least 1 image to convert to PDF." }
 
-        try {
-            bmpW = bmp.width
-            bmpH = bmp.height
-            val a4W = 595
-            val a4H = 842
-            val margin = 36f
-            val maxW = a4W - margin * 2f
-            val maxH = a4H - margin * 2f
-
-            val scale = min(maxW / max(1, bmpW), maxH / max(1, bmpH))
-            val renderW = max(1, (bmpW * scale).toInt())
-            val renderH = max(1, (bmpH * scale).toInt())
-            val left = margin + (maxW - renderW) / 2f
-            val top = margin + (maxH - renderH) / 2f
-
-            val pageInfo = PdfDocument.PageInfo.Builder(a4W, a4H, 1).create()
-            val page = doc.startPage(pageInfo)
-            val canvas = page.canvas
-            canvas.drawColor(Color.WHITE)
-
-            val destRect = RectF(left, top, left + renderW, top + renderH)
-            canvas.drawBitmap(bmp, null, destRect, null)
-
-            val borderPaint = Paint().apply {
-                color = Color.rgb(225, 230, 238)
-                style = Paint.Style.STROKE
-                strokeWidth = 1f
-            }
-            canvas.drawRect(destRect, borderPaint)
-
-            doc.finishPage(page)
-            FileOutputStream(outputFile).use { doc.writeTo(it) }
-        } finally {
-            runCatching { doc.close() }
-            bmp.recycle()
+        val a4W = 595
+        val a4H = 842
+        val margin = 36f
+        val maxW = a4W - margin * 2f
+        val maxH = a4H - margin * 2f
+        val borderPaint = Paint().apply {
+            color = Color.rgb(225, 230, 238)
+            style = Paint.Style.STROKE
+            strokeWidth = 1f
         }
 
-        return "Placed ${bmpW}x${bmpH} image onto centered A4 PDF page"
+        val doc = PdfDocument()
+        var firstW = 0
+        var firstH = 0
+        var success = false
+
+        try {
+            batch.forEachIndexed { idx, file ->
+                onProgress?.invoke(idx + 1, batch.size)
+                val bmp = decodeNormalizedBitmap(file)
+                try {
+                    val bmpW = bmp.width
+                    val bmpH = bmp.height
+                    if (idx == 0) {
+                        firstW = bmpW
+                        firstH = bmpH
+                    }
+                    val scale = min(maxW / max(1, bmpW), maxH / max(1, bmpH))
+                    val renderW = max(1, (bmpW * scale).toInt())
+                    val renderH = max(1, (bmpH * scale).toInt())
+                    val left = margin + (maxW - renderW) / 2f
+                    val top = margin + (maxH - renderH) / 2f
+
+                    val pageInfo = PdfDocument.PageInfo.Builder(a4W, a4H, idx + 1).create()
+                    val page = doc.startPage(pageInfo)
+                    val canvas = page.canvas
+                    canvas.drawColor(Color.WHITE)
+
+                    val destRect = RectF(left, top, left + renderW, top + renderH)
+                    canvas.drawBitmap(bmp, null, destRect, null)
+                    canvas.drawRect(destRect, borderPaint)
+                    doc.finishPage(page)
+                } finally {
+                    bmp.recycle()
+                }
+            }
+            FileOutputStream(outputFile).use { doc.writeTo(it) }
+            success = true
+        } finally {
+            runCatching { doc.close() }
+            if (!success && outputFile.exists()) {
+                outputFile.delete()
+            }
+        }
+
+        return if (batch.size == 1) {
+            "Placed ${firstW}x${firstH} image onto centered A4 PDF page"
+        } else {
+            "Combined ${batch.size} images into ${batch.size}-page A4 PDF"
+        }
     }
+
+    /**
+     * Centers image into a print-ready A4 vector PDF page.
+     */
+    fun convertImageToPdf(inputFile: File, outputFile: File): String =
+        convertImagesToPdf(listOf(inputFile), outputFile)
 
     /**
      * Scales image resolution by percent (recycling each stage promptly) and optionally adds a studio frame.

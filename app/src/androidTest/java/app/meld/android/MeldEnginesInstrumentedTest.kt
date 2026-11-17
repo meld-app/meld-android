@@ -160,6 +160,17 @@ class MeldEnginesInstrumentedTest {
         assertNotNull(collageBmp)
         assertTrue(collageBmp!!.width > 0 && collageBmp.height > 0)
         collageBmp.recycle()
+
+        val multiPdfOut = File(tempDir, "multi_photos.pdf")
+        val pdfProgress = mutableListOf<Pair<Int, Int>>()
+        ImageEngine.convertImagesToPdf(
+            listOf(sampleImage, sampleImage, sampleImage),
+            multiPdfOut
+        ) { cur, total ->
+            pdfProgress += cur to total
+        }
+        assertEquals(listOf(1 to 3, 2 to 3, 3 to 3), pdfProgress)
+        assertEquals(3, DocumentEngine.countPdfPages(multiPdfOut))
     }
 
     @Test

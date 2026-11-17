@@ -319,6 +319,7 @@ fun MeldTaskScreen(
 
                         MeldToolId.PDF_MERGE,
                         MeldToolId.COLLAGE,
+                        MeldToolId.IMG_TO_PDF,
                         MeldToolId.PACK_ZIP -> {
                             BatchQueueTaskControls(
                                 tool = tool,
@@ -437,6 +438,8 @@ fun MeldTaskScreen(
                 stringResource(R.string.batch_cta_merge_need_two)
             tool == MeldToolId.COLLAGE && batchFiles.size > 1 ->
                 stringResource(R.string.batch_cta_collage_n, minOf(batchFiles.size, tool.maxBatchCount))
+            tool == MeldToolId.IMG_TO_PDF && batchFiles.size > 1 ->
+                stringResource(R.string.batch_cta_img_to_pdf_n, minOf(batchFiles.size, tool.maxBatchCount))
             tool == MeldToolId.PACK_ZIP && batchFiles.size > 1 ->
                 stringResource(R.string.batch_cta_zip_n, batchFiles.size)
             isPdfImageTool && effectivePdfPages > 1 -> {
@@ -1259,16 +1262,18 @@ private fun BatchQueueTaskControls(
     val cardColor = when (tool) {
         MeldToolId.PDF_MERGE -> colors.periwinkle
         MeldToolId.COLLAGE -> colors.butter
+        MeldToolId.IMG_TO_PDF -> colors.mint
         else -> colors.lavender
     }
     val headerRes = when (tool) {
         MeldToolId.PDF_MERGE -> R.string.batch_queue_header_merge
         MeldToolId.COLLAGE -> R.string.batch_queue_header_collage
+        MeldToolId.IMG_TO_PDF -> R.string.batch_queue_header_img_pdf
         else -> R.string.batch_queue_header_zip
     }
     val pickLabelRes = when (tool) {
         MeldToolId.PDF_MERGE -> R.string.batch_pick_pdfs
-        MeldToolId.COLLAGE -> R.string.batch_pick_photos
+        MeldToolId.COLLAGE, MeldToolId.IMG_TO_PDF -> R.string.batch_pick_photos
         else -> R.string.batch_pick_files
     }
     val statusLine = when (tool) {
@@ -1282,6 +1287,11 @@ private fun BatchQueueTaskControls(
             )
         }
         MeldToolId.COLLAGE -> batchSummaryForCollage(stagedFiles.size)
+        MeldToolId.IMG_TO_PDF -> when {
+            stagedFiles.isEmpty() -> stringResource(R.string.batch_empty_img_pdf)
+            stagedFiles.size == 1 -> stringResource(R.string.batch_summary_img_pdf_single)
+            else -> stringResource(R.string.batch_summary_img_pdf_multi, stagedFiles.size)
+        }
         else -> if (stagedFiles.isEmpty()) {
             stringResource(R.string.batch_empty_zip)
         } else {
@@ -1301,7 +1311,7 @@ private fun BatchQueueTaskControls(
                     conv.outputFile.absolutePath !in stagedPaths &&
                     when (tool) {
                         MeldToolId.PDF_MERGE -> conv.outputFile.extension.equals("pdf", ignoreCase = true)
-                        MeldToolId.COLLAGE -> tool.acceptsExtension(conv.outputFile.extension)
+                        MeldToolId.COLLAGE, MeldToolId.IMG_TO_PDF -> tool.acceptsExtension(conv.outputFile.extension)
                         MeldToolId.PACK_ZIP -> true
                         else -> false
                     }
@@ -1321,7 +1331,7 @@ private fun BatchQueueTaskControls(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 when (tool) {
-                    MeldToolId.PDF_MERGE -> MergeBookletStage()
+                    MeldToolId.PDF_MERGE, MeldToolId.IMG_TO_PDF -> MergeBookletStage()
                     MeldToolId.COLLAGE -> CollageGridAssembleStage()
                     else -> ZipPackStage()
                 }

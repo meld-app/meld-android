@@ -477,12 +477,12 @@ enum class MeldToolId(
     );
 
     val supportsBatchQueue: Boolean
-        get() = this == PDF_MERGE || this == COLLAGE || this == PACK_ZIP
+        get() = this == PDF_MERGE || this == COLLAGE || this == PACK_ZIP || this == IMG_TO_PDF
 
     val maxBatchCount: Int
         get() = when (this) {
             COLLAGE -> 9
-            PDF_MERGE, PACK_ZIP -> 12
+            PDF_MERGE, PACK_ZIP, IMG_TO_PDF -> 12
             else -> 1
         }
 
