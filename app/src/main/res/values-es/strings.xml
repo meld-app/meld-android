@@ -256,6 +256,8 @@
     <string name="vm_pptx_single_slide_rendered">Diapositiva %1$d de %2$d renderizada a %3$s sin alterar la presentación</string>
     <string name="vm_pptx_handout_built">Folleto %1$d por hoja creado con %2$d diapositivas</string>
     <string name="vm_pptx_text_extracted">Extraídas %1$d diapositivas (%2$d tablas, %3$d notas)</string>
+    <string name="vm_pptx_html_exported">Lector HTML5 creado (%1$d diapositivas, %2$d tablas, %3$d notas)</string>
+    <string name="vm_pptx_docx_exported">%1$d diapositivas convertidas a Word .docx (%2$d tablas, %3$d notas)</string>
     <string name="vm_pptx_sanitized">Limpiadas %1$d diapositivas (%2$d XML/medios intactos, %3$d notas eliminadas)</string>
     <string name="vm_err_merge_need_two">Añade al menos 2 archivos PDF para combinarlos en uno solo.</string>
     <string name="vm_batch_added_one">Añadido %1$s a la cola</string>
@@ -501,6 +503,18 @@
     <string name="tool_pptx_to_jpg_subtitle">Guarda todas (.zip) o una diapositiva en imagen JPEG de alta calidad</string>
     <string name="tool_pptx_to_jpg_cta">Exportar JPG</string>
     <string name="tool_pptx_to_jpg_result">JPEG de diapositiva listo.</string>
+
+    <string name="tool_pptx_to_html_title">PPTX a HTML5</string>
+    <string name="tool_pptx_to_html_badge">Web Deck</string>
+    <string name="tool_pptx_to_html_subtitle">Crea un lector HTML5 sin conexión con vistas y notas del orador</string>
+    <string name="tool_pptx_to_html_cta">Exportar HTML5</string>
+    <string name="tool_pptx_to_html_result">Lector HTML5 listo.</string>
+
+    <string name="tool_pptx_to_docx_title">PPTX a Word</string>
+    <string name="tool_pptx_to_docx_badge">DOCX</string>
+    <string name="tool_pptx_to_docx_subtitle">Exporta títulos, viñetas, tablas y notas del orador a .docx</string>
+    <string name="tool_pptx_to_docx_cta">Exportar a Word</string>
+    <string name="tool_pptx_to_docx_result">Archivo Word listo.</string>
 
     <string name="tool_pptx_to_md_title">PPTX a Markdown</string>
     <string name="tool_pptx_to_md_badge">Slide MD</string>

@@ -17,7 +17,7 @@ class MeldLocalizationResourcesTest {
     @Test
     fun allToolAndFilterEnumsBindNonZeroDistinctStringResources() {
         val tools = MeldToolId.entries
-        assertEquals(38, tools.size)
+        assertEquals(40, tools.size)
 
         tools.forEach { tool ->
             assertTrue("${tool.name} titleRes", tool.titleRes != 0)

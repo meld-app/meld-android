@@ -438,6 +438,32 @@ class PptxEngineUnitTest {
         assertTrue(app.meld.android.model.MeldToolId.PPTX_TO_JPG.followUpTools("zip").isEmpty())
     }
 
+    @Test
+    fun convertPptxToDocx_buildsValidOpenXmlDocumentWithSlideTextAndTables() {
+        val samplePptx = SampleFileFactory.createSamplePptx(tempFolder.root)
+        val beforeHash = sha256Hex(samplePptx)
+
+        val docxOut = File(tempFolder.root, "slides.docx")
+        val progress = mutableListOf<Pair<Int, Int>>()
+        val summary = PptxEngine.convertPptxToDocx(samplePptx, docxOut) { cur, tot ->
+            progress += cur to tot
+        }
+
+        assertEquals(beforeHash, sha256Hex(samplePptx))
+        assertEquals(3, summary.slideCount)
+        assertTrue(summary.tableCount >= 1)
+        assertTrue(summary.noteCount >= 1)
+        assertEquals(listOf(1 to 3, 2 to 3, 3 to 3), progress)
+        ZipFile(docxOut).use { zf ->
+            val xml = zf.getInputStream(zf.getEntry("word/document.xml"))
+                .bufferedReader(StandardCharsets.UTF_8)
+                .readText()
+            assertTrue(xml.contains("<w:tbl>"))
+            assertTrue(xml.contains("Speaker Notes:"))
+            assertTrue(xml.contains("Slide 1"))
+        }
+    }
+
     private fun buildSyntheticSfnt(magic: ByteArray, size: Int): ByteArray {
         val bytes = ByteArray(size) { (it * 3 + 7).toByte() }
         System.arraycopy(magic, 0, bytes, 0, 4)
