@@ -291,7 +291,7 @@
 
     <string name="tool_img_to_pdf_title">Imagen a PDF</string>
     <string name="tool_img_to_pdf_badge">PDF A4</string>
-    <string name="tool_img_to_pdf_subtitle">Centra una imagen limpiamente en una página A4 lista para imprimir</string>
+    <string name="tool_img_to_pdf_subtitle">Centra 1–12 imágenes limpiamente en páginas PDF A4 listas para imprimir</string>
     <string name="tool_img_to_pdf_cta">Crear PDF</string>
     <string name="tool_img_to_pdf_result">PDF listo.</string>
 
@@ -448,15 +448,19 @@
     <!-- Controles de cola por lotes -->
     <string name="batch_queue_header_merge">COLA PARA UNIR PDF</string>
     <string name="batch_queue_header_collage">COLA PARA COLLAGE</string>
+    <string name="batch_queue_header_img_pdf">COLA DE IMAGEN A PDF</string>
     <string name="batch_queue_header_zip">COLA DE ARCHIVO ZIP</string>
     <string name="batch_summary_merge_single">1 PDF · %1$d páginas en total</string>
     <string name="batch_summary_merge">%1$d PDFs · %2$d páginas en total</string>
     <string name="batch_summary_collage_single">1 foto · hoja de contacto 2×2</string>
     <string name="batch_summary_collage_multi">%1$d fotos · cuadrícula %2$s</string>
+    <string name="batch_summary_img_pdf_single">1 foto · 1 página PDF A4 centrada</string>
+    <string name="batch_summary_img_pdf_multi">%1$d fotos · PDF A4 de %1$d páginas</string>
     <string name="batch_summary_zip">%1$d archivo(s) · %2$s en total</string>
     <string name="batch_empty_merge">Elige 2 o más PDFs del almacenamiento (o añade muestras/recientes) en el orden deseado.</string>
     <string name="batch_need_one_more_pdf">Añade al menos 1 PDF más abajo para unir.</string>
     <string name="batch_empty_collage">Añade 1–9 fotos para crear una cuadrícula 2×1, 2×2, 3×2 o 3×3.</string>
+    <string name="batch_empty_img_pdf">Añade 1–12 fotos para combinarlas en un PDF A4 multipágina.</string>
     <string name="batch_empty_zip">Añade uno o más archivos de cualquier tipo para empaquetarlos en un .zip.</string>
     <string name="batch_pick_pdfs">Elegir PDFs</string>
     <string name="batch_pick_photos">Elegir fotos</string>
@@ -466,6 +470,7 @@
     <string name="batch_cta_merge_n">Unir %1$d PDFs</string>
     <string name="batch_cta_merge_need_two">Elige 2+ PDFs para unir</string>
     <string name="batch_cta_collage_n">Crear collage de %1$d fotos</string>
+    <string name="batch_cta_img_to_pdf_n">Crear PDF de %1$d páginas</string>
     <string name="batch_cta_zip_n">Empaquetar %1$d archivos en ZIP</string>
     <string name="cd_move_up">Subir</string>
     <string name="cd_move_down">Bajar</string>

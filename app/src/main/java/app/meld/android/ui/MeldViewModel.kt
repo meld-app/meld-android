@@ -338,7 +338,7 @@ class MeldViewModel : ViewModel() {
     private fun isCompatibleForBatch(tool: MeldToolId, info: SelectedFileInfo): Boolean =
         when (tool) {
             MeldToolId.PDF_MERGE -> info.extension.equals("pdf", ignoreCase = true)
-            MeldToolId.COLLAGE -> tool.acceptsExtension(info.extension)
+            MeldToolId.COLLAGE, MeldToolId.IMG_TO_PDF -> tool.acceptsExtension(info.extension)
             MeldToolId.PACK_ZIP -> true
             else -> false
         }
@@ -358,7 +358,7 @@ class MeldViewModel : ViewModel() {
                     val sampleDir = File(context.cacheDir, "samples").apply { mkdirs() }
                     val sampleFile = when (tool) {
                         MeldToolId.PDF_MERGE -> SampleFileFactory.createSamplePdf(sampleDir)
-                        MeldToolId.COLLAGE -> SampleFileFactory.createSampleImage(sampleDir)
+                        MeldToolId.COLLAGE, MeldToolId.IMG_TO_PDF -> SampleFileFactory.createSampleImage(sampleDir)
                         MeldToolId.PACK_ZIP -> {
                             val existingNames = current.stagedBatchFiles.map { it.displayName }.toSet()
                             val candidates = listOf(
@@ -804,6 +804,8 @@ class MeldViewModel : ViewModel() {
                             "${current.stagedBatchFiles.first().file.nameWithoutExtension.ifBlank { "merged" }}_${current.stagedBatchFiles.size}files"
                         tool == MeldToolId.COLLAGE && current.stagedBatchFiles.size > 1 ->
                             "collage_${current.stagedBatchFiles.size}photos"
+                        tool == MeldToolId.IMG_TO_PDF && current.stagedBatchFiles.size > 1 ->
+                            "images_${current.stagedBatchFiles.size}pages"
                         tool == MeldToolId.PACK_ZIP && current.stagedBatchFiles.size > 1 ->
                             "meld_bundle_${current.stagedBatchFiles.size}files"
                         else -> inputFile.nameWithoutExtension.ifBlank { "output" }
@@ -827,8 +829,15 @@ class MeldViewModel : ViewModel() {
                             ImageEngine.convertFormat(imgFile, outFile, tool.outputExtension)
                         }
                         MeldToolId.IMG_TO_PDF -> {
-                            val imgFile = ensureImageInput(context, inputFile)
-                            ImageEngine.convertImageToPdf(imgFile, outFile)
+                            val inputs = current.stagedBatchFiles
+                                .map { it.file }
+                                .filter { it.isFile && MeldToolId.IMG_TO_PDF.acceptsExtension(it.extension) }
+                                .take(MeldToolId.IMG_TO_PDF.maxBatchCount)
+                                .ifEmpty { listOf(ensureImageInput(context, inputFile)) }
+                            batchRecordedInputSize = inputs.sumOf { it.length() }
+                            ImageEngine.convertImagesToPdf(inputs, outFile) { cur, tot ->
+                                reportProgress(ProgressUnit.PHOTO, cur, tot)
+                            }
                         }
 
                         // Image Tools

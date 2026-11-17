@@ -105,7 +105,8 @@ class MainActivity : ComponentActivity() {
                     onPickBatchFiles = { tool ->
                         val mimeTypes = when (tool) {
                             app.meld.android.model.MeldToolId.PDF_MERGE -> arrayOf("application/pdf")
-                            app.meld.android.model.MeldToolId.COLLAGE -> arrayOf("image/*")
+                            app.meld.android.model.MeldToolId.COLLAGE,
+                            app.meld.android.model.MeldToolId.IMG_TO_PDF -> arrayOf("image/*")
                             else -> arrayOf("*/*")
                         }
                         multiFilePickerLauncher.launch(mimeTypes)
