@@ -21,6 +21,7 @@
     <string name="all_tools_count">Todas (%1$d)</string>
     <string name="more_for_file_heading">Más para este archivo</string>
     <string name="pinned_tools_heading">Accesos fijados</string>
+    <string name="recent_outputs_heading">Resultados recientes</string>
     <string name="customize_home">Personalizar</string>
     <string name="home_edit_sheet_title">Personalizar inicio</string>
     <string name="home_edit_sheet_subtitle">Fija, cambia o reordena tus herramientas favoritas en el inicio.</string>
@@ -38,6 +39,7 @@
     <string name="home_edit_reset_defaults">Restablecer predeterminados</string>
     <string name="home_edit_done">Listo</string>
     <string name="vm_home_layout_reset">Diseño de inicio restablecido a los valores predeterminados</string>
+    <string name="vm_cache_cleared">Caché temporal e historial reciente borrados</string>
     <string name="recent_title_with_ext">%1$s · %2$s</string>
     <string name="recent_result_meta">%1$s · hace un momento</string>
     <string name="cd_share_result">Compartir resultado</string>
@@ -101,6 +103,8 @@
     <string name="prefs_section_about">ACERCA DE</string>
     <string name="privacy_promise_title" formatted="false">Promesa 100% en el dispositivo</string>
     <string name="privacy_promise_body">MELD no solicita permiso de internet. Tus documentos nunca salen a un servidor.</string>
+    <string name="clear_cache_title">Borrar caché e historial local</string>
+    <string name="clear_cache_subtitle" formatted="false">%1$s en espacio temporal • %2$d elemento(s) recientes — toca para borrar</string>
     <string name="auto_downloads_title">Guardar directo en Descargas/MELD</string>
     <string name="auto_downloads_on_desc">Activado: cada resultado también se copia en Descargas/MELD.</string>
     <string name="auto_downloads_off_desc">Desactivado: los archivos permanecen privados en MELD hasta que tocas Guardar.</string>
@@ -109,6 +113,8 @@
     <string name="handout_3_up_short">3 con notas</string>
     <string name="handout_3_up_long">3 por hoja (estilo Mac)</string>
     <string name="handout_4_up">Cuadrícula 4 por hoja</string>
+    <string name="prefs_customize_home_title">Personalizar diseño de inicio</string>
+    <string name="prefs_customize_home_subtitle">Elige y reordena tus 3 herramientas rápidas y accesos fijados</string>
     <string name="replay_intro_title">Repetir animación inicial</string>
     <string name="replay_intro_subtitle">Ver de nuevo el plegado y acoplamiento de MELD</string>
     <string name="about_version_title">MELD para Android v%1$s</string>

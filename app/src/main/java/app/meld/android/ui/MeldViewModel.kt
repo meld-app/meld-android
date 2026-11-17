@@ -82,7 +82,8 @@ data class MeldUiState(
     val isBannerError: Boolean = false,
     val recentResults: List<ConversionResult> = emptyList(),
     val stagedBatchFiles: List<SelectedFileInfo> = emptyList(),
-    val defaultSaveToDownloads: Boolean = false
+    val defaultSaveToDownloads: Boolean = false,
+    val cachedStorageBytes: Long = 0L
 )
 
 class MeldViewModel : ViewModel() {
@@ -94,6 +95,7 @@ class MeldViewModel : ViewModel() {
         const val KEY_HOME_CUSTOM = "home_layout_custom"
         const val KEY_HOME_QUICK_TOOLS = "home_quick_tools"
         const val KEY_HOME_GRID_TOOLS = "home_grid_tools"
+        const val KEY_RECENT_RESULTS = "recent_results_v1"
         const val MAX_IMPORT_BYTES = 100L * 1024L * 1024L // 100 MB safety cap
         const val MAX_CACHED_FILES = 16
         val VALID_EXT_REGEX = Regex("^[A-Za-z0-9]{1,8}$")
@@ -110,7 +112,8 @@ class MeldViewModel : ViewModel() {
     fun loadPersistedPreferences(context: Context) {
         if (prefsLoaded) return
         prefsLoaded = true
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val appContext = context.applicationContext
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val savedAuto = prefs.getBoolean(KEY_AUTO_DOWNLOADS, false)
         val savedHandout = prefs.getInt(KEY_HANDOUT_PAGES, 3).coerceIn(2, 4)
         val savedHomeLayout = HomeLayoutConfig.fromPreferences(
@@ -118,12 +121,28 @@ class MeldViewModel : ViewModel() {
             quickCsv = prefs.getString(KEY_HOME_QUICK_TOOLS, null),
             gridCsv = prefs.getString(KEY_HOME_GRID_TOOLS, null)
         )
+        val rawRecents = prefs.getString(KEY_RECENT_RESULTS, null)
         _uiState.update { state ->
             state.copy(
                 defaultSaveToDownloads = savedAuto,
                 homeLayout = savedHomeLayout,
                 options = state.options.copy(handoutPagesPerSheet = savedHandout)
             )
+        }
+        viewModelScope.launch {
+            val (recents, cacheBytes) = withContext(Dispatchers.IO) {
+                ConversionResult.deserializeList(rawRecents) to computeCachedStorageBytes(appContext)
+            }
+            _uiState.update { state ->
+                val merged = if (state.recentResults.isEmpty()) {
+                    recents
+                } else {
+                    (state.recentResults + recents)
+                        .distinctBy { it.outputFile.absolutePath }
+                        .take(12)
+                }
+                state.copy(recentResults = merged, cachedStorageBytes = cacheBytes)
+            }
         }
     }
 
@@ -146,6 +165,28 @@ class MeldViewModel : ViewModel() {
                         options = clampOptionsForFile(info, state.options)
                     )
                 }
+            }
+        }
+    }
+
+    fun selectDockTab(context: Context, tab: DockTab) {
+        activeToolJob?.cancel()
+        activeToolJob = null
+        _uiState.update {
+            it.copy(
+                activeTab = tab,
+                route = MeldScreenRoute.Home,
+                isProcessing = false,
+                processingProgress = null,
+                bannerMessage = null,
+                isBannerError = false
+            )
+        }
+        if (tab == DockTab.SETTINGS) {
+            val appContext = context.applicationContext
+            viewModelScope.launch {
+                val bytes = withContext(Dispatchers.IO) { computeCachedStorageBytes(appContext) }
+                _uiState.update { it.copy(cachedStorageBytes = bytes) }
             }
         }
     }
@@ -1156,12 +1197,25 @@ class MeldViewModel : ViewModel() {
                 val autoSavedPath = if (current.defaultSaveToDownloads) {
                     withContext(Dispatchers.IO) { persistToDownloads(context, result.outputFile) }
                 } else null
+                val updatedRecents = (
+                    listOf(result) + _uiState.value.recentResults.filterNot {
+                        it.outputFile.absolutePath == result.outputFile.absolutePath
+                    }
+                    ).take(12)
+                val cacheBytes = withContext(Dispatchers.IO) {
+                    context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                        .edit()
+                        .putString(KEY_RECENT_RESULTS, ConversionResult.serializeList(updatedRecents))
+                        .apply()
+                    computeCachedStorageBytes(context)
+                }
                 _uiState.update { state ->
                     state.copy(
                         isProcessing = false,
                         processingProgress = null,
                         route = MeldScreenRoute.Result(result),
-                        recentResults = (listOf(result) + state.recentResults).take(12),
+                        recentResults = updatedRecents,
+                        cachedStorageBytes = cacheBytes,
                         bannerMessage = autoSavedPath?.let { context.getString(R.string.vm_auto_saved_to, it) },
                         isBannerError = false
                     )
@@ -1308,6 +1362,53 @@ class MeldViewModel : ViewModel() {
             }
             MeldCategory.ALL -> SampleFileFactory.createSampleImage(sampleDir)
         }
+    }
+
+    fun clearLocalCacheAndHistory(context: Context) {
+        activeToolJob?.cancel()
+        activeToolJob = null
+        val appContext = context.applicationContext
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                listOf(
+                    File(appContext.cacheDir, "outputs"),
+                    File(appContext.cacheDir, "imports")
+                ).forEach { dir ->
+                    if (dir.isDirectory) {
+                        dir.listFiles()?.forEach { child ->
+                            runCatching { child.deleteRecursively() }
+                        }
+                    }
+                }
+                appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                    .edit()
+                    .remove(KEY_RECENT_RESULTS)
+                    .apply()
+            }
+            _uiState.update { state ->
+                state.copy(
+                    isProcessing = false,
+                    processingProgress = null,
+                    recentResults = emptyList(),
+                    stagedBatchFiles = emptyList(),
+                    cachedStorageBytes = 0L,
+                    bannerMessage = appContext.getString(R.string.vm_cache_cleared),
+                    isBannerError = false
+                )
+            }
+        }
+    }
+
+    private fun computeCachedStorageBytes(context: Context): Long {
+        return runCatching {
+            listOf(
+                File(context.cacheDir, "outputs"),
+                File(context.cacheDir, "imports")
+            ).sumOf { dir ->
+                if (!dir.isDirectory) 0L
+                else dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+            }
+        }.getOrDefault(0L)
     }
 
     private fun ensureImageInput(context: Context, file: File): File {

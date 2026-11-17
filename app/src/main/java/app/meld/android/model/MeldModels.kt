@@ -6,6 +6,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import app.meld.android.R
 import java.io.File
+import java.util.Base64
 import java.util.Locale
 
 enum class MeldMode(@StringRes val labelRes: Int) {
@@ -604,8 +605,64 @@ data class ConversionResult(
     val inputSizeBytes: Long,
     val outputSizeBytes: Long,
     val summary: String,
-    val durationMs: Long
-)
+    val durationMs: Long,
+    val createdAtEpochMs: Long = System.currentTimeMillis()
+) {
+    companion object {
+        private const val MAX_RECENT_ITEMS = 12
+
+        fun serializeList(results: List<ConversionResult>): String {
+            return results.take(MAX_RECENT_ITEMS).joinToString("\n") { item ->
+                val encodedSummary = Base64.getEncoder().withoutPadding()
+                    .encodeToString(item.summary.toByteArray(Charsets.UTF_8))
+                listOf(
+                    item.tool.name,
+                    item.outputFile.absolutePath.replace("\n", ""),
+                    item.inputSizeBytes.toString(),
+                    item.outputSizeBytes.toString(),
+                    item.durationMs.toString(),
+                    item.createdAtEpochMs.toString(),
+                    encodedSummary
+                ).joinToString("|")
+            }
+        }
+
+        fun deserializeList(raw: String?): List<ConversionResult> {
+            if (raw.isNullOrBlank()) return emptyList()
+            val out = mutableListOf<ConversionResult>()
+            val seenPaths = HashSet<String>()
+            for (line in raw.lineSequence()) {
+                if (line.isBlank()) continue
+                val parts = line.split('|')
+                if (parts.size < 7) continue
+                val tool = MeldToolId.entries.firstOrNull { it.name == parts[0] } ?: continue
+                val file = File(parts[1])
+                if (!file.isFile || file.length() <= 0L) continue
+                if (!seenPaths.add(file.absolutePath)) continue
+                val inBytes = parts[2].toLongOrNull() ?: continue
+                val outBytes = parts[3].toLongOrNull() ?: continue
+                val duration = parts[4].toLongOrNull() ?: continue
+                val createdAt = parts[5].toLongOrNull() ?: System.currentTimeMillis()
+                val summary = runCatching {
+                    String(Base64.getDecoder().decode(parts[6]), Charsets.UTF_8)
+                }.getOrDefault("")
+                out.add(
+                    ConversionResult(
+                        tool = tool,
+                        outputFile = file,
+                        inputSizeBytes = inBytes,
+                        outputSizeBytes = outBytes,
+                        summary = summary,
+                        durationMs = duration,
+                        createdAtEpochMs = createdAt
+                    )
+                )
+                if (out.size >= MAX_RECENT_ITEMS) break
+            }
+            return out
+        }
+    }
+}
 
 data class HomeLayoutConfig(
     val isCustom: Boolean = false,

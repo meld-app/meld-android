@@ -107,7 +107,8 @@ fun MeldAppRoot(
     onUpdatePptxImageScope: (Boolean, Int) -> Unit = { _, _ -> },
     onUpdateChromaTolerance: (Int) -> Unit,
     onUpdateRedactionZones: (List<app.meld.android.model.RedactionRect>) -> Unit = {},
-    onToggleAutoDownloads: (Boolean) -> Unit
+    onToggleAutoDownloads: (Boolean) -> Unit,
+    onClearCache: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val reduceMotion = rememberReduceMotion()
@@ -245,6 +246,7 @@ fun MeldAppRoot(
                                                     onSelectCategory = onSelectCategory,
                                                     onSearchChange = onSearchChange,
                                                     onToggleAutoDownloads = onToggleAutoDownloads,
+                                                    onClearCache = onClearCache,
                                                     onUpdateHandoutMode = onUpdateHandoutMode,
                                                     modifier = Modifier
                                                         .widthIn(max = adaptiveSpec.contentMaxWidth)
@@ -271,6 +273,7 @@ fun MeldAppRoot(
                                                 onSelectCategory = onSelectCategory,
                                                 onSearchChange = onSearchChange,
                                                 onToggleAutoDownloads = onToggleAutoDownloads,
+                                                onClearCache = onClearCache,
                                                 onUpdateHandoutMode = onUpdateHandoutMode,
                                                 modifier = Modifier.fillMaxSize()
                                             )
@@ -422,6 +425,7 @@ private fun MeldHomeTabContent(
     onSelectCategory: (MeldCategory) -> Unit,
     onSearchChange: (String) -> Unit,
     onToggleAutoDownloads: (Boolean) -> Unit,
+    onClearCache: () -> Unit,
     onUpdateHandoutMode: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -476,6 +480,8 @@ private fun MeldHomeTabContent(
                         onToggleAutoDownloads = onToggleAutoDownloads,
                         onUpdateDefaultHandout = onUpdateHandoutMode,
                         onReplayIntro = replayOpening,
+                        onOpenCustomizeHome = { onSetCustomizeHomeSheetVisible(true) },
+                        onClearCache = onClearCache,
                         contentStartPadding = adaptiveSpec.listStartPadding,
                         contentBottomPadding = adaptiveSpec.listBottomPadding
                     )

@@ -672,4 +672,40 @@ class MeldEngineUnitTest {
         assertTrue(MeldToolId.IMG_TO_PDF.supportsBatchQueue)
         assertEquals(12, MeldToolId.IMG_TO_PDF.maxBatchCount)
     }
+
+    @Test
+    fun conversionResult_serializeAndDeserializeRoundTripFiltersMissingFiles() {
+        val dir = java.nio.file.Files.createTempDirectory("meld_recents").toFile()
+        try {
+            val f1 = File(dir, "deck.pdf").apply { writeText("%PDF-1.4 mock") }
+            val f2 = File(dir, "missing.png")
+            val r1 = app.meld.android.model.ConversionResult(
+                tool = MeldToolId.PPTX_TO_PDF,
+                outputFile = f1,
+                inputSizeBytes = 2048L,
+                outputSizeBytes = f1.length(),
+                summary = "Exported 3 slides cleanly | no delimiter issues",
+                durationMs = 42L,
+                createdAtEpochMs = 1700000000000L
+            )
+            val r2 = app.meld.android.model.ConversionResult(
+                tool = MeldToolId.REMOVE_BG,
+                outputFile = f2,
+                inputSizeBytes = 5000L,
+                outputSizeBytes = 1200L,
+                summary = "Gone file",
+                durationMs = 15L,
+                createdAtEpochMs = 1700000001000L
+            )
+            val encoded = app.meld.android.model.ConversionResult.serializeList(listOf(r1, r2))
+            val decoded = app.meld.android.model.ConversionResult.deserializeList(encoded)
+            assertEquals(1, decoded.size)
+            assertEquals(MeldToolId.PPTX_TO_PDF, decoded[0].tool)
+            assertEquals(f1.absolutePath, decoded[0].outputFile.absolutePath)
+            assertEquals(r1.summary, decoded[0].summary)
+            assertEquals(1700000000000L, decoded[0].createdAtEpochMs)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }
