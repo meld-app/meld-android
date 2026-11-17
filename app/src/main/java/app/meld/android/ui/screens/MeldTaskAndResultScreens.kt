@@ -113,6 +113,7 @@ import app.meld.android.ui.components.TactilePillButton
 import app.meld.android.ui.components.TactileRulerSlider
 import app.meld.android.ui.components.ZipPackStage
 import app.meld.android.ui.components.renderPdfPagePreview
+import app.meld.android.ui.components.renderPdfPageThumbnails
 import app.meld.android.ui.theme.MeldDimens
 import app.meld.android.ui.theme.MeldMotion
 import app.meld.android.ui.theme.meldColors
@@ -240,6 +241,7 @@ fun MeldTaskScreen(
 
                         MeldToolId.PDF_EXTRACT -> {
                             SplitPdfTaskControls(
+                                file = file,
                                 totalPages = file?.pageCount ?: 4,
                                 startPage = options.pageRangeStart,
                                 endPage = options.pageRangeEnd,
@@ -786,15 +788,36 @@ private fun SplitPdfTaskControls(
     totalPages: Int,
     startPage: Int,
     endPage: Int,
-    onUpdateRange: (Int, Int) -> Unit
+    onUpdateRange: (Int, Int) -> Unit,
+    file: SelectedFileInfo? = null
 ) {
     val safeTotal = max(1, totalPages)
     val largeFont = MeldAdaptiveLayout.isLargeFontScale(LocalDensity.current.fontScale)
+    var pageThumbnails by remember { mutableStateOf<List<android.graphics.Bitmap>>(emptyList()) }
+    LaunchedEffect(file?.file?.absolutePath, file?.sizeBytes) {
+        pageThumbnails = withContext(Dispatchers.IO) {
+            if (file != null && file.extension.equals("pdf", ignoreCase = true) && file.file.isFile) {
+                renderPdfPageThumbnails(file.file, maxPages = 6, maxDim = 220)
+            } else {
+                emptyList()
+            }
+        }
+    }
+    DisposableEffect(pageThumbnails) {
+        val current = pageThumbnails
+        onDispose {
+            current.forEach { bmp ->
+                if (!bmp.isRecycled) bmp.recycle()
+            }
+        }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SplitPageSpreadStage(
             totalPages = safeTotal,
             startPage = startPage,
             endPage = endPage,
+            pageThumbnails = pageThumbnails,
             onSelectPage = { tapped ->
                 when {
                     tapped < startPage -> onUpdateRange(tapped, endPage)
