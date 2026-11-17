@@ -606,3 +606,220 @@ data class ConversionResult(
     val summary: String,
     val durationMs: Long
 )
+
+data class HomeLayoutConfig(
+    val isCustom: Boolean = false,
+    val quickTools: List<MeldToolId> = DEFAULT_QUICK_TOOLS,
+    val gridTools: List<MeldToolId> = DEFAULT_GRID_TOOLS
+) {
+    fun resolveQuickTools(ext: String): Triple<MeldToolId, MeldToolId, MeldToolId> {
+        if (isCustom) {
+            val q = normalized().quickTools
+            return Triple(q[0], q[1], q[2])
+        }
+        return defaultQuickTripleForExtension(ext)
+    }
+
+    fun resolveGridTools(ext: String, defaultMaxCount: Int): List<MeldToolId> {
+        if (isCustom) {
+            return normalized().gridTools
+        }
+        return defaultGridToolsForExtension(ext, defaultMaxCount)
+    }
+
+    fun materializeForEditing(ext: String, defaultMaxCount: Int = 4): HomeLayoutConfig {
+        if (isCustom) return normalized()
+        val triple = defaultQuickTripleForExtension(ext)
+        val initialQuick = listOf(triple.first, triple.second, triple.third)
+        val initialGrid = defaultGridToolsForExtension(ext, defaultMaxCount)
+        return HomeLayoutConfig(
+            isCustom = false,
+            quickTools = initialQuick,
+            gridTools = initialGrid
+        ).normalized()
+    }
+
+    fun swapQuickTool(slotIndex: Int, newTool: MeldToolId, currentExt: String = "pdf"): HomeLayoutConfig {
+        val base = materializeForEditing(currentExt)
+        if (slotIndex !in 0..2) return base.copy(isCustom = true)
+        val updatedQuick = base.quickTools.toMutableList()
+        val updatedGrid = base.gridTools.toMutableList()
+        val oldTool = updatedQuick[slotIndex]
+        if (oldTool == newTool) return base.copy(isCustom = true)
+
+        val otherQuickIdx = updatedQuick.indexOf(newTool)
+        val existingGridIdx = updatedGrid.indexOf(newTool)
+        when {
+            otherQuickIdx >= 0 -> {
+                updatedQuick[otherQuickIdx] = oldTool
+                updatedQuick[slotIndex] = newTool
+            }
+            existingGridIdx >= 0 -> {
+                updatedGrid[existingGridIdx] = oldTool
+                updatedQuick[slotIndex] = newTool
+            }
+            else -> {
+                updatedQuick[slotIndex] = newTool
+            }
+        }
+        return HomeLayoutConfig(
+            isCustom = true,
+            quickTools = updatedQuick,
+            gridTools = updatedGrid
+        ).normalized()
+    }
+
+    fun moveQuickTool(index: Int, delta: Int, currentExt: String = "pdf"): HomeLayoutConfig {
+        val base = materializeForEditing(currentExt)
+        val updated = swapAdjacentOrClamped(base.quickTools, index, delta) ?: return base.copy(isCustom = true)
+        return base.copy(isCustom = true, quickTools = updated).normalized()
+    }
+
+    fun swapGridTool(slotIndex: Int, newTool: MeldToolId, currentExt: String = "pdf"): HomeLayoutConfig {
+        val base = materializeForEditing(currentExt)
+        if (slotIndex !in base.gridTools.indices) return base.copy(isCustom = true)
+        val updatedQuick = base.quickTools.toMutableList()
+        val updatedGrid = base.gridTools.toMutableList()
+        val oldTool = updatedGrid[slotIndex]
+        if (oldTool == newTool) return base.copy(isCustom = true)
+
+        val quickIdx = updatedQuick.indexOf(newTool)
+        val otherGridIdx = updatedGrid.indexOf(newTool)
+        when {
+            quickIdx >= 0 -> {
+                updatedQuick[quickIdx] = oldTool
+                updatedGrid[slotIndex] = newTool
+            }
+            otherGridIdx >= 0 -> {
+                updatedGrid[otherGridIdx] = oldTool
+                updatedGrid[slotIndex] = newTool
+            }
+            else -> {
+                updatedGrid[slotIndex] = newTool
+            }
+        }
+        return HomeLayoutConfig(
+            isCustom = true,
+            quickTools = updatedQuick,
+            gridTools = updatedGrid
+        ).normalized()
+    }
+
+    fun moveGridTool(index: Int, delta: Int, currentExt: String = "pdf"): HomeLayoutConfig {
+        val base = materializeForEditing(currentExt)
+        val updated = swapAdjacentOrClamped(base.gridTools, index, delta) ?: return base.copy(isCustom = true)
+        return base.copy(isCustom = true, gridTools = updated).normalized()
+    }
+
+    fun addGridTool(tool: MeldToolId, currentExt: String = "pdf"): HomeLayoutConfig {
+        val base = materializeForEditing(currentExt)
+        if (tool in base.quickTools || tool in base.gridTools || base.gridTools.size >= MAX_HOME_GRID_TOOLS) {
+            return base.copy(isCustom = true)
+        }
+        return base.copy(
+            isCustom = true,
+            gridTools = base.gridTools + tool
+        ).normalized()
+    }
+
+    fun removeGridTool(tool: MeldToolId, currentExt: String = "pdf"): HomeLayoutConfig {
+        val base = materializeForEditing(currentExt)
+        return base.copy(
+            isCustom = true,
+            gridTools = base.gridTools.filterNot { it == tool }
+        ).normalized()
+    }
+
+    private fun normalized(): HomeLayoutConfig {
+        val distinctQuick = quickTools.distinct().take(3).toMutableList()
+        for (fallback in DEFAULT_QUICK_TOOLS + MeldToolId.entries) {
+            if (distinctQuick.size >= 3) break
+            if (fallback !in distinctQuick) distinctQuick.add(fallback)
+        }
+        val quickSet = distinctQuick.toSet()
+        val distinctGrid = gridTools
+            .distinct()
+            .filter { it !in quickSet }
+            .take(MAX_HOME_GRID_TOOLS)
+        return copy(quickTools = distinctQuick, gridTools = distinctGrid)
+    }
+
+    companion object {
+        const val MAX_HOME_GRID_TOOLS = 8
+
+        val DEFAULT_QUICK_TOOLS: List<MeldToolId> = listOf(
+            MeldToolId.COMPRESS_PDF,
+            MeldToolId.HANDOUT,
+            MeldToolId.PDF_EXTRACT
+        )
+
+        val DEFAULT_GRID_TOOLS: List<MeldToolId> = listOf(
+            MeldToolId.PDF_TO_PNG,
+            MeldToolId.PDF_TO_JPG,
+            MeldToolId.PDF_TO_MD,
+            MeldToolId.PDF_TO_HTML
+        )
+
+        fun defaultQuickTripleForExtension(ext: String): Triple<MeldToolId, MeldToolId, MeldToolId> =
+            when (ext.lowercase()) {
+                "pptx" ->
+                    Triple(MeldToolId.PPTX_TO_PDF, MeldToolId.PPTX_HANDOUT, MeldToolId.PPTX_SANITIZE)
+                in setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif") ->
+                    Triple(MeldToolId.COMPRESS, MeldToolId.REMOVE_BG, MeldToolId.IMG_TO_PDF)
+                in setOf("wav", "pcm", "mp3", "m4a", "aac", "mp4", "ogg") ->
+                    Triple(MeldToolId.VISUALIZE, MeldToolId.SPEED_2X, MeldToolId.PACK_ZIP)
+                in setOf("csv", "tsv", "txt") ->
+                    Triple(MeldToolId.SHEET_TO_PDF, MeldToolId.SHEET_TO_MD, MeldToolId.TABLE_CONVERT)
+                else ->
+                    Triple(MeldToolId.COMPRESS_PDF, MeldToolId.HANDOUT, MeldToolId.PDF_EXTRACT)
+            }
+
+        fun defaultGridToolsForExtension(ext: String, maxCount: Int): List<MeldToolId> {
+            val triple = defaultQuickTripleForExtension(ext)
+            val shown = setOf(triple.first, triple.second, triple.third)
+            return MeldToolId.entries
+                .filter { it.acceptsExtension(ext) && it !in shown && it != MeldToolId.SCAN_QR }
+                .take(maxCount)
+        }
+
+        private fun swapAdjacentOrClamped(
+            list: List<MeldToolId>,
+            index: Int,
+            delta: Int
+        ): List<MeldToolId>? {
+            if (index !in list.indices || delta == 0) return null
+            val target = (index + delta).coerceIn(0, list.lastIndex)
+            if (target == index) return null
+            val mutable = list.toMutableList()
+            val item = mutable[index]
+            mutable[index] = mutable[target]
+            mutable[target] = item
+            return mutable
+        }
+
+        fun serializeTools(tools: List<MeldToolId>): String = tools.joinToString(",") { it.name }
+
+        fun deserializeTools(raw: String?): List<MeldToolId> {
+            if (raw.isNullOrBlank()) return emptyList()
+            val seen = LinkedHashSet<MeldToolId>()
+            raw.split(',').forEach { token ->
+                val trimmed = token.trim()
+                if (trimmed.isNotEmpty()) {
+                    MeldToolId.entries.firstOrNull { it.name == trimmed }?.let { seen.add(it) }
+                }
+            }
+            return seen.toList()
+        }
+
+        fun fromPreferences(isCustom: Boolean, quickCsv: String?, gridCsv: String?): HomeLayoutConfig {
+            if (!isCustom) return HomeLayoutConfig()
+            val quick = deserializeTools(quickCsv).ifEmpty { DEFAULT_QUICK_TOOLS }
+            val grid = if (gridCsv != null) deserializeTools(gridCsv) else DEFAULT_GRID_TOOLS
+            return HomeLayoutConfig(
+                isCustom = true,
+                quickTools = quick,
+                gridTools = grid
+            ).normalized()
+        }
+    }
+}

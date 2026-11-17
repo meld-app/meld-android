@@ -50,6 +50,7 @@ import app.meld.android.ui.components.MeldOpeningDriver
 import app.meld.android.ui.components.MeldOpeningOverlay
 import app.meld.android.ui.screens.MeldAllToolsScreen
 import app.meld.android.ui.screens.MeldChangeFileBottomSheet
+import app.meld.android.ui.screens.MeldCustomizeHomeBottomSheet
 import app.meld.android.ui.screens.MeldFloatingBottomDock
 import app.meld.android.ui.screens.MeldNavigationRail
 import app.meld.android.ui.screens.MeldResultScreen
@@ -71,6 +72,14 @@ fun MeldAppRoot(
     onOpenResult: (app.meld.android.model.ConversionResult) -> Unit,
     onNavigateHome: () -> Unit,
     onSetFileSheetVisible: (Boolean) -> Unit,
+    onSetCustomizeHomeSheetVisible: (Boolean) -> Unit = {},
+    onSwapHomeQuickTool: (Int, MeldToolId) -> Unit = { _, _ -> },
+    onMoveHomeQuickTool: (Int, Int) -> Unit = { _, _ -> },
+    onSwapHomeGridTool: (Int, MeldToolId) -> Unit = { _, _ -> },
+    onMoveHomeGridTool: (Int, Int) -> Unit = { _, _ -> },
+    onAddHomeGridTool: (MeldToolId) -> Unit = {},
+    onRemoveHomeGridTool: (MeldToolId) -> Unit = {},
+    onResetHomeLayout: () -> Unit = {},
     onClearBanner: () -> Unit = {},
     onPickExternalFile: () -> Unit,
     onPickBatchFiles: (MeldToolId) -> Unit = {},
@@ -225,8 +234,9 @@ fun MeldAppRoot(
                                                     openingDriver = openingDriver,
                                                     routeAnimScope = routeAnimScope,
                                                     adaptiveSpec = adaptiveSpec,
-                                                    replayOpening = replayOpening,
+                                                     replayOpening = replayOpening,
                                                     onSetFileSheetVisible = onSetFileSheetVisible,
+                                                    onSetCustomizeHomeSheetVisible = onSetCustomizeHomeSheetVisible,
                                                     onOpenTask = onOpenTask,
                                                     onSelectTab = onSelectTab,
                                                     onOpenResult = onOpenResult,
@@ -252,6 +262,7 @@ fun MeldAppRoot(
                                                 adaptiveSpec = adaptiveSpec,
                                                 replayOpening = replayOpening,
                                                 onSetFileSheetVisible = onSetFileSheetVisible,
+                                                onSetCustomizeHomeSheetVisible = onSetCustomizeHomeSheetVisible,
                                                 onOpenTask = onOpenTask,
                                                 onSelectTab = onSelectTab,
                                                 onOpenResult = onOpenResult,
@@ -352,6 +363,20 @@ fun MeldAppRoot(
                     )
                 }
 
+                if (uiState.showCustomizeHomeSheet) {
+                    MeldCustomizeHomeBottomSheet(
+                        uiState = uiState,
+                        onDismiss = { onSetCustomizeHomeSheetVisible(false) },
+                        onSwapQuickTool = onSwapHomeQuickTool,
+                        onMoveQuickTool = onMoveHomeQuickTool,
+                        onSwapGridTool = onSwapHomeGridTool,
+                        onMoveGridTool = onMoveHomeGridTool,
+                        onAddGridTool = onAddHomeGridTool,
+                        onRemoveGridTool = onRemoveHomeGridTool,
+                        onResetDefaults = onResetHomeLayout
+                    )
+                }
+
                 if (uiState.route == MeldScreenRoute.Home && uiState.bannerMessage != null && !openingDriver.showOverlay) {
                     LaunchedEffect(uiState.bannerMessage) {
                         kotlinx.coroutines.delay(2800L)
@@ -388,6 +413,7 @@ private fun MeldHomeTabContent(
     adaptiveSpec: MeldAdaptiveSpec,
     replayOpening: () -> Unit,
     onSetFileSheetVisible: (Boolean) -> Unit,
+    onSetCustomizeHomeSheetVisible: (Boolean) -> Unit,
     onOpenTask: (MeldToolId) -> Unit,
     onSelectTab: (DockTab) -> Unit,
     onOpenResult: (app.meld.android.model.ConversionResult) -> Unit,
@@ -423,6 +449,7 @@ private fun MeldHomeTabContent(
                         openingDriver = openingDriver,
                         onReplayIntro = replayOpening,
                         onOpenChangeFile = { onSetFileSheetVisible(true) },
+                        onOpenCustomizeHome = { onSetCustomizeHomeSheetVisible(true) },
                         onOpenTask = onOpenTask,
                         onSeeAllTools = { onSelectTab(DockTab.ALL_TOOLS) },
                         onOpenResult = onOpenResult,

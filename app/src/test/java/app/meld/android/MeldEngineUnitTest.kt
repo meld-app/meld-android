@@ -618,4 +618,52 @@ class MeldEngineUnitTest {
         assertEquals(0.5f, app.meld.android.model.ProcessingProgress(2, 4).fraction, 0.0001f)
         assertEquals(1f, app.meld.android.model.ProcessingProgress(7, 4).fraction, 0.0001f)
     }
+
+    @Test
+    fun homeLayoutConfig_supportsSwapReorderAddRemoveAndPersistenceRoundTrip() {
+        val defaultConfig = app.meld.android.model.HomeLayoutConfig()
+        assertEquals(
+            Triple(MeldToolId.COMPRESS_PDF, MeldToolId.HANDOUT, MeldToolId.PDF_EXTRACT),
+            defaultConfig.resolveQuickTools("pdf")
+        )
+        val defaultPdfGrid = defaultConfig.resolveGridTools("pdf", 4)
+        assertEquals(
+            listOf(MeldToolId.PDF_TO_PNG, MeldToolId.PDF_TO_JPG, MeldToolId.PDF_TO_MD, MeldToolId.PDF_TO_HTML),
+            defaultPdfGrid
+        )
+
+        // Swap HTML export in grid slot 3 for PPTX to PDF
+        val replacedHtmlWithPptx = defaultConfig.swapGridTool(3, MeldToolId.PPTX_TO_PDF, currentExt = "pdf")
+        assertTrue(replacedHtmlWithPptx.isCustom)
+        assertEquals(
+            listOf(MeldToolId.PDF_TO_PNG, MeldToolId.PDF_TO_JPG, MeldToolId.PDF_TO_MD, MeldToolId.PPTX_TO_PDF),
+            replacedHtmlWithPptx.resolveGridTools("png", 4)
+        )
+        // Custom quick tools also stay fixed globally across extensions
+        assertEquals(
+            Triple(MeldToolId.COMPRESS_PDF, MeldToolId.HANDOUT, MeldToolId.PDF_EXTRACT),
+            replacedHtmlWithPptx.resolveQuickTools("png")
+        )
+
+        // Swapping a quick slot with an existing grid tool trades places without duplicates
+        val swappedQuickAndGrid = replacedHtmlWithPptx.swapQuickTool(0, MeldToolId.PPTX_TO_PDF, currentExt = "pdf")
+        assertEquals(MeldToolId.PPTX_TO_PDF, swappedQuickAndGrid.quickTools[0])
+        assertEquals(MeldToolId.COMPRESS_PDF, swappedQuickAndGrid.gridTools[3])
+
+        // Reordering, removing, adding
+        val movedUp = swappedQuickAndGrid.moveQuickTool(2, -1)
+        assertEquals(MeldToolId.PDF_EXTRACT, movedUp.quickTools[1])
+        val removed = movedUp.removeGridTool(MeldToolId.PDF_TO_MD)
+        assertFalse(removed.gridTools.contains(MeldToolId.PDF_TO_MD))
+        val added = removed.addGridTool(MeldToolId.REMOVE_BG)
+        assertTrue(added.gridTools.contains(MeldToolId.REMOVE_BG))
+
+        // SharedPreferences CSV round-trip ignores corrupt tokens & restores exact custom layout
+        val quickCsv = app.meld.android.model.HomeLayoutConfig.serializeTools(added.quickTools)
+        val gridCsv = app.meld.android.model.HomeLayoutConfig.serializeTools(added.gridTools) + ",UNKNOWN_TOOL"
+        val restored = app.meld.android.model.HomeLayoutConfig.fromPreferences(true, quickCsv, gridCsv)
+        assertTrue(restored.isCustom)
+        assertEquals(added.quickTools, restored.quickTools)
+        assertEquals(added.gridTools, restored.gridTools)
+    }
 }

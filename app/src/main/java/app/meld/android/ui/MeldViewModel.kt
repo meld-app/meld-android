@@ -21,6 +21,7 @@ import app.meld.android.engine.MediaEngine
 import app.meld.android.engine.PptxEngine
 import app.meld.android.engine.SampleFileFactory
 import app.meld.android.model.ConversionResult
+import app.meld.android.model.HomeLayoutConfig
 import app.meld.android.model.MeldCategory
 import app.meld.android.model.MeldMode
 import app.meld.android.model.MeldToolId
@@ -75,6 +76,8 @@ data class MeldUiState(
     val isProcessing: Boolean = false,
     val processingProgress: ProcessingProgress? = null,
     val showFileSheet: Boolean = false,
+    val showCustomizeHomeSheet: Boolean = false,
+    val homeLayout: HomeLayoutConfig = HomeLayoutConfig(),
     val bannerMessage: String? = null,
     val isBannerError: Boolean = false,
     val recentResults: List<ConversionResult> = emptyList(),
@@ -88,6 +91,9 @@ class MeldViewModel : ViewModel() {
         const val PREFS_NAME = "meld_prefs"
         const val KEY_AUTO_DOWNLOADS = "default_save_to_downloads"
         const val KEY_HANDOUT_PAGES = "handout_pages_per_sheet"
+        const val KEY_HOME_CUSTOM = "home_layout_custom"
+        const val KEY_HOME_QUICK_TOOLS = "home_quick_tools"
+        const val KEY_HOME_GRID_TOOLS = "home_grid_tools"
         const val MAX_IMPORT_BYTES = 100L * 1024L * 1024L // 100 MB safety cap
         const val MAX_CACHED_FILES = 16
         val VALID_EXT_REGEX = Regex("^[A-Za-z0-9]{1,8}$")
@@ -107,9 +113,15 @@ class MeldViewModel : ViewModel() {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val savedAuto = prefs.getBoolean(KEY_AUTO_DOWNLOADS, false)
         val savedHandout = prefs.getInt(KEY_HANDOUT_PAGES, 3).coerceIn(2, 4)
+        val savedHomeLayout = HomeLayoutConfig.fromPreferences(
+            isCustom = prefs.getBoolean(KEY_HOME_CUSTOM, false),
+            quickCsv = prefs.getString(KEY_HOME_QUICK_TOOLS, null),
+            gridCsv = prefs.getString(KEY_HOME_GRID_TOOLS, null)
+        )
         _uiState.update { state ->
             state.copy(
                 defaultSaveToDownloads = savedAuto,
+                homeLayout = savedHomeLayout,
                 options = state.options.copy(handoutPagesPerSheet = savedHandout)
             )
         }
@@ -184,6 +196,83 @@ class MeldViewModel : ViewModel() {
 
     fun setFileSheetVisible(visible: Boolean) {
         _uiState.update { it.copy(showFileSheet = visible) }
+    }
+
+    fun setCustomizeHomeSheetVisible(visible: Boolean) {
+        _uiState.update { it.copy(showCustomizeHomeSheet = visible) }
+    }
+
+    fun swapHomeQuickTool(context: Context, slotIndex: Int, newTool: MeldToolId) {
+        mutateHomeLayout(context) { layout, ext ->
+            layout.swapQuickTool(slotIndex, newTool, currentExt = ext)
+        }
+    }
+
+    fun moveHomeQuickTool(context: Context, index: Int, delta: Int) {
+        mutateHomeLayout(context) { layout, ext ->
+            layout.moveQuickTool(index, delta, currentExt = ext)
+        }
+    }
+
+    fun swapHomeGridTool(context: Context, slotIndex: Int, newTool: MeldToolId) {
+        mutateHomeLayout(context) { layout, ext ->
+            layout.swapGridTool(slotIndex, newTool, currentExt = ext)
+        }
+    }
+
+    fun moveHomeGridTool(context: Context, index: Int, delta: Int) {
+        mutateHomeLayout(context) { layout, ext ->
+            layout.moveGridTool(index, delta, currentExt = ext)
+        }
+    }
+
+    fun addHomeGridTool(context: Context, tool: MeldToolId) {
+        mutateHomeLayout(context) { layout, ext ->
+            layout.addGridTool(tool, currentExt = ext)
+        }
+    }
+
+    fun removeHomeGridTool(context: Context, tool: MeldToolId) {
+        mutateHomeLayout(context) { layout, ext ->
+            layout.removeGridTool(tool, currentExt = ext)
+        }
+    }
+
+    fun resetHomeLayoutToDefaults(context: Context) {
+        val defaultLayout = HomeLayoutConfig(isCustom = false)
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_HOME_CUSTOM, false)
+            .remove(KEY_HOME_QUICK_TOOLS)
+            .remove(KEY_HOME_GRID_TOOLS)
+            .apply()
+        _uiState.update {
+            it.copy(
+                homeLayout = defaultLayout,
+                bannerMessage = context.getString(R.string.vm_home_layout_reset),
+                isBannerError = false
+            )
+        }
+    }
+
+    private fun mutateHomeLayout(
+        context: Context,
+        transform: (HomeLayoutConfig, String) -> HomeLayoutConfig
+    ) {
+        val currentState = _uiState.value
+        val ext = currentState.selectedFile?.extension?.lowercase() ?: "pdf"
+        val updated = transform(currentState.homeLayout, ext)
+        persistHomeLayout(context, updated)
+    }
+
+    private fun persistHomeLayout(context: Context, config: HomeLayoutConfig) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_HOME_CUSTOM, config.isCustom)
+            .putString(KEY_HOME_QUICK_TOOLS, HomeLayoutConfig.serializeTools(config.quickTools))
+            .putString(KEY_HOME_GRID_TOOLS, HomeLayoutConfig.serializeTools(config.gridTools))
+            .apply()
+        _uiState.update { it.copy(homeLayout = config) }
     }
 
     fun selectMode(mode: MeldMode) {
