@@ -432,6 +432,28 @@ enum class MeldToolId(
         supportedExtensions = setOf("pptx"),
         outputExtension = "jpg"
     ),
+    PPTX_TO_HTML(
+        titleRes = R.string.tool_pptx_to_html_title,
+        badgeRes = R.string.tool_pptx_to_html_badge,
+        subtitleRes = R.string.tool_pptx_to_html_subtitle,
+        ctaLabelRes = R.string.tool_pptx_to_html_cta,
+        resultHeadlineRes = R.string.tool_pptx_to_html_result,
+        mode = MeldMode.CONVERT,
+        category = MeldCategory.SLIDES,
+        supportedExtensions = setOf("pptx"),
+        outputExtension = "html"
+    ),
+    PPTX_TO_DOCX(
+        titleRes = R.string.tool_pptx_to_docx_title,
+        badgeRes = R.string.tool_pptx_to_docx_badge,
+        subtitleRes = R.string.tool_pptx_to_docx_subtitle,
+        ctaLabelRes = R.string.tool_pptx_to_docx_cta,
+        resultHeadlineRes = R.string.tool_pptx_to_docx_result,
+        mode = MeldMode.CONVERT,
+        category = MeldCategory.SLIDES,
+        supportedExtensions = setOf("pptx"),
+        outputExtension = "docx"
+    ),
     PPTX_TO_MD(
         titleRes = R.string.tool_pptx_to_md_title,
         badgeRes = R.string.tool_pptx_to_md_badge,

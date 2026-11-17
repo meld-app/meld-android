@@ -221,5 +221,19 @@ class MeldEnginesInstrumentedTest {
         assertNotNull(slideBmp)
         assertTrue(slideBmp!!.width > 0 && slideBmp.height > 0)
         slideBmp.recycle()
+
+        val htmlOut = File(tempDir, "deck.html")
+        val htmlProgress = mutableListOf<Pair<Int, Int>>()
+        val htmlSummary = PptxEngine.convertPptxToHtml(
+            inputFile = samplePptx,
+            outputFile = htmlOut,
+            fontCacheDir = tempDir,
+            onProgress = { cur, total -> htmlProgress += cur to total }
+        )
+        assertEquals(3, htmlSummary.slideCount)
+        assertEquals(listOf(1 to 3, 2 to 3, 3 to 3), htmlProgress)
+        val htmlText = htmlOut.readText()
+        assertTrue(htmlText.contains("data:image/jpeg;base64,"))
+        assertTrue(htmlText.contains("Speaker Notes"))
     }
 }

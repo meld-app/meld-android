@@ -256,6 +256,8 @@
     <string name="vm_pptx_single_slide_rendered">Rendered slide %1$d of %2$d to %3$s without altering deck</string>
     <string name="vm_pptx_handout_built">Built %1$d-up handout from %2$d slides cleanly</string>
     <string name="vm_pptx_text_extracted">Extracted %1$d slides (%2$d tables, %3$d notes)</string>
+    <string name="vm_pptx_html_exported">Built HTML5 presentation reader (%1$d slides, %2$d tables, %3$d notes)</string>
+    <string name="vm_pptx_docx_exported">Converted %1$d slides into Word .docx (%2$d tables, %3$d notes)</string>
     <string name="vm_pptx_sanitized">Sanitized %1$d slides (%2$d XML/media untouched, %3$d notes removed)</string>
     <string name="vm_err_merge_need_two">Add at least 2 PDF files to merge into one document.</string>
     <string name="vm_batch_added_one">Added %1$s to queue</string>
@@ -501,6 +503,18 @@
     <string name="tool_pptx_to_jpg_subtitle">Save all slides (.zip) or any chosen slide as a high-res JPEG image</string>
     <string name="tool_pptx_to_jpg_cta">Export slide JPG</string>
     <string name="tool_pptx_to_jpg_result">Slide JPEG ready.</string>
+
+    <string name="tool_pptx_to_html_title">PPTX to HTML5</string>
+    <string name="tool_pptx_to_html_badge">Web Deck</string>
+    <string name="tool_pptx_to_html_subtitle">Build an offline HTML5 slide reader with visuals &amp; speaker notes</string>
+    <string name="tool_pptx_to_html_cta">Export HTML5 deck</string>
+    <string name="tool_pptx_to_html_result">HTML5 deck ready.</string>
+
+    <string name="tool_pptx_to_docx_title">PPTX to Word</string>
+    <string name="tool_pptx_to_docx_badge">DOCX</string>
+    <string name="tool_pptx_to_docx_subtitle">Export slide headings, bullets, tables &amp; speaker notes into .docx</string>
+    <string name="tool_pptx_to_docx_cta">Export to Word</string>
+    <string name="tool_pptx_to_docx_result">Word deck ready.</string>
 
     <string name="tool_pptx_to_md_title">PPTX to Markdown</string>
     <string name="tool_pptx_to_md_badge">Slide MD</string>

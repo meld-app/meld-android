@@ -17,6 +17,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.charset.StandardCharsets
+import java.util.Base64
 import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
@@ -39,6 +40,7 @@ import kotlin.math.roundToInt
 object PptxEngine {
 
     private const val MAX_RENDER_IMAGE_SIDE_PX = 2160f
+    private const val MAX_HTML_SLIDE_IMAGES = 20
 
     data class PptxPdfRenderSummary(
         val outputFile: File,
@@ -155,10 +157,11 @@ object PptxEngine {
     private fun renderSlideToBitmap(
         zip: ZipFile,
         slide: PptxOoxmlParser.PptxSlide,
-        fontResolver: PptxFontResolver
+        fontResolver: PptxFontResolver,
+        maxSidePx: Float = MAX_RENDER_IMAGE_SIDE_PX
     ): Bitmap {
         val maxSlideDim = max(1f, max(slide.widthPt, slide.heightPt))
-        val scale = (MAX_RENDER_IMAGE_SIDE_PX / maxSlideDim).coerceIn(1.5f, 3.0f)
+        val scale = (maxSidePx / maxSlideDim).coerceIn(0.75f, 3.0f)
         val bmpW = (slide.widthPt * scale).roundToInt().coerceIn(64, 4096)
         val bmpH = (slide.heightPt * scale).roundToInt().coerceIn(64, 4096)
 
@@ -541,6 +544,275 @@ object PptxEngine {
             tableCount = tableCount,
             noteCount = noteCount,
             characterCount = content.length,
+        )
+    }
+
+    fun convertPptxToHtml(
+        inputFile: File,
+        outputFile: File,
+        fontCacheDir: File = outputFile.parentFile ?: inputFile.parentFile ?: File("."),
+        onProgress: ((Int, Int) -> Unit)? = null,
+    ): PptxTextExtractSummary {
+        val presentation = PptxOoxmlParser.parse(inputFile)
+        if (presentation.slides.isEmpty()) {
+            throw IllegalArgumentException("Presentation contains no readable slides")
+        }
+        outputFile.parentFile?.mkdirs()
+
+        var tableCount = 0
+        var noteCount = 0
+        val total = presentation.slides.size
+        val safeTitle = DocumentEngine.escapeXml(inputFile.nameWithoutExtension)
+        val safeName = DocumentEngine.escapeXml(inputFile.name)
+
+        val html = buildString {
+            append("""
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                  <meta charset="UTF-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <title>$safeTitle — MELD Slide Reader</title>
+                  <style>
+                    body { margin: 0; padding: 24px; background: #0D0E12; color: #F5F7FA; font-family: system-ui, -apple-system, sans-serif; line-height: 1.55; }
+                    .header, .slide { max-width: 860px; margin: 0 auto 20px; background: #151821; border: 1px solid #2B3042; border-radius: 14px; padding: 20px; }
+                    .tag { display: inline-block; background: #FF6A2B; color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: bold; }
+                    .badge { color: #FFB347; font-family: monospace; font-size: 12px; }
+                    .slide-img { width: 100%; height: auto; border-radius: 10px; margin: 12px 0; border: 1px solid #2B3042; display: block; background: #fff; }
+                    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+                    th, td { border: 1px solid #2B3042; padding: 8px 10px; text-align: left; }
+                    th { background: #1E2230; }
+                    details { margin-top: 12px; background: #1E2230; border-radius: 8px; padding: 10px 12px; border: 1px solid #2B3042; }
+                    summary { cursor: pointer; font-weight: 600; color: #FFB347; }
+                    .meta { color: #9BA3B5; font-size: 13px; }
+                  </style>
+                </head>
+                <body>
+                  <div class="header">
+                    <span class="tag">MELD PPTX READER</span>
+                    <h2>$safeName</h2>
+                    <p class="meta">Slides: $total • Canvas: ${presentation.slideWidthPt.roundToInt()}×${presentation.slideHeightPt.roundToInt()} pt • Offline Local Reader</p>
+                  </div>
+            """.trimIndent())
+
+            ZipFile(inputFile).use { zip ->
+                PptxFontResolver(fontCacheDir, zip, presentation.embeddedFonts).use { fontResolver ->
+                    presentation.slides.forEachIndexed { idx, slide ->
+                        onProgress?.invoke(idx + 1, total)
+                        val heading = slide.extractHeading()
+                        append("<section class=\"slide\"><span class=\"badge\">SLIDE ${slide.index1Based} OF $total</span>")
+                        if (!heading.isNullOrBlank()) {
+                            append("<h3>").append(DocumentEngine.escapeXml(heading)).append("</h3>")
+                        }
+                        if (slide.hidden) {
+                            append("<p class=\"meta\"><em>Hidden slide</em></p>")
+                        }
+                        if (idx < MAX_HTML_SLIDE_IMAGES) {
+                            val bmp = renderSlideToBitmap(zip, slide, fontResolver, maxSidePx = 960f)
+                            val b64 = try {
+                                val baos = ByteArrayOutputStream()
+                                if (bmp.compress(Bitmap.CompressFormat.JPEG, 84, baos)) {
+                                    Base64.getEncoder().encodeToString(baos.toByteArray())
+                                } else null
+                            } finally {
+                                bmp.recycle()
+                            }
+                            if (b64 != null) {
+                                append("<img class=\"slide-img\" alt=\"Slide ${slide.index1Based}\" src=\"data:image/jpeg;base64,$b64\"/>")
+                            }
+                        }
+
+                        for (element in slide.elements) {
+                            when (element) {
+                                is PptxOoxmlParser.PptxElement.Shape -> {
+                                    val body = element.textBody ?: continue
+                                    val bulletParas = mutableListOf<String>()
+                                    for (para in body.paragraphs) {
+                                        val line = para.runs.joinToString("") { it.text }.trim()
+                                        if (line.isEmpty()) continue
+                                        if (para.bulletPrefix != null) {
+                                            bulletParas += line
+                                        } else {
+                                            if (bulletParas.isNotEmpty()) {
+                                                append("<ul>")
+                                                bulletParas.forEach { append("<li>${DocumentEngine.escapeXml(it)}</li>") }
+                                                append("</ul>")
+                                                bulletParas.clear()
+                                            }
+                                            append("<p>").append(DocumentEngine.escapeXml(line)).append("</p>")
+                                        }
+                                    }
+                                    if (bulletParas.isNotEmpty()) {
+                                        append("<ul>")
+                                        bulletParas.forEach { append("<li>${DocumentEngine.escapeXml(it)}</li>") }
+                                        append("</ul>")
+                                    }
+                                }
+
+                                is PptxOoxmlParser.PptxElement.Table -> {
+                                    tableCount++
+                                    append("<table>")
+                                    element.rows.forEachIndexed { rIdx, row ->
+                                        val tag = if (rIdx == 0) "th" else "td"
+                                        append("<tr>")
+                                        row.cells.filterNot { it.mergedAway }.forEach { cell ->
+                                            val text = cell.textBody?.paragraphs
+                                                ?.joinToString(" ") { p -> p.runs.joinToString("") { it.text }.trim() }
+                                                ?.trim()
+                                                .orEmpty()
+                                            append("<$tag>${DocumentEngine.escapeXml(text)}</$tag>")
+                                        }
+                                        append("</tr>")
+                                    }
+                                    append("</table>")
+                                }
+
+                                is PptxOoxmlParser.PptxElement.Picture -> Unit
+                            }
+                        }
+
+                        if (slide.notesText.isNotBlank()) {
+                            noteCount++
+                            append("<details><summary>Speaker Notes</summary><p>")
+                                .append(DocumentEngine.escapeXml(slide.notesText.trim()))
+                                .append("</p></details>")
+                        }
+                        append("</section>")
+                    }
+                }
+            }
+            append("</body></html>")
+        }
+
+        outputFile.writeText(html, StandardCharsets.UTF_8)
+        return PptxTextExtractSummary(
+            outputFile = outputFile,
+            slideCount = total,
+            tableCount = tableCount,
+            noteCount = noteCount,
+            characterCount = html.length,
+        )
+    }
+
+    fun convertPptxToDocx(
+        inputFile: File,
+        outputFile: File,
+        onProgress: ((Int, Int) -> Unit)? = null,
+    ): PptxTextExtractSummary {
+        val presentation = PptxOoxmlParser.parse(inputFile)
+        if (presentation.slides.isEmpty()) {
+            throw IllegalArgumentException("Presentation contains no readable slides")
+        }
+        outputFile.parentFile?.mkdirs()
+
+        var tableCount = 0
+        var noteCount = 0
+        val total = presentation.slides.size
+
+        val docXml = buildString {
+            append("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>""")
+            append("""<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">""")
+            append("<w:body>")
+            append("<w:p><w:pPr><w:pStyle w:val=\"Title\"/></w:pPr><w:r><w:t>${DocumentEngine.escapeXml(inputFile.nameWithoutExtension)}</w:t></w:r></w:p>")
+            append("<w:p><w:r><w:t>Converted locally by MELD for Android • Slides: $total</w:t></w:r></w:p>")
+
+            presentation.slides.forEachIndexed { idx, slide ->
+                onProgress?.invoke(idx + 1, total)
+                val heading = slide.extractHeading()
+                val titleText = buildString {
+                    append("Slide ${slide.index1Based}")
+                    if (!heading.isNullOrBlank()) append(": $heading")
+                    if (slide.hidden) append(" [Hidden]")
+                }
+                append("<w:p><w:pPr><w:pStyle w:val=\"Heading1\"/></w:pPr><w:r><w:t xml:space=\"preserve\">${DocumentEngine.escapeXml(titleText)}</w:t></w:r></w:p>")
+
+                var headingSkipped = false
+                for (element in slide.elements) {
+                    when (element) {
+                        is PptxOoxmlParser.PptxElement.Shape -> {
+                            val body = element.textBody ?: continue
+                            for (para in body.paragraphs) {
+                                val rawLine = para.runs.joinToString("") { it.text }.trim()
+                                if (rawLine.isEmpty()) continue
+                                if (!headingSkipped && heading != null && rawLine == heading) {
+                                    headingSkipped = true
+                                    continue
+                                }
+                                val line = if (para.bulletPrefix != null) {
+                                    val indent = "  ".repeat(para.level.coerceIn(0, 4))
+                                    "$indent• $rawLine"
+                                } else {
+                                    rawLine
+                                }
+                                append("<w:p><w:r><w:t xml:space=\"preserve\">${DocumentEngine.escapeXml(line)}</w:t></w:r></w:p>")
+                            }
+                        }
+
+                        is PptxOoxmlParser.PptxElement.Table -> {
+                            tableCount++
+                            append("<w:tbl>")
+                            for (row in element.rows) {
+                                val cells = row.cells.filterNot { it.mergedAway }
+                                if (cells.isEmpty()) continue
+                                append("<w:tr>")
+                                for (cell in cells) {
+                                    val cellText = cell.textBody?.paragraphs
+                                        ?.joinToString(" ") { p -> p.runs.joinToString("") { it.text }.trim() }
+                                        ?.trim()
+                                        .orEmpty()
+                                    append("<w:tc><w:p><w:r><w:t xml:space=\"preserve\">${DocumentEngine.escapeXml(cellText)}</w:t></w:r></w:p></w:tc>")
+                                }
+                                append("</w:tr>")
+                            }
+                            append("</w:tbl>")
+                        }
+
+                        is PptxOoxmlParser.PptxElement.Picture -> Unit
+                    }
+                }
+
+                if (slide.notesText.isNotBlank()) {
+                    noteCount++
+                    append("<w:p><w:r><w:t xml:space=\"preserve\">Speaker Notes: ${DocumentEngine.escapeXml(slide.notesText.trim())}</w:t></w:r></w:p>")
+                }
+            }
+
+            append("<w:sectPr><w:pgSz w:w=\"11906\" w:h=\"16838\"/></w:sectPr>")
+            append("</w:body></w:document>")
+        }
+
+        val contentTypes = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+              <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+              <Default Extension="xml" ContentType="application/xml"/>
+              <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+            </Types>""".trimIndent()
+
+        val rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+              <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+            </Relationships>""".trimIndent()
+
+        ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile))).use { zos ->
+            zos.putNextEntry(ZipEntry("[Content_Types].xml"))
+            zos.write(contentTypes.toByteArray(StandardCharsets.UTF_8))
+            zos.closeEntry()
+
+            zos.putNextEntry(ZipEntry("_rels/.rels"))
+            zos.write(rels.toByteArray(StandardCharsets.UTF_8))
+            zos.closeEntry()
+
+            zos.putNextEntry(ZipEntry("word/document.xml"))
+            zos.write(docXml.toByteArray(StandardCharsets.UTF_8))
+            zos.closeEntry()
+        }
+
+        return PptxTextExtractSummary(
+            outputFile = outputFile,
+            slideCount = total,
+            tableCount = tableCount,
+            noteCount = noteCount,
+            characterCount = docXml.length,
         )
     }
 

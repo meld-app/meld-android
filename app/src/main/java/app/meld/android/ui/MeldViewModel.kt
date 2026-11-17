@@ -1128,6 +1128,35 @@ class MeldViewModel : ViewModel() {
                                 )
                             }
                         }
+                        MeldToolId.PPTX_TO_HTML -> {
+                            val pptxFile = ensurePptxInput(context, inputFile)
+                            val res = PptxEngine.convertPptxToHtml(
+                                pptxFile,
+                                outFile,
+                                fontCacheDir = context.cacheDir,
+                                onProgress = { cur, tot -> reportProgress(ProgressUnit.SLIDE, cur, tot) }
+                            )
+                            context.getString(
+                                R.string.vm_pptx_html_exported,
+                                res.slideCount,
+                                res.tableCount,
+                                res.noteCount
+                            )
+                        }
+                        MeldToolId.PPTX_TO_DOCX -> {
+                            val pptxFile = ensurePptxInput(context, inputFile)
+                            val res = PptxEngine.convertPptxToDocx(
+                                pptxFile,
+                                outFile,
+                                onProgress = { cur, tot -> reportProgress(ProgressUnit.SLIDE, cur, tot) }
+                            )
+                            context.getString(
+                                R.string.vm_pptx_docx_exported,
+                                res.slideCount,
+                                res.tableCount,
+                                res.noteCount
+                            )
+                        }
                         MeldToolId.PPTX_TO_MD, MeldToolId.PPTX_TO_TXT -> {
                             val pptxFile = ensurePptxInput(context, inputFile)
                             val res = if (tool == MeldToolId.PPTX_TO_MD) {

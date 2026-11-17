@@ -1171,9 +1171,9 @@ fun SpecializedToolShowcaseCard(
                 MeldToolId.COLLAGE -> CollageGridAssembleStage()
                 MeldToolId.PDF_MERGE -> MergeBookletStage()
                 MeldToolId.PACK_ZIP -> ZipPackStage()
-                MeldToolId.PDF_TO_DOCX -> SheetFlipWordStage()
+                MeldToolId.PDF_TO_DOCX, MeldToolId.PPTX_TO_DOCX -> SheetFlipWordStage()
                 MeldToolId.PDF_TO_MD, MeldToolId.PPTX_TO_MD -> SheetToCodeTerminalStage(tag = "#", accentColor = colors.stageLimeCode)
-                MeldToolId.PDF_TO_HTML -> SheetToCodeTerminalStage(tag = "</>", accentColor = colors.periwinkle)
+                MeldToolId.PDF_TO_HTML, MeldToolId.PPTX_TO_HTML -> SheetToCodeTerminalStage(tag = "</>", accentColor = colors.periwinkle)
                 MeldToolId.PDF_TO_TXT, MeldToolId.PPTX_TO_TXT -> SheetToCodeTerminalStage(tag = "Aa", accentColor = colors.mint)
                 MeldToolId.PDF_TO_PNG, MeldToolId.PDF_TO_JPG,
                 MeldToolId.PPTX_TO_PNG, MeldToolId.PPTX_TO_JPG,

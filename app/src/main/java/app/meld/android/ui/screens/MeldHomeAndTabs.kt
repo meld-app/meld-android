@@ -2350,6 +2350,8 @@ fun iconForTool(tool: MeldToolId): ImageVector = when (tool) {
     MeldToolId.PACK_ZIP -> Icons.Default.Archive
     MeldToolId.PPTX_TO_PDF -> Icons.Default.PictureAsPdf
     MeldToolId.PPTX_TO_PNG, MeldToolId.PPTX_TO_JPG -> Icons.Default.Image
+    MeldToolId.PPTX_TO_HTML -> Icons.Default.Language
+    MeldToolId.PPTX_TO_DOCX -> Icons.Default.Description
     MeldToolId.PPTX_TO_MD -> Icons.Default.Code
     MeldToolId.PPTX_TO_TXT -> Icons.Default.EditNote
     MeldToolId.PPTX_HANDOUT -> Icons.Default.GridView
