@@ -1,5 +1,6 @@
 package app.meld.android.ui.components
 
+import android.graphics.Bitmap
 import androidx.compose.ui.res.stringResource
 import app.meld.android.R
 
@@ -15,6 +16,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -65,9 +67,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
@@ -665,7 +669,8 @@ fun SplitPageSpreadStage(
     startPage: Int,
     endPage: Int,
     onSelectPage: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    pageThumbnails: List<Bitmap> = emptyList()
 ) {
     val visiblePages = minOf(totalPages.coerceAtLeast(1), 6)
     var replay by remember { mutableIntStateOf(0) }
@@ -763,10 +768,11 @@ fun SplitPageSpreadStage(
                         animationSpec = tween(durationMillis = MeldMotion.UI_MS, easing = MeldMotion.EaseOut),
                         label = "pageScale"
                     )
+                    val thumb = pageThumbnails.getOrNull(page - 1)?.takeIf { !it.isRecycled }
                     Surface(
                         modifier = Modifier
                             .weight(1f)
-                            .defaultMinSize(minHeight = 56.dp)
+                            .defaultMinSize(minHeight = 76.dp)
                             .graphicsLayer {
                                 scaleX = scale
                                 scaleY = scale
@@ -793,6 +799,18 @@ fun SplitPageSpreadStage(
                                     .clip(CircleShape)
                                     .background(if (selected) colors.coral else colors.inkOnAccent.copy(alpha = 0.35f))
                             )
+                            if (thumb != null) {
+                                Image(
+                                    bitmap = thumb.asImageBitmap(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Fit,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(40.dp)
+                                        .padding(vertical = 2.dp)
+                                        .clip(RoundedCornerShape(4.dp))
+                                )
+                            }
                             Text(
                                 text = stringResource(R.string.page_tile_short, page),
                                 style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),

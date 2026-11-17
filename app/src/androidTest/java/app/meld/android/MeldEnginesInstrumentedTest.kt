@@ -132,6 +132,11 @@ class MeldEnginesInstrumentedTest {
             redactionZones = listOf(RedactionRect(0.10f, 0.24f, 0.90f, 0.34f, "Sensitive"))
         )
         assertEquals(4, DocumentEngine.countPdfPages(redactedOut))
+
+        val thumbs = app.meld.android.ui.components.renderPdfPageThumbnails(samplePdf, maxPages = 6, maxDim = 220)
+        assertEquals(4, thumbs.size)
+        assertTrue(thumbs.all { it.width > 0 && it.height > 0 && !it.isRecycled })
+        thumbs.forEach { it.recycle() }
     }
 
     @Test

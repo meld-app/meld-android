@@ -1214,3 +1214,37 @@ internal fun renderPdfPagePreview(pdfFile: File, maxDim: Int = 1080): Bitmap? {
         }
     }.getOrNull()
 }
+
+internal fun renderPdfPageThumbnails(pdfFile: File, maxPages: Int = 6, maxDim: Int = 220): List<Bitmap> {
+    if (!pdfFile.isFile) return emptyList()
+    return runCatching {
+        ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+            PdfRenderer(pfd).use { renderer ->
+                val count = min(renderer.pageCount, maxPages.coerceAtLeast(1))
+                val list = ArrayList<Bitmap>(count)
+                for (i in 0 until count) {
+                    renderer.openPage(i).use { page ->
+                        val rawW = max(1, page.width)
+                        val rawH = max(1, page.height)
+                        val largest = max(rawW, rawH)
+                        val scale = if (largest > maxDim && maxDim > 0) maxDim.toFloat() / largest else 1f
+                        val w = max(1, (rawW * scale).toInt())
+                        val h = max(1, (rawH * scale).toInt())
+                        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                        try {
+                            val canvas = android.graphics.Canvas(bmp)
+                            canvas.drawColor(android.graphics.Color.WHITE)
+                            page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                            list.add(bmp)
+                        } catch (t: Throwable) {
+                            bmp.recycle()
+                            list.forEach { if (!it.isRecycled) it.recycle() }
+                            throw t
+                        }
+                    }
+                }
+                list
+            }
+        }
+    }.getOrDefault(emptyList())
+}
