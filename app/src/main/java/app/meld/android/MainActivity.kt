@@ -75,6 +75,28 @@ class MainActivity : ComponentActivity() {
                     onOpenResult = viewModel::openResult,
                     onNavigateHome = viewModel::navigateHome,
                     onSetFileSheetVisible = viewModel::setFileSheetVisible,
+                    onSetCustomizeHomeSheetVisible = viewModel::setCustomizeHomeSheetVisible,
+                    onSwapHomeQuickTool = { slot, tool ->
+                        viewModel.swapHomeQuickTool(this@MainActivity, slot, tool)
+                    },
+                    onMoveHomeQuickTool = { idx, delta ->
+                        viewModel.moveHomeQuickTool(this@MainActivity, idx, delta)
+                    },
+                    onSwapHomeGridTool = { slot, tool ->
+                        viewModel.swapHomeGridTool(this@MainActivity, slot, tool)
+                    },
+                    onMoveHomeGridTool = { idx, delta ->
+                        viewModel.moveHomeGridTool(this@MainActivity, idx, delta)
+                    },
+                    onAddHomeGridTool = { tool ->
+                        viewModel.addHomeGridTool(this@MainActivity, tool)
+                    },
+                    onRemoveHomeGridTool = { tool ->
+                        viewModel.removeHomeGridTool(this@MainActivity, tool)
+                    },
+                    onResetHomeLayout = {
+                        viewModel.resetHomeLayoutToDefaults(this@MainActivity)
+                    },
                     onClearBanner = viewModel::clearBanner,
                     onPickExternalFile = {
                         viewModel.setFileSheetVisible(false)

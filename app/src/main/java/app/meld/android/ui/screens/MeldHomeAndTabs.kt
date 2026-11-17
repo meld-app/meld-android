@@ -40,15 +40,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Collections
@@ -63,6 +66,8 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.HideImage
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Lock
@@ -88,7 +93,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -102,6 +109,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -113,6 +121,7 @@ import androidx.compose.ui.util.lerp
 import app.meld.android.BuildConfig
 import app.meld.android.R
 import app.meld.android.model.ConversionResult
+import app.meld.android.model.HomeLayoutConfig
 import app.meld.android.model.MeldCategory
 import app.meld.android.model.MeldMode
 import app.meld.android.model.MeldToolId
@@ -143,6 +152,7 @@ fun MeldStudioHomeScreen(
     openingDriver: MeldOpeningDriver,
     onReplayIntro: () -> Unit,
     onOpenChangeFile: () -> Unit,
+    onOpenCustomizeHome: () -> Unit = {},
     onOpenTask: (MeldToolId) -> Unit,
     onSeeAllTools: () -> Unit,
     onOpenResult: (ConversionResult) -> Unit,
@@ -166,19 +176,8 @@ fun MeldStudioHomeScreen(
     )
 
     val ext = uiState.selectedFile?.extension?.lowercase() ?: "pdf"
-    val quickTriple: Triple<MeldToolId, MeldToolId, MeldToolId> = remember(ext) {
-        when (ext) {
-            "pptx" ->
-                Triple(MeldToolId.PPTX_TO_PDF, MeldToolId.PPTX_HANDOUT, MeldToolId.PPTX_SANITIZE)
-            in setOf("png", "jpg", "jpeg", "webp", "bmp", "tiff", "tif") ->
-                Triple(MeldToolId.COMPRESS, MeldToolId.REMOVE_BG, MeldToolId.IMG_TO_PDF)
-            in setOf("wav", "pcm", "mp3", "m4a", "aac", "mp4", "ogg") ->
-                Triple(MeldToolId.VISUALIZE, MeldToolId.SPEED_2X, MeldToolId.PACK_ZIP)
-            in setOf("csv", "tsv", "txt") ->
-                Triple(MeldToolId.SHEET_TO_PDF, MeldToolId.SHEET_TO_MD, MeldToolId.TABLE_CONVERT)
-            else ->
-                Triple(MeldToolId.COMPRESS_PDF, MeldToolId.HANDOUT, MeldToolId.PDF_EXTRACT)
-        }
+    val quickTriple: Triple<MeldToolId, MeldToolId, MeldToolId> = remember(ext, uiState.homeLayout) {
+        uiState.homeLayout.resolveQuickTools(ext)
     }
 
     val slide22Px = with(density) { 22.dp.toPx() }
@@ -402,7 +401,7 @@ fun MeldStudioHomeScreen(
             val t3T = if (!openingDriver.showOverlay) 1f else openingDriver.t3Anim.value
 
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(
+                FlowRow(
                     modifier = Modifier
                         .fillMaxWidth()
                         .graphicsLayer {
@@ -410,24 +409,59 @@ fun MeldStudioHomeScreen(
                             translationY = (1f - qtT) * slide22Px
                         },
                     horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = stringResource(R.string.quick_tools_heading),
                         style = MaterialTheme.typography.headlineSmall,
-                        color = colors.textPrimary
-                    )
-                    Text(
-                        text = stringResource(R.string.all_tools_count, MeldToolId.entries.size),
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            textDecoration = TextDecoration.Underline
-                        ),
                         color = colors.textPrimary,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { onSeeAllTools() }
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
+                        modifier = Modifier.align(Alignment.CenterVertically)
                     )
+                    Row(
+                        modifier = Modifier.align(Alignment.CenterVertically),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .clickable { onOpenCustomizeHome() },
+                            shape = CircleShape,
+                            color = colors.surface,
+                            border = BorderStroke(1.5.dp, colors.border)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = null,
+                                    tint = colors.textPrimary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Text(
+                                    text = stringResource(R.string.customize_home),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = colors.textPrimary,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
+                        Text(
+                            text = stringResource(R.string.all_tools_count, MeldToolId.entries.size),
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                textDecoration = TextDecoration.Underline
+                            ),
+                            color = colors.textPrimary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { onSeeAllTools() }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
                 }
 
                 val primaryTool = quickTriple.first
@@ -571,16 +605,13 @@ fun MeldStudioHomeScreen(
             }
         }
 
-        // More tools that also work on the current file (fills the lower Home area)
+        // Pinned / context-aware lower Home shortcuts grid
         item {
-            val shown = setOf(quickTriple.first, quickTriple.second, quickTriple.third)
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 val columns = MeldAdaptiveLayout.toolColumnsForGridWidth(maxWidth.value, fontScale)
                 val maxMoreTools = if (columns >= 3) 6 else 4
-                val moreTools = remember(ext, maxMoreTools) {
-                    MeldToolId.entries
-                        .filter { it.acceptsExtension(ext) && it !in shown && it != MeldToolId.SCAN_QR }
-                        .take(maxMoreTools)
+                val moreTools = remember(ext, maxMoreTools, uiState.homeLayout) {
+                    uiState.homeLayout.resolveGridTools(ext, maxMoreTools)
                 }
                 if (moreTools.isNotEmpty()) {
                     val tints = listOf(
@@ -589,7 +620,13 @@ fun MeldStudioHomeScreen(
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(
-                            text = stringResource(R.string.more_for_file_heading),
+                            text = stringResource(
+                                if (uiState.homeLayout.isCustom) {
+                                    R.string.pinned_tools_heading
+                                } else {
+                                    R.string.more_for_file_heading
+                                }
+                            ),
                             style = MaterialTheme.typography.headlineSmall,
                             color = colors.textPrimary
                         )
@@ -1676,6 +1713,501 @@ fun MeldChangeFileBottomSheet(
                     repeat(sampleColumns - rowPresets.size) {
                         Spacer(modifier = Modifier.weight(1f))
                     }
+                }
+            }
+        }
+    }
+}
+
+private sealed interface HomeSwapTarget {
+    data class QuickSlot(val index: Int) : HomeSwapTarget
+    data class GridSlot(val index: Int) : HomeSwapTarget
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun MeldCustomizeHomeBottomSheet(
+    uiState: MeldUiState,
+    onDismiss: () -> Unit,
+    onSwapQuickTool: (Int, MeldToolId) -> Unit,
+    onMoveQuickTool: (Int, Int) -> Unit,
+    onSwapGridTool: (Int, MeldToolId) -> Unit,
+    onMoveGridTool: (Int, Int) -> Unit,
+    onAddGridTool: (MeldToolId) -> Unit,
+    onRemoveGridTool: (MeldToolId) -> Unit,
+    onResetDefaults: () -> Unit
+) {
+    val colors = meldColors
+    val context = LocalContext.current
+    val ext = uiState.selectedFile?.extension?.lowercase() ?: "pdf"
+    val effectiveLayout = remember(uiState.homeLayout, ext) {
+        uiState.homeLayout.materializeForEditing(ext, defaultMaxCount = 4)
+    }
+    var swapTarget by remember { mutableStateOf<HomeSwapTarget?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredCatalog = remember(searchQuery, context) {
+        val q = searchQuery.trim().lowercase()
+        MeldToolId.entries.filter { tool ->
+            q.isEmpty() ||
+                context.getString(tool.titleRes).lowercase().contains(q) ||
+                context.getString(tool.subtitleRes).lowercase().contains(q) ||
+                context.getString(tool.badgeRes).lowercase().contains(q)
+        }
+    }
+
+    val quickSlotLabels = listOf(
+        R.string.home_edit_slot_primary,
+        R.string.home_edit_slot_top_right,
+        R.string.home_edit_slot_bottom_right
+    )
+    val quickTintColors = listOf(colors.butter, colors.mint, colors.periwinkle)
+    val gridTintColors = listOf(colors.lavender, colors.peach, colors.periwinkle, colors.mint)
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = colors.canvas
+    ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("customize_home_list"),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.home_edit_sheet_title),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = colors.textPrimary
+                    )
+                    Text(
+                        text = stringResource(R.string.home_edit_sheet_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary
+                    )
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .clickable {
+                                    swapTarget = null
+                                    onResetDefaults()
+                                },
+                            shape = CircleShape,
+                            color = colors.surface,
+                            border = BorderStroke(1.5.dp, colors.border)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.home_edit_reset_defaults),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = colors.textPrimary,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp)
+                            )
+                        }
+                        Surface(
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .clickable { onDismiss() },
+                            shape = CircleShape,
+                            color = colors.coral,
+                            border = BorderStroke(1.5.dp, colors.border)
+                        ) {
+                            Text(
+                                text = stringResource(R.string.home_edit_done),
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.inkOnAccent,
+                                modifier = Modifier.padding(horizontal = 18.dp, vertical = 9.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    text = stringResource(R.string.home_edit_bento_section),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+            }
+
+            items(effectiveLayout.quickTools.size, key = { idx -> "quick_${idx}_${effectiveLayout.quickTools[idx].name}" }) { idx ->
+                val tool = effectiveLayout.quickTools[idx]
+                val target = HomeSwapTarget.QuickSlot(idx)
+                HomeLayoutSlotEditorCard(
+                    tool = tool,
+                    slotLabel = stringResource(quickSlotLabels.getOrElse(idx) { R.string.home_edit_slot_primary }),
+                    accentColor = quickTintColors[idx % quickTintColors.size],
+                    isSelectingSwap = swapTarget == target,
+                    canMoveUp = idx > 0,
+                    canMoveDown = idx < effectiveLayout.quickTools.lastIndex,
+                    canRemove = false,
+                    onMoveUp = { onMoveQuickTool(idx, -1) },
+                    onMoveDown = { onMoveQuickTool(idx, 1) },
+                    onToggleSwap = {
+                        swapTarget = if (swapTarget == target) null else target
+                    },
+                    onRemove = {}
+                )
+            }
+
+            item {
+                Text(
+                    text = stringResource(
+                        R.string.home_edit_grid_section,
+                        effectiveLayout.gridTools.size,
+                        HomeLayoutConfig.MAX_HOME_GRID_TOOLS
+                    ),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textSecondary,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+            }
+
+            if (effectiveLayout.gridTools.isEmpty()) {
+                item {
+                    TactileCard(
+                        backgroundColor = colors.surface,
+                        cornerRadius = 16.dp,
+                        elevationOffset = 1.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.home_edit_grid_empty),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.textSecondary,
+                            modifier = Modifier.padding(14.dp)
+                        )
+                    }
+                }
+            } else {
+                items(effectiveLayout.gridTools.size, key = { idx -> "grid_${idx}_${effectiveLayout.gridTools[idx].name}" }) { idx ->
+                    val tool = effectiveLayout.gridTools[idx]
+                    val target = HomeSwapTarget.GridSlot(idx)
+                    HomeLayoutSlotEditorCard(
+                        tool = tool,
+                        slotLabel = null,
+                        accentColor = gridTintColors[idx % gridTintColors.size],
+                        isSelectingSwap = swapTarget == target,
+                        canMoveUp = idx > 0,
+                        canMoveDown = idx < effectiveLayout.gridTools.lastIndex,
+                        canRemove = true,
+                        onMoveUp = { onMoveGridTool(idx, -1) },
+                        onMoveDown = { onMoveGridTool(idx, 1) },
+                        onToggleSwap = {
+                            swapTarget = if (swapTarget == target) null else target
+                        },
+                        onRemove = {
+                            if (swapTarget == target) swapTarget = null
+                            onRemoveGridTool(tool)
+                        }
+                    )
+                }
+            }
+
+            item {
+                val activeTargetTool = when (val t = swapTarget) {
+                    is HomeSwapTarget.QuickSlot -> effectiveLayout.quickTools.getOrNull(t.index)
+                    is HomeSwapTarget.GridSlot -> effectiveLayout.gridTools.getOrNull(t.index)
+                    null -> null
+                }
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 6.dp)
+                ) {
+                    Text(
+                        text = if (activeTargetTool != null) {
+                            stringResource(
+                                R.string.home_edit_catalog_swap_prompt,
+                                stringResource(activeTargetTool.titleRes)
+                            )
+                        } else {
+                            stringResource(R.string.home_edit_catalog_add_prompt)
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (activeTargetTool != null) colors.coral else colors.textSecondary
+                    )
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = { Text(stringResource(R.string.search_tools_placeholder)) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = colors.textPrimary
+                            )
+                        },
+                        trailingIcon = if (searchQuery.isNotEmpty()) {
+                            {
+                                IconButton(onClick = { searchQuery = "" }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.cd_clear_search),
+                                        tint = colors.textPrimary
+                                    )
+                                }
+                            }
+                        } else null,
+                        singleLine = true,
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedContainerColor = colors.surface,
+                            unfocusedContainerColor = colors.surface,
+                            focusedBorderColor = colors.border,
+                            unfocusedBorderColor = colors.border,
+                            focusedTextColor = colors.textPrimary,
+                            unfocusedTextColor = colors.textPrimary,
+                            focusedPlaceholderColor = colors.textSecondary,
+                            unfocusedPlaceholderColor = colors.textSecondary,
+                            cursorColor = colors.coral
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            val pinnedOnHome = (effectiveLayout.quickTools + effectiveLayout.gridTools).toSet()
+            val gridIsFull = effectiveLayout.gridTools.size >= HomeLayoutConfig.MAX_HOME_GRID_TOOLS
+            items(filteredCatalog, key = { it.name }) { tool ->
+                val isPinned = tool in pinnedOnHome
+                val canClickCatalogRow = swapTarget != null || (!isPinned && !gridIsFull)
+                TactileCard(
+                    backgroundColor = colors.surface,
+                    cornerRadius = 18.dp,
+                    elevationOffset = 1.dp,
+                    onClick = if (canClickCatalogRow) {
+                        {
+                            when (val t = swapTarget) {
+                                is HomeSwapTarget.QuickSlot -> {
+                                    onSwapQuickTool(t.index, tool)
+                                    swapTarget = null
+                                }
+                                is HomeSwapTarget.GridSlot -> {
+                                    onSwapGridTool(t.index, tool)
+                                    swapTarget = null
+                                }
+                                null -> {
+                                    onAddGridTool(tool)
+                                }
+                            }
+                        }
+                    } else null,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(36.dp),
+                            shape = CircleShape,
+                            color = colors.canvas,
+                            border = BorderStroke(1.5.dp, colors.border)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = iconForTool(tool),
+                                    contentDescription = null,
+                                    tint = colors.textPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(tool.titleRes),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = stringResource(tool.subtitleRes),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (swapTarget != null) {
+                            Surface(
+                                shape = CircleShape,
+                                color = colors.coral,
+                                border = BorderStroke(1.2.dp, colors.border)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.home_edit_swap),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.inkOnAccent,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
+                        } else if (isPinned) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = colors.coral,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        } else if (!gridIsFull) {
+                            Surface(
+                                shape = CircleShape,
+                                color = colors.mint,
+                                border = BorderStroke(1.2.dp, colors.border)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Add,
+                                        contentDescription = null,
+                                        tint = colors.inkOnAccent,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.home_edit_add),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = colors.inkOnAccent
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun HomeLayoutSlotEditorCard(
+    tool: MeldToolId,
+    slotLabel: String?,
+    accentColor: Color,
+    isSelectingSwap: Boolean,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    canRemove: Boolean,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
+    onToggleSwap: () -> Unit,
+    onRemove: () -> Unit
+) {
+    val colors = meldColors
+    TactileCard(
+        backgroundColor = if (isSelectingSwap) colors.coral else colors.surface,
+        cornerRadius = 18.dp,
+        elevationOffset = 2.dp,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.align(Alignment.CenterVertically)
+            ) {
+                Surface(
+                    modifier = Modifier.size(34.dp),
+                    shape = CircleShape,
+                    color = accentColor,
+                    border = BorderStroke(1.5.dp, colors.border)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = iconForTool(tool),
+                            contentDescription = null,
+                            tint = colors.inkOnAccent,
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
+                }
+                Column {
+                    if (slotLabel != null) {
+                        Text(
+                            text = slotLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (isSelectingSwap) colors.inkOnAccent.copy(alpha = 0.85f) else colors.textSecondary
+                        )
+                    }
+                    Text(
+                        text = stringResource(tool.titleRes),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = if (isSelectingSwap) colors.inkOnAccent else colors.textPrimary
+                    )
+                }
+            }
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.align(Alignment.CenterVertically)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable { onToggleSwap() },
+                    shape = CircleShape,
+                    color = if (isSelectingSwap) colors.surface else colors.butter,
+                    border = BorderStroke(1.4.dp, colors.border)
+                ) {
+                    Text(
+                        text = stringResource(if (isSelectingSwap) R.string.home_edit_swapping else R.string.home_edit_swap),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSelectingSwap) colors.textPrimary else colors.inkOnAccent,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
+                if (canMoveUp) {
+                    TactileCircleIconButton(
+                        icon = Icons.Default.KeyboardArrowUp,
+                        contentDescription = stringResource(R.string.cd_move_up),
+                        onClick = onMoveUp,
+                        backgroundColor = colors.surface,
+                        size = 34.dp
+                    )
+                }
+                if (canMoveDown) {
+                    TactileCircleIconButton(
+                        icon = Icons.Default.KeyboardArrowDown,
+                        contentDescription = stringResource(R.string.cd_move_down),
+                        onClick = onMoveDown,
+                        backgroundColor = colors.surface,
+                        size = 34.dp
+                    )
+                }
+                if (canRemove) {
+                    TactileCircleIconButton(
+                        icon = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.cd_remove_item),
+                        onClick = onRemove,
+                        backgroundColor = colors.surface,
+                        size = 34.dp
+                    )
                 }
             }
         }
