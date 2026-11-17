@@ -21,6 +21,7 @@
     <string name="all_tools_count">All %1$d</string>
     <string name="more_for_file_heading">More for this file</string>
     <string name="pinned_tools_heading">Pinned shortcuts</string>
+    <string name="recent_outputs_heading">Recent outputs</string>
     <string name="customize_home">Customize</string>
     <string name="home_edit_sheet_title">Customize Home layout</string>
     <string name="home_edit_sheet_subtitle">Pin, swap, or reorder your favorite tools on Studio Home.</string>
@@ -38,6 +39,7 @@
     <string name="home_edit_reset_defaults">Reset to defaults</string>
     <string name="home_edit_done">Done</string>
     <string name="vm_home_layout_reset">Home layout restored to smart defaults</string>
+    <string name="vm_cache_cleared">Cleared temporary cache and recent history</string>
     <string name="recent_title_with_ext">%1$s · %2$s</string>
     <string name="recent_result_meta">%1$s · just now</string>
     <string name="cd_share_result">Share result</string>
@@ -101,6 +103,8 @@
     <string name="prefs_section_about">ABOUT</string>
     <string name="privacy_promise_title">100% On-device promise</string>
     <string name="privacy_promise_body">MELD requests zero internet permission. Your documents never touch a server.</string>
+    <string name="clear_cache_title">Clear local cache &amp; history</string>
+    <string name="clear_cache_subtitle" formatted="false">%1$s in temporary workspace • %2$d recent item(s) — tap to wipe</string>
     <string name="auto_downloads_title">Save directly to Downloads/MELD</string>
     <string name="auto_downloads_on_desc">On: every result is also copied to Downloads/MELD.</string>
     <string name="auto_downloads_off_desc">Off: files stay private inside MELD until you tap Save.</string>
@@ -109,6 +113,8 @@
     <string name="handout_3_up_short">3-up notes</string>
     <string name="handout_3_up_long">3-up (Mac style)</string>
     <string name="handout_4_up">4-up grid</string>
+    <string name="prefs_customize_home_title">Customize Studio Home Layout</string>
+    <string name="prefs_customize_home_subtitle">Choose &amp; reorder your 3 Bento Quick Tools and pinned shortcuts</string>
     <string name="replay_intro_title">Replay Opening Animation</string>
     <string name="replay_intro_subtitle">Watch the MELD sheet fold &amp; dock choreography</string>
     <string name="about_version_title">MELD for Android v%1$s</string>

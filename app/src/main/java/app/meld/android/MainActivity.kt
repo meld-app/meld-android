@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
 
                 MeldAppRoot(
                     uiState = uiState,
-                    onSelectTab = viewModel::selectDockTab,
+                    onSelectTab = { tab -> viewModel.selectDockTab(this@MainActivity, tab) },
                     onOpenTask = viewModel::openTask,
                     onOpenResult = viewModel::openResult,
                     onNavigateHome = viewModel::navigateHome,
@@ -174,6 +174,9 @@ class MainActivity : ComponentActivity() {
                     },
                     onToggleAutoDownloads = { enabled ->
                         viewModel.toggleAutoDownloads(this@MainActivity, enabled)
+                    },
+                    onClearCache = {
+                        viewModel.clearLocalCacheAndHistory(this@MainActivity)
                     },
                     onUpdateHandoutMode = { pagesPerSheet ->
                         viewModel.updateHandoutPagesPerSheet(this@MainActivity, pagesPerSheet)

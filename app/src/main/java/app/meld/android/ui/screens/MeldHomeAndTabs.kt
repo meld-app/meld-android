@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.Compress
 import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.FastForward
@@ -680,62 +681,73 @@ fun MeldStudioHomeScreen(
             }
         }
 
-        // Most Recent Result Strip (`rec`)
-        uiState.recentResults.firstOrNull()?.let { latest ->
+        // Recent Result Strip (`rec`) — persists across app restarts
+        val recentTop = uiState.recentResults.take(3)
+        if (recentTop.isNotEmpty()) {
             item {
                 val recT = if (!openingDriver.showOverlay) 1f else openingDriver.recAnim.value
-                TactileCard(
-                    backgroundColor = colors.surface,
-                    cornerRadius = 22.dp,
-                    onClick = { onOpenResult(latest) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .graphicsLayer {
-                            alpha = recT.coerceIn(0f, 1f)
-                            translationY = (1f - recT) * slide22Px
-                        }
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.graphicsLayer {
+                        alpha = recT.coerceIn(0f, 1f)
+                        translationY = (1f - recT) * slide22Px
+                    }
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = iconForTool(latest.tool),
-                            contentDescription = null,
-                            tint = colors.textPrimary,
-                            modifier = Modifier.size(26.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(
-                                    R.string.recent_title_with_ext,
-                                    stringResource(latest.tool.titleRes),
-                                    latest.outputFile.extension.uppercase()
-                                ),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = colors.textPrimary,
-                                maxLines = if (largeFont) 2 else 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = stringResource(
-                                    R.string.recent_result_meta,
-                                    SelectedFileInfo.formatByteCount(latest.outputSizeBytes)
-                                ),
-                                style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-                                color = colors.textSecondary
-                            )
-                        }
-                        TactileCircleIconButton(
-                            icon = Icons.Default.IosShare,
-                            contentDescription = stringResource(R.string.cd_share_result),
-                            onClick = { onShareFile(latest.outputFile) },
+                    Text(
+                        text = stringResource(R.string.recent_outputs_heading),
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = colors.textPrimary
+                    )
+                    recentTop.forEach { recent ->
+                        TactileCard(
                             backgroundColor = colors.surface,
-                            size = 40.dp
-                        )
+                            cornerRadius = 22.dp,
+                            onClick = { onOpenResult(recent) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = iconForTool(recent.tool),
+                                    contentDescription = null,
+                                    tint = colors.textPrimary,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(
+                                            R.string.recent_title_with_ext,
+                                            stringResource(recent.tool.titleRes),
+                                            recent.outputFile.extension.uppercase()
+                                        ),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = colors.textPrimary,
+                                        maxLines = if (largeFont) 2 else 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = stringResource(
+                                            R.string.recent_result_meta,
+                                            SelectedFileInfo.formatByteCount(recent.outputSizeBytes)
+                                        ),
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
+                                        color = colors.textSecondary
+                                    )
+                                }
+                                TactileCircleIconButton(
+                                    icon = Icons.Default.IosShare,
+                                    contentDescription = stringResource(R.string.cd_share_result),
+                                    onClick = { onShareFile(recent.outputFile) },
+                                    backgroundColor = colors.surface,
+                                    size = 40.dp
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -1177,6 +1189,8 @@ fun MeldSettingsScreen(
     onToggleAutoDownloads: (Boolean) -> Unit,
     onUpdateDefaultHandout: (Int) -> Unit,
     onReplayIntro: () -> Unit,
+    onOpenCustomizeHome: () -> Unit = {},
+    onClearCache: () -> Unit = {},
     contentStartPadding: Dp = 20.dp,
     contentBottomPadding: Dp = 136.dp
 ) {
@@ -1238,6 +1252,54 @@ fun MeldSettingsScreen(
                             text = stringResource(R.string.privacy_promise_body),
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.inkOnAccent.copy(alpha = 0.85f)
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            TactileCard(
+                backgroundColor = colors.surface,
+                cornerRadius = 22.dp,
+                onClick = onClearCache,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = CircleShape,
+                        color = colors.peach,
+                        border = BorderStroke(1.8.dp, colors.border)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = null,
+                                tint = colors.inkOnAccent
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.clear_cache_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.clear_cache_subtitle,
+                                SelectedFileInfo.formatByteCount(uiState.cachedStorageBytes),
+                                uiState.recentResults.size
+                            ),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.textSecondary
                         )
                     }
                 }
@@ -1333,6 +1395,50 @@ fun MeldSettingsScreen(
         }
 
         item { PrefsSectionLabel(stringResource(R.string.prefs_section_experience)) }
+
+        item {
+            TactileCard(
+                backgroundColor = colors.lavender,
+                cornerRadius = 22.dp,
+                onClick = onOpenCustomizeHome,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        modifier = Modifier.size(40.dp),
+                        shape = CircleShape,
+                        color = colors.surface,
+                        border = BorderStroke(1.8.dp, colors.inkOnAccent)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.GridView,
+                                contentDescription = null,
+                                tint = colors.textPrimary
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.prefs_customize_home_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.inkOnAccent
+                        )
+                        Text(
+                            text = stringResource(R.string.prefs_customize_home_subtitle),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.inkOnAccent.copy(alpha = 0.85f)
+                        )
+                    }
+                }
+            }
+        }
 
         item {
             TactileCard(
