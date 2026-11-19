@@ -6,3 +6,10 @@
     public <init>();
 }
 
+# Preserve MeldToolId enum constant names persisted in SharedPreferences (home layout & recent results)
+-keep enum app.meld.android.model.MeldToolId {
+    <fields>;
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
+

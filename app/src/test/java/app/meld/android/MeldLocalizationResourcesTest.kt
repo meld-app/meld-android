@@ -63,6 +63,7 @@ class MeldLocalizationResourcesTest {
         basePlurals.forEach { (key, quantities) ->
             val esQuantities = esPlurals.getValue(key)
             assertTrue("Missing 'one' quantity for $key in values-es", esQuantities.containsKey("one"))
+            assertTrue("Missing 'many' quantity for $key in values-es", esQuantities.containsKey("many"))
             assertTrue("Missing 'other' quantity for $key in values-es", esQuantities.containsKey("other"))
             quantities.forEach { (qty, text) ->
                 val esQtyText = esQuantities.getValue(qty)
@@ -70,6 +71,9 @@ class MeldLocalizationResourcesTest {
                 val esSpecs = formatRegex.findAll(esQtyText).map { it.value }.sorted().toList()
                 assertEquals("Format specifiers mismatch for <plurals name=\"$key\" qty=\"$qty\">", baseSpecs, esSpecs)
             }
+            val otherSpecs = formatRegex.findAll(quantities.getValue("other")).map { it.value }.sorted().toList()
+            val manySpecs = formatRegex.findAll(esQuantities.getValue("many")).map { it.value }.sorted().toList()
+            assertEquals("Format specifiers mismatch for <plurals name=\"$key\" qty=\"many\">", otherSpecs, manySpecs)
         }
     }
 

@@ -2,7 +2,7 @@
 
 **TRANSFORM • CONVERT • ORGANIZE — 100% Local & Offline**
 
-Native Android application (`2.1.0-beta.2`) built with **Kotlin 2.0**, **Jetpack Compose (Material 3)**, and **Android SDK 26–35**, delivering fast, zero-cloud file workflows across **PDF**, **PPTX Slides**, **Images**, **Audio**, **Tables**, and **Archives** with zero uploads and zero telemetry.
+Native Android application (`2.1.0`) built with **Kotlin 2.0**, **Jetpack Compose (Material 3)**, and **Android SDK 26–35**, delivering fast, zero-cloud file workflows across **PDF**, **PPTX Slides**, **Images**, **Audio**, **Tables**, and **Archives** with zero uploads and zero telemetry.
 
 ---
 

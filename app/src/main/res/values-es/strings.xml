@@ -75,10 +75,12 @@
 
     <plurals name="file_page_count">
         <item quantity="one">%1$d página</item>
+        <item quantity="many">%1$d páginas</item>
         <item quantity="other">%1$d páginas</item>
     </plurals>
     <plurals name="file_slide_count">
         <item quantity="one">%1$d diapositiva</item>
+        <item quantity="many">%1$d diapositivas</item>
         <item quantity="other">%1$d diapositivas</item>
     </plurals>
     <string name="file_meta_pages_size">%1$s · %2$s</string>
@@ -217,6 +219,7 @@
     <!-- Vistas previas enriquecidas y etapas de animación -->
     <plurals name="preview_zip_items">
         <item quantity="one">%1$d elemento</item>
+        <item quantity="many">%1$d elementos</item>
         <item quantity="other">%1$d elementos</item>
     </plurals>
     <string name="preview_zip_header">Archivo ZIP (%1$s)\n%2$s</string>
