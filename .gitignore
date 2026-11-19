@@ -13,4 +13,6 @@
 *.ap_
 *.dex
 /dist/
+*.jks
+*.keystore
 

@@ -39,7 +39,7 @@ jobs:
       - name: Run Lint, Unit Tests & Assemble Debug APK
         run: |
           chmod +x gradlew
-          ./gradlew lintDebug testDebugUnitTest assembleDebug
+          ./gradlew lintDebug testDebugUnitTest testReleaseUnitTest assembleDebug
 
       - name: Assemble & Package Release APK
         env:
@@ -77,3 +77,66 @@ jobs:
         with:
           name: MELD-Android-APK
           path: dist/*
+
+  publish-github-release:
+    needs: build-android-apk
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download Built APK Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: MELD-Android-APK
+          path: dist
+
+      - name: Verify Tag & Extract Changelog Release Notes
+        run: |
+          VERSION_NAME=$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle.kts | head -n 1)
+          EXPECTED_TAG="v${VERSION_NAME}"
+          if [ -z "$VERSION_NAME" ] || [ "$GITHUB_REF_NAME" != "$EXPECTED_TAG" ]; then
+            echo "Tag '$GITHUB_REF_NAME' does not match versionName '$EXPECTED_TAG' in app/build.gradle.kts" >&2
+            exit 1
+          fi
+          ls dist/*.apk dist/*.sha256 >/dev/null
+
+          python3 - "$VERSION_NAME" <<'EOF' > /tmp/release-notes.md
+          import re, sys
+          version = sys.argv[1]
+          text = open("CHANGELOG.md", encoding="utf-8").read()
+          pattern = re.compile(
+              r"^## \[" + re.escape(version) + r"\][^\n]*\n(.*?)(?=^## \[|\Z)",
+              re.MULTILINE | re.DOTALL,
+          )
+          m = pattern.search(text)
+          if m:
+              print(m.group(1).strip())
+          EOF
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_ARGS=()
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            RELEASE_ARGS+=(--prerelease)
+          fi
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          elif [ -s /tmp/release-notes.md ]; then
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --title "MELD ${GITHUB_REF_NAME}" \
+              --notes-file /tmp/release-notes.md \
+              "${RELEASE_ARGS[@]}"
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --title "MELD ${GITHUB_REF_NAME}" \
+              --generate-notes \
+              "${RELEASE_ARGS[@]}"
+          fi
