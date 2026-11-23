@@ -95,6 +95,7 @@ Pure-Kotlin OOXML parser & Canvas/PDF renderer with embedded/mapped font resolut
 ## Architecture, Personalization & Safeguards
 
 - **On-Device Processing:** All engines (`DocumentEngine`, `ImageEngine`, `MediaEngine`, `PptxEngine`) run locally on `Dispatchers.IO` with bounded bitmap decoding, streaming buffers, and a `100 MB` import guard.
+- **16 KB-Aligned Rust Native Core (`rust/meld-native`):** Optional JNI library (`libmeld_native.so`) provides lossless structural PDF `Merge`, `Split`, and `Sanitize` (preserving vector text/fonts without rasterizing), zero-re-encode JPEG/PNG/WebP EXIF stripping, and off-heap `Remove BG` — with automatic pure-Kotlin fallbacks on JVM tests or unsupported ABIs.
 - **Scoped Output & Sharing:** Temporary outputs stay inside cache `outputs/` exposed strictly via `FileProvider` (`outputs/` path scope); auto-saving to Downloads is opt-in and persisted in `meld_prefs`.
 - **Adaptive Warm Neo-Brutalist UI:** Supports light & dark (`values-night`) stationery themes, bottom dock / landscape Navigation Rail, adaptive tool grids, `200%` accessibility font scaling, and externalized `strings.xml` resources.
 - **Customizable Studio Home Layout:** Pin, swap, reorder, add/remove, or reset both the Top 3 Bento Quick Tools and up to 8 Home Shortcuts cards (`HomeLayoutConfig`, persisted in `meld_prefs` and accessible from Studio Home or `Preferences -> EXPERIENCE`).
@@ -107,6 +108,10 @@ Pure-Kotlin OOXML parser & Canvas/PDF renderer with embedded/mapped font resolut
 ## Build & Verify
 
 ```bash
+# Test and build the optional 16 KB-aligned Rust native core (libmeld_native.so)
+cargo test --manifest-path rust/meld-native/Cargo.toml
+./scripts/build-rust-android.sh
+
 # Run Android Lint, all JVM unit tests, and build the debug APK
 JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
   ./gradlew lintDebug testDebugUnitTest assembleDebug --offline --console=plain

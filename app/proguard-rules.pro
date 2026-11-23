@@ -13,3 +13,8 @@
     public static ** valueOf(java.lang.String);
 }
 
+# Preserve JNI bridge class and native method signatures for libmeld_native.so
+-keep class app.meld.android.engine.MeldNativeBridge {
+    *;
+}
+

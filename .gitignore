@@ -15,4 +15,6 @@
 /dist/
 *.jks
 *.keystore
+/app/src/main/jniLibs/
+/rust/meld-native/target/
 

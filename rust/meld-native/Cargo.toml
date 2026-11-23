@@ -1,0 +1,20 @@
+[package]
+name = "meld_native"
+version = "0.1.0"
+edition = "2021"
+description = "Zero-cloud native Rust core for MELD for Android (lossless PDF structure, lossless image metadata strip, off-heap Remove BG)"
+
+[lib]
+name = "meld_native"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+jni = "0.21"
+lopdf = { version = "0.34", default-features = false, features = ["nom_parser"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

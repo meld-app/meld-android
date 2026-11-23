@@ -297,6 +297,20 @@ object DocumentEngine {
         endPage1Based: Int,
         onProgress: ((Int, Int) -> Unit)? = null
     ): String {
+        val nativePages = MeldNativeBridge.splitPdf(
+            inputFile = inputFile,
+            startPage1Based = startPage1Based,
+            endPage1Based = endPage1Based,
+            outputFile = outputFile
+        )
+        if (nativePages != null) {
+            val total = runCatching { countPdfPages(inputFile) }.getOrDefault(nativePages)
+            val safeStart = startPage1Based.coerceIn(1, max(1, total))
+            val safeEnd = endPage1Based.coerceIn(safeStart, max(1, total))
+            onProgress?.invoke(nativePages, nativePages)
+            return "Extracted $nativePages page(s) losslessly (pages $safeStart..$safeEnd of $total)"
+        }
+
         val outDoc = PdfDocument()
         var total = 0
         var startIdx = 0
@@ -668,6 +682,12 @@ object DocumentEngine {
         outputFile: File,
         onProgress: ((Int, Int) -> Unit)? = null
     ): String {
+        val nativePages = MeldNativeBridge.sanitizePdf(inputFile, outputFile)
+        if (nativePages != null) {
+            onProgress?.invoke(nativePages, nativePages)
+            return "Sanitized $nativePages PDF page(s) losslessly — stripped author, producer & XMP metadata"
+        }
+
         val outDoc = PdfDocument()
         var pageCount = 0
         val memOut = ByteArrayOutputStream()
@@ -759,6 +779,14 @@ object DocumentEngine {
             require(file.exists() && file.isFile) {
                 "Cannot merge missing PDF: ${file.name}"
             }
+        }
+
+        val nativeMergedPages = MeldNativeBridge.mergePdfs(inputFiles, outputFile)
+        if (nativeMergedPages != null) {
+            for (i in 1..inputFiles.size) {
+                onProgress?.invoke(i, inputFiles.size)
+            }
+            return "Merged ${inputFiles.size} PDFs into $nativeMergedPages lossless page(s)"
         }
 
         val outDoc = PdfDocument()
