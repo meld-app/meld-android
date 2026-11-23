@@ -486,6 +486,18 @@ object ImageEngine {
      * Wipes all EXIF/GPS metadata by decoding pure pixel raster and re-encoding.
      */
     fun stripImageExif(inputFile: File, outputFile: File): String {
+        val inExt = inputFile.extension.lowercase()
+        val outExt = outputFile.extension.lowercase()
+        val sameContainer = (inExt in setOf("jpg", "jpeg") && outExt in setOf("jpg", "jpeg")) ||
+            (inExt == "png" && outExt == "png") ||
+            (inExt == "webp" && outExt == "webp")
+        if (sameContainer) {
+            val stripped = MeldNativeBridge.stripImageMetadataLossless(inputFile, outputFile)
+            if (stripped != null) {
+                return "Losslessly stripped $stripped EXIF & metadata segment(s) (${outExt.uppercase()}, zero re-encode)"
+            }
+        }
+
         val original = decodeNormalizedBitmap(inputFile)
         val w: Int
         val h: Int
@@ -513,6 +525,7 @@ object ImageEngine {
         tolerance: Int = 42
     ): Int {
         if (width <= 0 || height <= 0 || pixels.size != width * height) return 0
+        MeldNativeBridge.removeBackgroundPixels(pixels, width, height, tolerance)?.let { return it }
 
         val opaqueBorderIndices = ArrayList<Int>(min(256, 2 * (width + height)))
         for (x in 0 until width) {

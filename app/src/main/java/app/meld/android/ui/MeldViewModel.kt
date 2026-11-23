@@ -912,7 +912,15 @@ class MeldViewModel : ViewModel() {
                         }
                         MeldToolId.STRIP_EXIF -> {
                             val imgFile = ensureImageInput(context, inputFile)
-                            ImageEngine.stripImageExif(imgFile, outFile)
+                            val inExt = imgFile.extension.lowercase()
+                            val targetExt = when {
+                                !app.meld.android.engine.MeldNativeBridge.isAvailable -> "png"
+                                inExt == "jpg" || inExt == "jpeg" -> "jpg"
+                                inExt == "webp" -> "webp"
+                                else -> "png"
+                            }
+                            actualOutFile = File(outDir, "${baseName}_${tool.name.lowercase()}_${uniqueTag}.$targetExt")
+                            ImageEngine.stripImageExif(imgFile, actualOutFile)
                         }
                         MeldToolId.SCAN_QR -> {
                             val payload = opts.qrPayloadText.trim().ifBlank { "meld.app" }

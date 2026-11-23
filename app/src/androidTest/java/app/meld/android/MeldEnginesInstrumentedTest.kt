@@ -115,6 +115,7 @@ class MeldEnginesInstrumentedTest {
 
     @Test
     fun samplePdf_mergePdfsAndRedactFlatten_produceValidPdfPages() {
+        assertTrue("Expected libmeld_native.so to load on Android device", app.meld.android.engine.MeldNativeBridge.isAvailable)
         val samplePdf = SampleFileFactory.createSamplePdf(tempDir)
 
         val mergedOut = File(tempDir, "merged.pdf")
@@ -124,6 +125,24 @@ class MeldEnginesInstrumentedTest {
         }
         assertEquals(listOf(1 to 2, 2 to 2), mergeProgress)
         assertEquals(8, DocumentEngine.countPdfPages(mergedOut))
+        // Lossless Rust structural merge preserves selectable vector text
+        val mergedTxt = File(tempDir, "merged_text.txt")
+        DocumentEngine.extractPdfPlainText(mergedOut, mergedTxt)
+        assertTrue(mergedTxt.readText().contains("SLIDE 01"))
+
+        val splitOut = File(tempDir, "split_2_3.pdf")
+        DocumentEngine.extractPageRange(samplePdf, splitOut, 2, 3)
+        assertEquals(2, DocumentEngine.countPdfPages(splitOut))
+        val splitTxt = File(tempDir, "split_text.txt")
+        DocumentEngine.extractPdfPlainText(splitOut, splitTxt)
+        assertTrue(splitTxt.readText().contains("SLIDE 02"))
+
+        val sanitizedOut = File(tempDir, "sanitized.pdf")
+        DocumentEngine.stripPdfMetadata(samplePdf, sanitizedOut)
+        assertEquals(4, DocumentEngine.countPdfPages(sanitizedOut))
+        val sanitizedTxt = File(tempDir, "sanitized_text.txt")
+        DocumentEngine.extractPdfPlainText(sanitizedOut, sanitizedTxt)
+        assertTrue(sanitizedTxt.readText().contains("SLIDE 01"))
 
         val redactedOut = File(tempDir, "redacted.pdf")
         DocumentEngine.redactAndFlattenPdf(
