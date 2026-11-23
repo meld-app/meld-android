@@ -1,0 +1,18 @@
+name: Feature Request
+description: Suggest a new offline engine, format conversion, or UX improvement for Android.
+title: "[Android Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Offline Workflow Need
+      placeholder: Describe the document/image/media conversion or editing task you want offline.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Tool or Enhancement
+    validations:
+      required: true
