@@ -1,0 +1,47 @@
+name: Bug Report
+description: Report a bug, crash, or conversion fidelity issue in MELD for Android.
+title: "[Android Bug]: "
+labels: ["bug"]
+body:
+  - type: input
+    id: app_version
+    attributes:
+      label: App Version
+      placeholder: e.g. 2.1.0 (versionCode 212)
+    validations:
+      required: true
+  - type: input
+    id: device_android
+    attributes:
+      label: Device & Android Version
+      placeholder: e.g. Pixel 9 / Android 15 (API 35)
+    validations:
+      required: true
+  - type: dropdown
+    id: studio
+    attributes:
+      label: Affected Studio / Engine
+      options:
+        - PDF Studio
+        - PPTX & Slides Studio
+        - Image Studio
+        - Audio / Tables / Archives
+        - Studio Home / UI / Localization
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction Steps
+      placeholder: |
+        1. Select file ...
+        2. Open tool ...
+        3. Observed behavior ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs. Actual Output
+    validations:
+      required: true

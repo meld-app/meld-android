@@ -1,8 +1,35 @@
-# MELD for Android
+<p align="center">
+  <img src="Assets/MELDLogo.png" alt="MELD Logo" width="144" />
+</p>
 
-**TRANSFORM • CONVERT • ORGANIZE — 100% Local & Offline**
+<h1 align="center">MELD for Android</h1>
+<p align="center"><strong>TRANSFORM • CONVERT • ORGANIZE — 100% Local &amp; Offline</strong></p>
+
+<p align="center">
+  <a href="https://github.com/meld-app/meld-android/releases"><img src="https://img.shields.io/github/v/release/meld-app/meld-android?color=FF6B4A&style=for-the-badge" alt="Release v2.1.0" /></a>
+  <a href="https://github.com/meld-app/meld-android/actions/workflows/release-apk.yml"><img src="https://github.com/meld-app/meld-android/actions/workflows/release-apk.yml/badge.svg" alt="Release Android APK CI" /></a>
+  <img src="https://img.shields.io/badge/Kotlin-2.0-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin 2.0" />
+  <img src="https://img.shields.io/badge/Jetpack_Compose-Material_3-4285F4?style=for-the-badge" alt="Jetpack Compose Material 3" />
+  <img src="https://img.shields.io/badge/Offline-100%25-1F8A5B?style=for-the-badge" alt="Offline 100%" />
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/meld-app/meld-android?color=2E64E5&style=for-the-badge" alt="MIT License" /></a>
+</p>
 
 Native Android application (`2.1.0`) built with **Kotlin 2.0**, **Jetpack Compose (Material 3)**, and **Android SDK 26–35**, delivering fast, zero-cloud file workflows across **PDF**, **PPTX Slides**, **Images**, **Audio**, **Tables**, and **Archives** with zero uploads and zero telemetry.
+
+---
+
+## Download Signed APK (`v2.1.0`) & Verify SHA-256
+
+1. Download [**`MELD-v2.1.0-Android.apk`**](https://github.com/meld-app/meld-android/releases/download/v2.1.0/MELD-v2.1.0-Android.apk) and its checksum [`MELD-v2.1.0-Android.apk.sha256`](https://github.com/meld-app/meld-android/releases/download/v2.1.0/MELD-v2.1.0-Android.apk.sha256) from [**GitHub Releases**](https://github.com/meld-app/meld-android/releases/tag/v2.1.0).
+2. Verify file integrity and APK signing certificate locally:
+   ```bash
+   sha256sum -c MELD-v2.1.0-Android.apk.sha256
+   # Expected SHA-256: 2ac515bd65dd50fe04294b5b732244023745995d7bea7e3aaff23c1ad70bf444
+
+   apksigner verify --print-certs MELD-v2.1.0-Android.apk
+   # Expected Signer #1 DN: CN=MELD for Android, OU=Mobile Studio, O=MELD, C=US
+   # Expected Cert SHA-256: 26448b78d839b7e8259d952fa65302e4edd61d3530eb1a2735497bc5464c1585
+   ```
 
 ---
 
@@ -91,3 +118,15 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
 # Install on a connected device or emulator
 ./gradlew installDebug
 ```
+
+---
+
+## Governance, Rules & Authority
+
+**MELD for Android** operates under the [**MELD Organization Governance Charter**](https://github.com/meld-app/.github/blob/main/GOVERNANCE.md):
+
+- **Governance & Release Authority (`GOVERNANCE.md`):** [`GOVERNANCE.md`](GOVERNANCE.md) — Lead Architect & Code Owner [`@omrajput14`](https://github.com/omrajput14), protected `main` ruleset policy, and signed APK release controls.
+- **Code Ownership (`.github/CODEOWNERS`):** [`.github/CODEOWNERS`](.github/CODEOWNERS) — Designates `@omrajput14` across all repository paths.
+- **Contributing (`CONTRIBUTING.md`):** [`CONTRIBUTING.md`](CONTRIBUTING.md) — Local Android lint/unit-test checklists and PR workflow.
+- **Security Policy (`SECURITY.md`):** [`SECURITY.md`](SECURITY.md) — Zero-cloud sandbox guarantees (`INTERNET`-less manifest, `FileProvider` scope, flatten-on-redact) and vulnerability disclosure.
+- **Privacy Policy (`PRIVACY.md`):** [`PRIVACY.md`](PRIVACY.md) — Local-only processing & 1-tap cache control.
